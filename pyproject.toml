@@ -34,6 +34,26 @@ classifiers = [
 [project.entry-points.r2x_plugin]
 reeds = "r2x_reeds:register_plugin"
 
+[dependency-groups]
+dev = [
+    "mypy>=1.18.2",
+    "pre-commit>=4.3.0",
+    "pytest>=8.4.2",
+    "pytest-coverage>=0.0",
+    "ruff>=0.13.3",
+]
+docs = [
+    "autodoc-pydantic",
+    "docstr-coverage>=2.3.2",
+    "furo>=2025.9.25",
+    "ghp-import",
+    "myst-parser",
+    "sphinx>=8.0.0",
+    "sphinx-copybutton",
+    "sphinx-reports",
+    "sphinx-tabs",
+]
+
 [build-system]
 requires = ["uv_build>=0.8.22,<0.9.0"]
 build-backend = "uv_build"
@@ -106,12 +126,3 @@ section-order = ["future", "standard-library", "third-party", "first-party", "lo
 [tool.ruff.lint.mccabe]
 # Cyclomatic complexity threshold
 max-complexity = 10
-
-[dependency-groups]
-dev = [
-    "mypy>=1.18.2",
-    "pre-commit>=4.3.0",
-    "pytest>=8.4.2",
-    "pytest-coverage>=0.0",
-    "ruff>=0.13.3",
-]

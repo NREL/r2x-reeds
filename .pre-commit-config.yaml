@@ -35,8 +35,7 @@ repos:
     hooks:
       - id: mypy
         types: [python]
-        args: [--config-file=pyproject.toml]
-        pass_filenames: true
+        args: [--config-file=pyproject.toml, ./src/r2x_reeds]
+        pass_filenames: false
         language: system
         entry: uv run mypy
-        exclude: '^tests/|_.*\.py$'
