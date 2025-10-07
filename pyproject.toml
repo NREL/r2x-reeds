@@ -1,0 +1,103 @@
+[project]
+name = "r2x-reeds"
+version = "0.0.1"
+readme = "README.md"
+description = "ReEDS model plugin"
+license = {file = "LICENSE.txt"}
+authors = [
+    { name = "pesap", email = "pesap@users.noreply.github.com" },
+]
+maintainers = [
+    { name = "pesap", email = "pesap@users.noreply.github.com" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "r2x-core>=0.0.6",
+    "infrasys>=1.0.0rc1",
+    "pydantic>=2.11.0,<3",
+    "polars>=1.33.0",
+    "h5py>=3.13.0",
+    "numpy>=1.20.0",
+    "loguru>=0.7.0",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: BSD License",
+  "Topic :: Software Development :: Build Tools",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+
+[project.entry-points.r2x_plugin]
+reeds = "r2x_reeds:register_plugin"
+
+[build-system]
+requires = ["uv_build>=0.8.22,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.mypy]
+strict = true
+exclude = ["tests/"]
+plugins = [
+  "pydantic.mypy"
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+# Line length
+line-length = 110
+
+# Exclude common directories
+extend-exclude = [
+    ".venv",
+    "venv",
+    "build",
+    "dist",
+    "*.egg-info",
+]
+
+[tool.ruff.lint]
+# Enable pycodestyle, pyflakes, isort, and more
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "N",      # pep8-naming
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+    "PIE",    # flake8-pie
+    "PERF",   # perflint (performance)
+    "RUF",    # ruff-specific rules
+]
+
+# Ignore specific rules
+ignore = [
+    "E501",   # Line too long (handled by formatter)
+    "B027",   # Empty method in abstract class without @abstractmethod (intentional for hooks)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests can use assert statements
+"tests/**/*.py" = [
+    "S101",   # Use of assert
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["r2x_core"]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+[tool.ruff.lint.mccabe]
+# Cyclomatic complexity threshold
+max-complexity = 10
+
+[tool.uv.sources]
+r2x-core = { path = "../../r2x-core/dev", editable = true }
