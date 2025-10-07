@@ -12,13 +12,13 @@ maintainers = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "r2x-core>=0.0.6",
     "infrasys>=1.0.0rc1",
     "pydantic>=2.11.0,<3",
     "polars>=1.33.0",
     "h5py>=3.13.0",
     "numpy>=1.20.0",
     "loguru>=0.7.0",
+    "r2x-core>=0.0.6",
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -99,5 +99,9 @@ section-order = ["future", "standard-library", "third-party", "first-party", "lo
 # Cyclomatic complexity threshold
 max-complexity = 10
 
-[tool.uv.sources]
-r2x-core = { path = "../../r2x-core/dev", editable = true }
+[dependency-groups]
+dev = [
+    "mypy>=1.18.2",
+    "pre-commit>=4.3.0",
+    "ruff>=0.13.3",
+]
