@@ -389,7 +389,7 @@ class ReEDSParser(BaseParser):
                 category=row.get("category"),
                 region=region_obj,
                 technology=tech,
-                capacity_mw=float(row.get("capacity_mw", 0.0)),
+                capacity=float(row.get("capacity_mw", 0.0)),
                 heat_rate=row.get("heat_rate"),
                 forced_outage_rate=row.get("forced_outage_rate"),
                 planned_outage_rate=row.get("planned_outage_rate"),
@@ -452,7 +452,7 @@ class ReEDSParser(BaseParser):
 
                 # Only use normalization if capacity > 0 to avoid division by zero
                 normalization = (
-                    NormalizationByValue(value=generator.capacity_mw) if generator.capacity_mw > 0 else None
+                    NormalizationByValue(value=generator.capacity) if generator.capacity > 0 else None
                 )
 
                 ts = SingleTimeSeries.from_array(

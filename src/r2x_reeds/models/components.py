@@ -173,7 +173,7 @@ class ReEDSResourceClass(ReEDSComponent):
     technology: Annotated[str, Field(description="Technology type (e.g., 'upv', 'wind-ons')")]
     region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
     resource_class: Annotated[str, Field(description="Resource class identifier")]
-    capacity_mw: Annotated[float, Field(description="Available capacity in MW", ge=0)]
+    capacity: Annotated[float, Field(description="Available capacity in MW", ge=0)]
     capacity_factor: Annotated[
         float | None,
         Field(None, description="Average capacity factor", ge=0, le=1),
