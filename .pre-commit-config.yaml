@@ -39,3 +39,4 @@ repos:
         pass_filenames: false
         language: system
         entry: uv run mypy
+        exclude: '^tests/|_.*\.py$'
