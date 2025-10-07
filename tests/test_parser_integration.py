@@ -5,11 +5,14 @@ These tests verify that the parser can build a system using real data files.
 
 from pathlib import Path
 
+import numpy as np
+import polars as pl
 import pytest
 from infrasys import Component
 
 from r2x_core.store import DataStore
 from r2x_reeds.config import ReEDSConfig
+from r2x_reeds.models.components import ReEDSDemand, ReEDSGenerator, ReEDSRegion
 from r2x_reeds.parser import ReEDSParser
 
 
@@ -22,7 +25,7 @@ def test_data_path() -> Path:
 @pytest.fixture
 def reeds_config() -> ReEDSConfig:
     """Create ReEDS configuration for testing."""
-    return ReEDSConfig(solve_years=2030, weather_years=2012)
+    return ReEDSConfig(solve_years=2032, weather_years=2012)
 
 
 @pytest.fixture
@@ -85,3 +88,185 @@ def test_system_has_loads(parser: ReEDSParser):
     components = list(system.get_components(Component))
     assert components is not None
     assert len(components) >= 0  # May be empty if no loads added yet
+
+
+@pytest.fixture
+def expected_generator_count(data_store: DataStore, reeds_config: ReEDSConfig) -> int:
+    """Get expected generator count from online capacity data."""
+    capacity_data = data_store.read_data_file(name="online_capacity")
+    df = capacity_data.filter(pl.col("year") == reeds_config.solve_years[0]).collect()
+    return df.height
+
+
+def test_generator_count_matches_capacity_data(parser: ReEDSParser, expected_generator_count: int):
+    """Test that system has correct number of generators."""
+    system = parser.build_system()
+    generators = list(system.get_components(ReEDSGenerator))
+
+    assert len(generators) == expected_generator_count
+
+
+def test_load_count_matches_region_count(parser: ReEDSParser):
+    """Test that number of loads matches number of regions."""
+    system = parser.build_system()
+    regions = list(system.get_components(ReEDSRegion))
+    loads = list(system.get_components(ReEDSDemand))
+
+    assert len(loads) == len(regions)
+
+
+def test_load_count_for_test_data(parser: ReEDSParser):
+    """Test expected load count for test_Pacific data."""
+    system = parser.build_system()
+    loads = list(system.get_components(ReEDSDemand))
+
+    assert len(loads) == 11
+
+
+@pytest.fixture
+def system_with_loads(parser: ReEDSParser):
+    """Build system and return it with loads."""
+    return parser.build_system()
+
+
+@pytest.fixture
+def load_dataframe(data_store: DataStore) -> pl.DataFrame:
+    """Get load data as DataFrame from DataStore."""
+    load_data = data_store.read_data_file(name="load_data")
+    return load_data.collect() if isinstance(load_data, pl.LazyFrame) else load_data
+
+
+@pytest.fixture
+def all_loads(system_with_loads):
+    """Get all load components from system."""
+    return list(system_with_loads.get_components(ReEDSDemand))
+
+
+def test_loads_exist_for_datastore_regions(all_loads, load_dataframe):
+    """Test that loads exist for all regions in DataStore."""
+    load_regions = {load.name.replace("_load", "") for load in all_loads}
+    datastore_regions = set(load_dataframe.columns)
+
+    assert load_regions == datastore_regions
+
+
+def test_load_time_series_attached(system_with_loads, all_loads):
+    """Test that time series exists for all loads."""
+    assert all(system_with_loads.get_time_series(load) is not None for load in all_loads)
+
+
+def test_load_time_series_length(system_with_loads, all_loads, load_dataframe):
+    """Test that time series length matches DataStore data."""
+    expected_length = load_dataframe.height
+
+    assert all(len(system_with_loads.get_time_series(load).data) == expected_length for load in all_loads)
+
+
+@pytest.fixture(params=["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11"])
+def region_load(request, system_with_loads):
+    """Parametrized fixture for each region's load."""
+    region_name = request.param
+    loads = list(system_with_loads.get_components(ReEDSDemand))
+    load = next((load_item for load_item in loads if load_item.name == f"{region_name}_load"), None)
+    return system_with_loads, load, region_name
+
+
+def test_load_time_series_values(region_load, load_dataframe):
+    """Test that time series values match DataStore data for each region."""
+    system, load, region_name = region_load
+    expected_profile = load_dataframe[region_name].to_numpy()
+    actual_profile = system.get_time_series(load).data
+
+    np.testing.assert_allclose(
+        actual_profile,
+        expected_profile,
+        rtol=1e-5,
+    )
+
+
+@pytest.fixture
+def system_with_renewables(parser: ReEDSParser):
+    """Build system and return it with renewable generators."""
+    return parser.build_system()
+
+
+@pytest.fixture
+def renewable_cf_dataframe(data_store: DataStore) -> pl.DataFrame:
+    """Get renewable CF data as DataFrame from DataStore."""
+    cf_data = data_store.read_data_file(name="renewable_cf")
+    return cf_data.collect() if isinstance(cf_data, pl.LazyFrame) else cf_data
+
+
+@pytest.fixture
+def all_renewable_generators(system_with_renewables):
+    """Get all renewable generators that have CF time series attached."""
+    generators = list(system_with_renewables.get_components(ReEDSGenerator))
+    return [g for g in generators if system_with_renewables.list_time_series(g, name="max_active_power")]
+
+
+def test_system_has_renewable_generators(all_renewable_generators):
+    """Test that built system contains renewable generators with profiles."""
+    assert len(all_renewable_generators) > 0
+
+
+def test_renewable_generator_count(all_renewable_generators):
+    """Test expected renewable generator count for test_Pacific data."""
+    assert len(all_renewable_generators) == 130
+
+
+def test_renewable_time_series_attached(system_with_renewables, all_renewable_generators):
+    """Test that time series exists for all renewable generators."""
+    assert all(system_with_renewables.get_time_series(gen) is not None for gen in all_renewable_generators)
+
+
+def test_renewable_time_series_length(
+    system_with_renewables, all_renewable_generators, renewable_cf_dataframe
+):
+    """Test that time series length matches DataStore data."""
+    expected_length = renewable_cf_dataframe.height
+
+    assert all(
+        len(system_with_renewables.get_time_series(gen).data) == expected_length
+        for gen in all_renewable_generators
+    )
+
+
+@pytest.fixture
+def sample_renewable_generator(system_with_renewables, all_renewable_generators):
+    """Get a sample renewable generator for value testing."""
+    distpv_gens = [g for g in all_renewable_generators if g.technology == "distpv" and g.region.name == "p1"]
+    return system_with_renewables, distpv_gens[0] if distpv_gens else None
+
+
+def test_renewable_time_series_values(sample_renewable_generator, renewable_cf_dataframe):
+    """Test that time series values match normalized CF data from DataStore."""
+    system, generator = sample_renewable_generator
+
+    if generator is None:
+        pytest.skip("No distpv generator found in p1 region")
+
+    expected_profile = renewable_cf_dataframe["distpv|p1"].to_numpy()
+    actual_ts = system.get_time_series(generator)
+    actual_profile = actual_ts.data
+
+    np.testing.assert_allclose(
+        actual_profile,
+        expected_profile,
+        rtol=1e-5,
+    )
+
+
+def test_renewable_time_series_normalization(sample_renewable_generator):
+    """Test that renewable time series has normalization metadata when capacity > 0."""
+    system, generator = sample_renewable_generator
+
+    if generator is None:
+        pytest.skip("No distpv generator found in p1 region")
+
+    ts = system.get_time_series(generator)
+
+    if generator.capacity_mw > 0:
+        assert ts.normalization is not None
+        assert ts.normalization.value == generator.capacity_mw
+    else:
+        assert ts.normalization is None

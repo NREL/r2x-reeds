@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any
 import h5py
 import numpy as np
 import polars as pl
+from infrasys.normalization import NormalizationByValue
+from infrasys.time_series_models import SingleTimeSeries
 from loguru import logger
 
 from r2x_core.parser import BaseParser
@@ -29,7 +31,27 @@ if TYPE_CHECKING:
     from .config import ReEDSConfig
 
 
-def read_reeds_load_h5(file_path: Path) -> pl.DataFrame:
+def read_reeds_maxage_csv(file_path: Path) -> pl.LazyFrame:
+    """Read ReEDS maxage.csv file without header and add column names.
+
+    The maxage.csv file has no header row, just data like:
+    Gas-CC,55
+    Gas-CC-CCS_mod,55
+
+    Parameters
+    ----------
+    file_path : Path
+        Path to the maxage.csv file
+
+    Returns
+    -------
+    pl.LazyFrame
+        LazyFrame with columns: technology, maxage_years
+    """
+    return pl.scan_csv(file_path, has_header=False, new_columns=["technology", "maxage_years"])
+
+
+def read_reeds_load_h5(file_path: Path) -> pl.LazyFrame:
     """Read ReEDS load.h5 files with complex HDF5 structure.
 
     ReEDS load files have a complex HDF5 structure with:
@@ -45,16 +67,17 @@ def read_reeds_load_h5(file_path: Path) -> pl.DataFrame:
 
     Returns
     -------
-    pl.DataFrame
-        DataFrame with columns as region names and rows as timesteps
+    pl.LazyFrame
+        LazyFrame with columns as region names and rows as timesteps
     """
     with h5py.File(file_path, "r") as f:
         # Read column names (region names) and data matrix
         columns = f["columns"][:].astype(str).tolist()
         data = f["data"][:]
 
-        # Create DataFrame with region columns
-        return pl.DataFrame({col: data[:, i] for i, col in enumerate(columns)})
+        # Create DataFrame with region columns, then convert to LazyFrame
+        df = pl.DataFrame({col: data[:, i] for i, col in enumerate(columns)})
+        return df.lazy()
 
 
 class ReEDSParser(BaseParser):
@@ -146,6 +169,18 @@ class ReEDSParser(BaseParser):
             existing_load_file = data_store.get_data_file_by_name("load_data")
             updated_load_file = existing_load_file.model_copy(update={"reader_function": read_reeds_load_h5})
             data_store.add_data_file(updated_load_file, overwrite=True)
+
+        if "renewable_cf" in data_store:
+            existing_cf_file = data_store.get_data_file_by_name("renewable_cf")
+            updated_cf_file = existing_cf_file.model_copy(update={"reader_function": read_reeds_load_h5})
+            data_store.add_data_file(updated_cf_file, overwrite=True)
+
+        if "maxage" in data_store:
+            existing_maxage_file = data_store.get_data_file_by_name("maxage")
+            updated_maxage_file = existing_maxage_file.model_copy(
+                update={"reader_function": read_reeds_maxage_csv}
+            )
+            data_store.add_data_file(updated_maxage_file, overwrite=True)
 
     def _setup_time_indices(self) -> None:
         """Create time indices for hourly and daily data."""
@@ -268,38 +303,101 @@ class ReEDSParser(BaseParser):
         """Build generator components from capacity data."""
         logger.info("Building generators...")
 
-        # Read capacity data for non-renewable resources (returns LazyFrame)
-        cap_data = self.read_data_file("existing_capacity").collect()
-        if cap_data is None:
+        capacity_data = self.read_data_file("online_capacity")
+        if capacity_data is None:
             logger.warning("No capacity data found, skipping generators")
             return
 
-        # Note: existing_capacity is static data without year field
+        solve_year = (
+            self.config.solve_years[0]
+            if isinstance(self.config.solve_years, list)
+            else self.config.solve_years
+        )
+        capacity_data = capacity_data.filter(pl.col("year") == solve_year)
+
+        generator_fuel = self.read_data_file("fuel_tech_map")
+        heat_rate = self.read_data_file("heat_rate")
+        cost_vom = self.read_data_file("cost_vom")
+        forced_outages = self.read_data_file("forced_outages")
+        planned_outages = self.read_data_file("planned_outages")
+        maxage = self.read_data_file("maxage")
+        fuel_price_input = self.read_data_file("fuel_price")
+        biofuel_price = self.read_data_file("biofuel_price")
+
+        fuel_price = fuel_price_input
+        if biofuel_price is not None:
+            bfuel_price_output = (
+                biofuel_price.with_columns(pl.lit("biomass").alias("fuel_type"))
+                .join(generator_fuel, on="fuel_type")
+                .select(pl.exclude("fuel_type"))
+            )
+            if not bfuel_price_output.collect().is_empty():
+                fuel_price = pl.concat([fuel_price_input, bfuel_price_output], how="diagonal")
+
+        dataframes = [
+            capacity_data,
+            generator_fuel,
+            fuel_price,
+            heat_rate,
+            cost_vom,
+            forced_outages,
+            planned_outages,
+            maxage,
+        ]
+        df = dataframes[0]
+        for next_df in dataframes[1:]:
+            if next_df is not None:
+                df_cols = set(df.collect_schema().names())
+                next_cols = set(next_df.collect_schema().names())
+                df = df.join(next_df, how="left", on=list(df_cols & next_cols))
+
+        df = df.collect()
+        if df.is_empty():
+            logger.warning("Generator data is empty, skipping generators")
+            return
+
+        defaults = self.config.load_defaults()
+        category_map = defaults.get("tech_categories")
+        if category_map:
+            df = df.with_columns(
+                pl.col("technology")
+                .map_elements(
+                    lambda tech: next((cat for cat, techs in category_map.items() if tech in techs), None),
+                    return_dtype=pl.String,
+                )
+                .alias("category")
+            )
+
         gen_count = 0
+        for row in df.iter_rows(named=True):
+            tech = row.get("technology")
+            vintage = row.get("vintage")
+            region_name = row.get("region")
 
-        for row in cap_data.iter_rows(named=True):
-            region = row.get("region") or row.get("r")
-            tech = row.get("technology") or row.get("tech") or row.get("i")
-            capacity = row.get("capacity_mw") or row.get("capacity") or row.get("value", 0.0)
-
-            if not region or not tech:
+            if not tech or not region_name:
                 continue
 
-            # Lookup the region object from cache
-            region_obj = self._region_cache.get(region)
+            region_obj = self._region_cache.get(region_name)
             if not region_obj:
-                logger.warning("Region '{}' not found for generator {}, skipping", region, tech)
+                logger.warning("Region '{}' not found for generator {}, skipping", region_name, tech)
                 continue
 
-            # Create generator component
-            gen_name = f"{region}_{tech}"
+            gen_name = f"{tech}_{vintage}_{region_name}" if vintage else f"{tech}_{region_name}"
             generator = self.create_component(
                 ReEDSGenerator,
                 name=gen_name,
-                description=f"Generator {tech} in {region}",  # Keep f-string for component data
-                region=region_obj,  # Pass the ReEDSRegion object, not string
+                category=row.get("category"),
+                region=region_obj,
                 technology=tech,
-                capacity_mw=float(capacity),
+                capacity_mw=float(row.get("capacity_mw", 0.0)),
+                heat_rate=row.get("heat_rate"),
+                forced_outage_rate=row.get("forced_outage_rate"),
+                planned_outage_rate=row.get("planned_outage_rate"),
+                max_age=row.get("maxage_years"),
+                fuel_type=row.get("fuel_type"),
+                fuel_price=row.get("fuel_price"),
+                vom_cost=row.get("vom_price"),
+                vintage=vintage,
             )
 
             self.add_component(generator)
@@ -307,6 +405,67 @@ class ReEDSParser(BaseParser):
             gen_count += 1
 
         logger.info("Built {} generators", gen_count)
+
+    def _attach_renewable_profiles(self) -> None:
+        """Attach renewable capacity factor profiles to generators."""
+        logger.info("Attaching renewable profiles to generators...")
+
+        renewable_cf_data = self.read_data_file("renewable_cf")
+        if renewable_cf_data is None:
+            logger.warning("No renewable CF data found, skipping renewable profiles")
+            return
+
+        cf_df = renewable_cf_data.collect()
+        logger.debug("CF data shape: {}", cf_df.shape)
+        logger.debug("CF columns sample: {}", cf_df.columns[:5] if len(cf_df.columns) > 0 else [])
+
+        if cf_df.is_empty():
+            logger.warning("Renewable CF data is empty, skipping profiles")
+            return
+
+        initial_timestamp = self.hourly_time_index[0]
+        resolution = self.hourly_time_index[1] - self.hourly_time_index[0]
+
+        # Convert numpy datetime64/timedelta64 to Python types for Pydantic
+        from datetime import datetime, timedelta
+
+        initial_timestamp = initial_timestamp.astype("datetime64[s]").astype(datetime)
+        resolution = timedelta(seconds=int(resolution / np.timedelta64(1, "s")))
+
+        profile_count = 0
+        for col_name in cf_df.columns:
+            parts = col_name.split("|")
+            if len(parts) != 2:
+                continue
+
+            tech = parts[0]
+            region_name = parts[1]
+
+            matching_generators = [
+                gen
+                for gen in self._generator_cache.values()
+                if gen.technology == tech and gen.region.name == region_name
+            ]
+
+            for generator in matching_generators:
+                ts_data = cf_df[col_name].to_numpy()
+
+                # Only use normalization if capacity > 0 to avoid division by zero
+                normalization = (
+                    NormalizationByValue(value=generator.capacity_mw) if generator.capacity_mw > 0 else None
+                )
+
+                ts = SingleTimeSeries.from_array(
+                    data=ts_data,
+                    name="max_active_power",
+                    initial_timestamp=initial_timestamp,
+                    resolution=resolution,
+                    normalization=normalization,
+                )
+                self.system.add_time_series(ts, generator)
+                profile_count += 1
+
+        logger.info("Attached {} renewable profiles", profile_count)
 
     def _build_transmission(self) -> None:
         """Build transmission interface and line components."""
@@ -554,15 +713,43 @@ class ReEDSParser(BaseParser):
     def _attach_load_profiles(self) -> None:
         """Attach load time series to demand components."""
         logger.info("Attaching load profiles...")
-        # Placeholder - implement load profile attachment
-        logger.debug("Load profile attachment not yet implemented")
 
-    def _attach_renewable_profiles(self) -> None:
-        """Attach renewable capacity factor profiles to generators."""
-        logger.info("Attaching renewable profiles...")
-        # Placeholder - implement renewable profile attachment
-        # Will read recf.h5
-        logger.debug("Renewable profile attachment not yet implemented")
+        load_data = self.read_data_file("load_data")
+        if load_data is None:
+            logger.warning("No load data found, skipping load profile attachment")
+            return
+
+        df = load_data.collect() if isinstance(load_data, pl.LazyFrame) else load_data
+        if df.is_empty():
+            logger.warning("Load data is empty, skipping load profile attachment")
+            return
+
+        demands = list(self.system.get_components(ReEDSDemand))
+        if not demands:
+            logger.warning("No demand components found, skipping load profile attachment")
+            return
+
+        initial_timestamp = self.hourly_time_index[0].astype("datetime64[us]").item()
+        resolution = (self.hourly_time_index[1] - self.hourly_time_index[0]).astype("timedelta64[us]").item()
+
+        attached_count = 0
+        for demand in demands:
+            region_name = demand.name.replace("_load", "")
+            if region_name not in df.columns:
+                logger.debug("No load data for region {}, skipping", region_name)
+                continue
+
+            load_profile = df[region_name].to_numpy()
+            ts = SingleTimeSeries.from_array(
+                data=load_profile,
+                name="max_active_power",
+                initial_timestamp=initial_timestamp,
+                resolution=resolution,
+            )
+            self.system.add_time_series(ts, demand)
+            attached_count += 1
+
+        logger.info("Attached {} load profiles to demand components", attached_count)
 
     def _attach_reserve_profiles(self) -> None:
         """Attach reserve requirement profiles."""

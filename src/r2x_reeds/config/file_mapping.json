@@ -226,7 +226,7 @@
       "i": "technology"
     },
     "drop_columns": [
-      "Value"
+      "value"
     ],
     "description": "Fuel to technology mapping",
     "fpath": "outputs/fuel2tech.csv",
