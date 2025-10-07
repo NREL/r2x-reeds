@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+from loguru import logger
 
 from r2x_core.parser import BaseParser
 
@@ -13,8 +13,6 @@ if TYPE_CHECKING:
     from r2x_core.store import DataStore
 
     from .config import ReEDSConfig
-
-logger = logging.getLogger(__name__)
 
 
 class ReEDSParser(BaseParser):
