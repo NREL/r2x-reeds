@@ -40,10 +40,18 @@ build-backend = "uv_build"
 
 [tool.mypy]
 strict = true
-exclude = ["tests/"]
+exclude = ["tests/", "_*"]
 plugins = [
   "pydantic.mypy"
 ]
+
+[[tool.mypy.overrides]]
+module = "r2x_core.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "r2x_reeds.*"
+disable_error_code = ["misc"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
