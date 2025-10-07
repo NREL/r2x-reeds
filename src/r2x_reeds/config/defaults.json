@@ -1,0 +1,60 @@
+{
+  "data_validation": {
+    "max_capacity_mw": 100000.0,
+    "max_fuel_price": 1000.0,
+    "max_heat_rate": 20.0,
+    "max_outage_rate": 1.0,
+    "min_capacity_mw": 0.0,
+    "min_fuel_price": 0.0,
+    "min_heat_rate": 5.0,
+    "min_outage_rate": 0.0,
+    "valid_fuel_types": [
+      "coal",
+      "gas",
+      "oil",
+      "nuclear",
+      "hydro",
+      "wind",
+      "solar",
+      "biomass"
+    ],
+    "valid_nerc_regions": [
+      "FRCC",
+      "MRO",
+      "NPCC",
+      "RFC",
+      "SERC",
+      "SPP",
+      "TREE",
+      "WECC"
+    ]
+  },
+  "default_values": {
+    "base_year": 2020,
+    "default_heat_rate": 10.0,
+    "default_outage_rate": 0.05,
+    "interconnects": [
+      "eastern",
+      "western",
+      "texas"
+    ],
+    "max_capacity_factor": 1.0,
+    "max_transmission_distance_miles": 2000.0,
+    "min_capacity_factor": 0.0,
+    "representative_hours": 17,
+    "seasons": [
+      "spring",
+      "summer",
+      "fall",
+      "winter"
+    ],
+    "time_periods_per_year": 8760,
+    "weather_year": 2012
+  },
+  "unit_conversions": {
+    "mmbt_to_mwh": 0.293071,
+    "mw_to_kw": 1000.0,
+    "mwh_to_kwh": 1000.0,
+    "percent_to_fraction": 0.01
+  }
+}
