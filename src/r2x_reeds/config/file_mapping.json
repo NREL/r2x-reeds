@@ -167,11 +167,7 @@
     "input": true,
     "name": "load_data",
     "optional": false,
-    "units": "MW",
-    "filters": {
-      "year": "solve_year",
-      "datetime": "weather_year"
-    }
+    "units": "MW"
   },
   {
     "column_mapping": {

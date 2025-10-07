@@ -70,6 +70,10 @@ module = "r2x_core.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = "h5py.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 module = "r2x_reeds.*"
 disable_error_code = ["misc"]
 

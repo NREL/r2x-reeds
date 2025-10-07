@@ -25,6 +25,8 @@ def mock_data_store() -> Mock:
     """Create a mock DataStore for testing parser instantiation."""
     mock_store = Mock(spec=DataStore)
     mock_store.folder = Path("/fake/path")
+    # Make __contains__ return False so load_data registration is skipped
+    mock_store.__contains__ = Mock(return_value=False)
     return mock_store
 
 
