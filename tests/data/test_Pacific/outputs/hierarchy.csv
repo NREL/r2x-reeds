@@ -1,0 +1,12 @@
+r,nercr,transreg,transgrp,cendiv,st,interconnect,country,usda_region,h2ptcreg,hurdlereg,ccreg
+p10,WECC_CA,CAISO,CAISO,Pacific,CA,western,USA,pacific,California,CAISO,CAISO
+p11,WECC_CA,CAISO,CAISO,Pacific,CA,western,USA,pacific,California,CAISO,CAISO
+p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,USA,pacific,California,CAISO,CAISO
+p8,WECC_NW,NorthernGrid,NorthernGrid_South,Pacific,CA,western,USA,pacific,California,PacifiCorp_West,NorthernGrid
+p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,USA,pacific,Northwest,Bonneville_Power_Administration,NorthernGrid
+p6,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,USA,pacific,Northwest,PacifiCorp_West,NorthernGrid
+p7,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,USA,pacific,Northwest,Bonneville_Power_Administration,NorthernGrid
+p1,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,USA,pacific,Northwest,Puget_Sound_Energy_Inc,NorthernGrid
+p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,USA,pacific,Northwest,Bonneville_Power_Administration,NorthernGrid
+p3,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,USA,pacific,Northwest,Avista_Corp,NorthernGrid
+p4,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,USA,pacific,Northwest,PUD_No2_of_Grant_County,NorthernGrid
