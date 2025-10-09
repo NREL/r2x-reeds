@@ -172,6 +172,62 @@ class ReEDSParser(BaseParser):
 
         logger.info("Input validation complete")
 
+    def _tech_matches_category(self, tech: str, category_name: str, defaults: dict[str, Any]) -> bool:
+        """Check if a technology matches a category using prefix or exact matching.
+
+        Parameters
+        ----------
+        tech : str
+            Technology name to check
+        category_name : str
+            Category name from tech_categories
+        defaults : dict
+            Defaults dictionary containing tech_categories
+
+        Returns
+        -------
+        bool
+            True if technology matches the category
+        """
+        tech_categories = defaults.get("tech_categories", {})
+        if category_name not in tech_categories:
+            return False
+
+        category = tech_categories[category_name]
+
+        if isinstance(category, list):
+            return tech in category
+
+        prefixes = category.get("prefixes", [])
+        exact = category.get("exact", [])
+
+        if tech in exact:
+            return True
+
+        return any(tech.startswith(prefix) for prefix in prefixes)
+
+    def _get_tech_category(self, tech: str, defaults: dict[str, Any]) -> str | None:
+        """Get the category for a technology.
+
+        Parameters
+        ----------
+        tech : str
+            Technology name
+        defaults : dict
+            Defaults dictionary containing tech_categories
+
+        Returns
+        -------
+        str | None
+            Category name if found, None otherwise
+        """
+        tech_categories = defaults.get("tech_categories", {})
+        for category_name in tech_categories:
+            category_name_str: str = str(category_name)
+            if self._tech_matches_category(tech, category_name_str, defaults):
+                return category_name_str
+        return None
+
     def build_system_components(self) -> None:
         """Create all system components from ReEDS data.
 
@@ -348,23 +404,21 @@ class ReEDSParser(BaseParser):
             logger.warning("All generators were excluded, skipping generators")
             return
 
-        category_map = defaults.get("tech_categories")
-        if category_map:
-            df = df.with_columns(
-                pl.col("technology")
-                .map_elements(
-                    lambda tech: next((cat for cat, techs in category_map.items() if tech in techs), None),
-                    return_dtype=pl.String,
-                )
-                .alias("category")
+        # Assign categories to technologies using pattern matching
+        df = df.with_columns(
+            pl.col("technology")
+            .map_elements(
+                lambda tech: self._get_tech_category(tech, defaults),
+                return_dtype=pl.String,
             )
-            df_renewable = df.filter(pl.col("category").is_in(["wind", "solar"]))
-            df_non_renewable = df.filter(
-                (~pl.col("category").is_in(["wind", "solar"])) | pl.col("category").is_null()
-            )
-        else:
-            df_renewable = df.filter(pl.lit(False))
-            df_non_renewable = df.with_columns(pl.lit(None).alias("category"))
+            .alias("category")
+        )
+
+        # Separate renewable from non-renewable generators
+        df_renewable = df.filter(pl.col("category").is_in(["wind", "solar"]))
+        df_non_renewable = df.filter(
+            (~pl.col("category").is_in(["wind", "solar"])) | pl.col("category").is_null()
+        )
 
         renewable_count = 0
         if not df_renewable.is_empty():
@@ -955,11 +1009,11 @@ class ReEDSParser(BaseParser):
             logger.warning("No month_map or month_hours in defaults, skipping hydro budgets")
             return
 
-        hydro_categories = defaults.get("tech_categories", {}).get("hydro", ["hydro", "hydro-d"])
         hydro_cf_columns = hydro_cf.collect_schema().names()
 
         for generator in self.system.get_components(ReEDSGenerator):
-            if generator.category not in hydro_categories:
+            # Check if generator is a hydro technology
+            if not self._tech_matches_category(generator.technology, "hydro", defaults):
                 continue
 
             region_id = generator.region.name
@@ -1026,11 +1080,11 @@ class ReEDSParser(BaseParser):
             logger.warning("No month_map in defaults, skipping hydro rating profiles")
             return
 
-        hydro_categories = defaults.get("tech_categories", {}).get("hydro", ["hydro", "hydro-d"])
         hydro_cf_columns = hydro_cf.collect_schema().names()
 
         for generator in self.system.get_components(ReEDSGenerator):
-            if generator.category not in hydro_categories:
+            # Check if generator is a hydro technology
+            if not self._tech_matches_category(generator.technology, "hydro", defaults):
                 continue
 
             region_id = generator.region.name

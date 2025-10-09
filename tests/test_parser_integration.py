@@ -81,6 +81,22 @@ def test_system_has_loads(system) -> None:
     assert len(components) >= 0
 
 
+def _tech_matches_any_renewable(tech: str, tech_cats: dict) -> bool:
+    """Check if tech matches any renewable category (solar or wind)."""
+    for category_name in ["solar", "wind"]:
+        category = tech_cats.get(category_name, {})
+        # Handle both old list format and new dict format
+        if isinstance(category, list):
+            if tech in category:
+                return True
+        elif isinstance(category, dict):
+            prefixes = category.get("prefixes", [])
+            exact = category.get("exact", [])
+            if tech in exact or any(tech.startswith(prefix) for prefix in prefixes):
+                return True
+    return False
+
+
 @pytest.fixture
 def expected_generator_count(data_store: DataStore, reeds_config: ReEDSConfig) -> int:
     """Get expected generator count from online capacity data.
@@ -90,13 +106,16 @@ def expected_generator_count(data_store: DataStore, reeds_config: ReEDSConfig) -
     """
     defaults = reeds_config.load_defaults()
     tech_cats = defaults.get("tech_categories", {})
-    renewable_techs = tech_cats.get("solar", []) + tech_cats.get("wind", [])
     excluded_techs = defaults.get("excluded_techs", [])
 
     capacity_data = data_store.read_data_file(name="online_capacity")
     df = capacity_data.filter(pl.col("year") == reeds_config.solve_year).collect()
 
     df = df.filter(~pl.col("technology").is_in(excluded_techs))
+
+    # Get all unique technologies and check which are renewable
+    all_techs = df["technology"].unique().to_list()
+    renewable_techs = [t for t in all_techs if _tech_matches_any_renewable(t, tech_cats)]
 
     df_renewable = df.filter(pl.col("technology").is_in(renewable_techs))
     df_non_renewable = df.filter(~pl.col("technology").is_in(renewable_techs))
@@ -214,9 +233,10 @@ def test_renewable_generator_count(all_renewable_generators) -> None:
 
     Renewable generators are aggregated by tech-region, not by vintage.
     Includes hydro generators which now have rating profiles.
+    With pattern-based matching, we catch more technology variants (upv_1 through upv_10, etc).
     """
-    assert 75 <= len(all_renewable_generators) <= 85, (
-        f"Expected ~80 renewable generators (including hydro, aggregated by tech-region), "
+    assert 100 <= len(all_renewable_generators) <= 150, (
+        f"Expected ~130 renewable generators (including hydro and all tech variants), "
         f"got {len(all_renewable_generators)}"
     )
 
