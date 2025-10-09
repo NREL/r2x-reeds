@@ -24,6 +24,13 @@ R2X ReEDS provides a parser plugin for converting ReEDS model outputs to R2X for
 
 For detailed API documentation with examples and method signatures, see the [Complete API Documentation](./api.md).
 
+## Documentation Coverage
+
+```{eval-rst}
+.. report:doc-coverage::
+   :reportid: src
+```
+
 ```{toctree}
 :maxdepth: 1
 :hidden:

@@ -69,9 +69,9 @@ copybutton_copy_empty_lines = False
 
 # Sphinx-reports - DocCov configuration
 report_doccov_packages = {
-    "r2x_reeds": {
+    "src": {
         "name": "r2x_reeds",
-        "directory": "../src/r2x_reeds",
+        "directory": "src/",
         "fail_below": 90,
         "levels": "default",
     }
