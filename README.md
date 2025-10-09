@@ -2,8 +2,8 @@
 > R2X Core plugin for translating ReEDS power system models
 >
 > [![image](https://img.shields.io/pypi/v/r2x-reeds.svg)](https://pypi.python.org/pypi/r2x-reeds)
-> [![image](https://img.shields.io/pypi/l/r2x-reeds.svg)](https://pypi.python.org/pypi/r2x-reeds)
-> [![image](https://img.shields.io/pypi/pyversions/r2x-reeds.svg)](https://pypi.python.org/pypi/r2x-reeds)
+> ![PyPI - License](https://img.shields.io/pypi/l/r2x-reeds)
+> ![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FNREL%2Fr2x-reeds%2Frefs%2Fheads%2Fmain%2Fpyproject.toml)
 > [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 R2X ReEDS is an [R2X Core](https://github.com/NREL/r2x-core) plugin for parsing [Regional Energy Deployment System (ReEDS)](https://github.com/NREL/ReEDS-2.0) power system model data. It provides a comprehensive parser for NREL's ReEDS model, enabling seamless data exchange with other power system modeling platforms through the R2X Core framework.
