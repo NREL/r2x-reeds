@@ -450,12 +450,16 @@ class ReEDSParser(BaseParser):
                 self._create_generator(tech, region, row.get("vintage"), row)
                 gen_count += 1
 
-        logger.info(
-            "Built {} generators ({} renewable aggregated, {} non-renewable)",
-            renewable_count + gen_count,
-            renewable_count,
-            gen_count,
-        )
+        total_gen_count = renewable_count + gen_count
+        if total_gen_count == 0:
+            logger.warning("No generators were created")
+        else:
+            logger.info(
+                "Built {} generators ({} renewable aggregated, {} non-renewable)",
+                total_gen_count,
+                renewable_count,
+                gen_count,
+            )
 
     def _build_transmission(self) -> None:
         """Build transmission interface and line components.
@@ -1011,11 +1015,18 @@ class ReEDSParser(BaseParser):
 
         hydro_cf_columns = hydro_cf.collect_schema().names()
 
-        for generator in self.system.get_components(ReEDSGenerator):
-            # Check if generator is a hydro technology
-            if not self._tech_matches_category(generator.technology, "hydro", defaults):
-                continue
+        hydro_generators = list(
+            self.system.get_components(
+                ReEDSGenerator,
+                filter_func=lambda gen: self._tech_matches_category(gen.technology, "hydro", defaults),
+            )
+        )
 
+        if not hydro_generators:
+            logger.warning("No hydro generators found, skipping hydro budgets")
+            return
+
+        for generator in hydro_generators:
             region_id = generator.region.name
             tech = generator.technology
 
@@ -1082,11 +1093,18 @@ class ReEDSParser(BaseParser):
 
         hydro_cf_columns = hydro_cf.collect_schema().names()
 
-        for generator in self.system.get_components(ReEDSGenerator):
-            # Check if generator is a hydro technology
-            if not self._tech_matches_category(generator.technology, "hydro", defaults):
-                continue
+        hydro_generators = list(
+            self.system.get_components(
+                ReEDSGenerator,
+                filter_func=lambda gen: self._tech_matches_category(gen.technology, "hydro", defaults),
+            )
+        )
 
+        if not hydro_generators:
+            logger.warning("No hydro generators found, skipping hydro rating profiles")
+            return
+
+        for generator in hydro_generators:
             region_id = generator.region.name
             tech = generator.technology
 
