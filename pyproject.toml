@@ -18,7 +18,7 @@ dependencies = [
     "h5py>=3.13.0",
     "numpy>=1.20.0",
     "loguru>=0.7.0",
-    "r2x-core>=0.0.6",
+    "r2x-core>=0.0.7",
 ]
 keywords=["ReEDS"]
 classifiers = [
@@ -97,10 +97,7 @@ pythonpath = ["src"]
 testpaths = ["tests"]
 
 [tool.ruff]
-# Line length
 line-length = 110
-
-# Exclude common directories
 extend-exclude = [
     ".venv",
     "venv",
@@ -110,7 +107,6 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
-# Enable pycodestyle, pyflakes, isort, and more
 select = [
     "E",      # pycodestyle errors
     "W",      # pycodestyle warnings
@@ -125,15 +121,12 @@ select = [
     "PERF",   # perflint (performance)
     "RUF",    # ruff-specific rules
 ]
-
-# Ignore specific rules
 ignore = [
     "E501",   # Line too long (handled by formatter)
     "B027",   # Empty method in abstract class without @abstractmethod (intentional for hooks)
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Tests can use assert statements
 "tests/**/*.py" = [
     "S101",   # Use of assert
 ]
@@ -145,6 +138,3 @@ section-order = ["future", "standard-library", "third-party", "first-party", "lo
 [tool.ruff.lint.mccabe]
 # Cyclomatic complexity threshold
 max-complexity = 10
-
-[tool.uv.sources]
-r2x-core = { path = "../../r2x-core/dev", editable = true }

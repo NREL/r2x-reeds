@@ -113,6 +113,7 @@ class ReEDSParser(BaseParser):
         auto_add_composed_components: bool = True,
         skip_validation: bool = False,
     ) -> None:
+        """Initialize ReEDS parser."""
         super().__init__(
             config,
             data_store,

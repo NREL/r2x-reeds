@@ -1303,8 +1303,8 @@ wheels = [
 
 [[package]]
 name = "r2x-core"
-version = "0.0.6"
-source = { editable = "../../r2x-core/dev" }
+version = "0.0.7"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "h5py" },
     { name = "infrasys" },
@@ -1312,35 +1312,9 @@ dependencies = [
     { name = "polars" },
     { name = "pydantic" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "h5py", specifier = ">=3.13.0" },
-    { name = "infrasys", specifier = ">=1.0.0rc1" },
-    { name = "loguru", specifier = ">=0.7.3" },
-    { name = "polars", specifier = ">=1.33.1" },
-    { name = "pydantic", specifier = ">=2.11.9,<3" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "h5py-stubs", specifier = ">=0.1.2" },
-    { name = "mypy", specifier = ">=1.18.2" },
-    { name = "pre-commit", specifier = ">=4.3.0" },
-    { name = "pytest", specifier = ">=8.4.2" },
-    { name = "pytest-coverage", specifier = ">=0.0" },
-    { name = "ruff", specifier = ">=0.13.2" },
-]
-docs = [
-    { name = "autodoc-pydantic" },
-    { name = "docstr-coverage", specifier = ">=2.3.2" },
-    { name = "furo", specifier = ">=2025.9.25" },
-    { name = "ghp-import" },
-    { name = "myst-parser" },
-    { name = "sphinx", specifier = ">=8.0.0" },
-    { name = "sphinx-copybutton" },
-    { name = "sphinx-reports" },
-    { name = "sphinx-tabs" },
+sdist = { url = "https://files.pythonhosted.org/packages/e8/d6/a69369dcc4f8517f1f93edb08e69f774b50bef1df28fac10a58128001bd0/r2x_core-0.0.7.tar.gz", hash = "sha256:e5d809cc20950a61d596f63411422f1cb7236d6563e3e71e2909c17d97e8ae0d", size = 40126, upload-time = "2025-10-09T20:57:31.272Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c1/83/4320c19228ceca443e6e650e0d9c995d4bff8c4e87ede91bc20135fad4ed/r2x_core-0.0.7-py3-none-any.whl", hash = "sha256:32d6ae3e93a6c90460b5531073c1fe9629f4ac5e2fc8e54bb32b1fb551a3227a", size = 47351, upload-time = "2025-10-09T20:57:29.949Z" },
 ]
 
 [[package]]
@@ -1386,7 +1360,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=1.20.0" },
     { name = "polars", specifier = ">=1.33.0" },
     { name = "pydantic", specifier = ">=2.11.0,<3" },
-    { name = "r2x-core", editable = "../../r2x-core/dev" },
+    { name = "r2x-core", specifier = ">=0.0.7" },
 ]
 
 [package.metadata.requires-dev]
