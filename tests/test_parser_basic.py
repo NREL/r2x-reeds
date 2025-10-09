@@ -17,7 +17,7 @@ from r2x_reeds.parser import ReEDSParser
 @pytest.fixture
 def reeds_config() -> ReEDSConfig:
     """Create basic ReEDS configuration."""
-    return ReEDSConfig(solve_years=2030, weather_years=2012)
+    return ReEDSConfig(solve_year=2030, weather_year=2012)
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ def test_parser_has_config(reeds_config: ReEDSConfig, mock_data_store: Mock):
     parser = ReEDSParser(config=reeds_config, data_store=mock_data_store, name="test_system")
 
     assert parser.config == reeds_config
-    assert parser.config.solve_years == [2030]
+    assert parser.config.solve_year == 2030
 
 
 def test_parser_has_data_store(reeds_config: ReEDSConfig, mock_data_store: Mock):

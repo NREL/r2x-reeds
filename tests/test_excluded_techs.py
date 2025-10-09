@@ -25,8 +25,8 @@ def file_mapping_path():
 def test_excluded_techs_empty_list_default(data_folder, file_mapping_path):
     """Test that default excluded_techs includes can-imports and electrolyzer."""
     config = ReEDSConfig(
-        solve_years=[2032],
-        weather_years=[2012],
+        solve_year=[2032],
+        weather_year=[2012],
         scenario="test",
         case_name="test",
     )

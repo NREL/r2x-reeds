@@ -25,7 +25,7 @@ def test_data_path() -> Path:
 @pytest.fixture
 def reeds_config() -> ReEDSConfig:
     """Create ReEDS configuration for testing."""
-    return ReEDSConfig(solve_years=2032, weather_years=2012, case_name="test", scenario="base")  # type: ignore[arg-type]
+    return ReEDSConfig(solve_year=2032, weather_year=2012, case_name="test", scenario="base")  # type: ignore[arg-type]
 
 
 @pytest.fixture
@@ -94,9 +94,8 @@ def expected_generator_count(data_store: DataStore, reeds_config: ReEDSConfig) -
     excluded_techs = defaults.get("excluded_techs", [])
 
     capacity_data = data_store.read_data_file(name="online_capacity")
-    df = capacity_data.filter(pl.col("year") == reeds_config.solve_years[0]).collect()
+    df = capacity_data.filter(pl.col("year") == reeds_config.solve_year).collect()
 
-    # Filter out excluded technologies
     df = df.filter(~pl.col("technology").is_in(excluded_techs))
 
     df_renewable = df.filter(pl.col("technology").is_in(renewable_techs))

@@ -73,7 +73,7 @@ def test_data_path() -> Path:
 @pytest.fixture
 def reeds_config() -> ReEDSConfig:
     """Create ReEDS configuration matching legacy system."""
-    return ReEDSConfig(solve_years=2032, weather_years=2012)
+    return ReEDSConfig(solve_year=2032, weather_year=2012)
 
 
 @pytest.fixture

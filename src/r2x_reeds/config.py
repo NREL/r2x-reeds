@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, ClassVar
 
-from pydantic import Field, field_validator
+from pydantic import Field
 
 from r2x_core.plugin_config import PluginConfig
 
@@ -69,28 +69,16 @@ class ReEDSConfig(PluginConfig):
     FILE_MAPPING_NAME: ClassVar[str] = "file_mapping.json"
     DEFAULTS_FILE_NAME: ClassVar[str] = "defaults.json"
 
-    solve_years: Annotated[
-        list[int],
+    solve_year: Annotated[
+        int | list[int],
         Field(description="Model solve year(s) - automatically converted to list"),
     ]
-    weather_years: Annotated[
-        list[int],
+    weather_year: Annotated[
+        int | list[int],
         Field(description="Weather data year(s) - automatically converted to list"),
     ]
     case_name: Annotated[str | None, Field(default=None, description="Case name")] = None
-    scenario: Annotated[str, Field(default="base", description="Scenario identifier")]
-
-    @field_validator("solve_years", mode="before")
-    @classmethod
-    def validate_solve_years(cls, v: int | list[int]) -> list[int]:
-        """Convert solve years to list."""
-        return [v] if isinstance(v, int) else v
-
-    @field_validator("weather_years", mode="before")
-    @classmethod
-    def validate_weather_years(cls, v: int | list[int]) -> list[int]:
-        """Convert weather years to list."""
-        return [v] if isinstance(v, int) else v
+    scenario: Annotated[str, Field(default="base", description="Scenario identifier")] = "base"
 
     @property
     def primary_solve_year(self) -> int:
@@ -101,7 +89,9 @@ class ReEDSConfig(PluginConfig):
         int
             The first solve year in the list
         """
-        return self.solve_years[0]
+        if isinstance(self.solve_year, list):
+            return self.solve_year[0]
+        return self.solve_year
 
     @property
     def primary_weather_year(self) -> int:
@@ -112,4 +102,6 @@ class ReEDSConfig(PluginConfig):
         int
             The first weather year in the list
         """
-        return self.weather_years[0]
+        if isinstance(self.weather_year, list):
+            return self.weather_year[0]
+        return self.weather_year

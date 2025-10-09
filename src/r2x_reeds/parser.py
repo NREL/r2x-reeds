@@ -130,32 +130,45 @@ class ReEDSParser(BaseParser):
         """Validate input data before building system."""
         logger.info("Validating ReEDS input data...")
 
-        # Validate solve years exist in modeledyears.csv
-        modeled_years_data = self.read_data_file("modeledyears").collect()
-        if modeled_years_data is not None and len(modeled_years_data) > 0:
-            # Extract years from the first row
-            available_solve_years = set(modeled_years_data.row(0))
+        # Get file paths from DataStore
+        modeledyears_file = self.data_store.get_data_file_by_name("modeledyears")
+        hour_map_file = self.data_store.get_data_file_by_name("hour_map")
 
-            for solve_year in self.config.solve_years:
-                if solve_year not in available_solve_years:
-                    msg = (
-                        f"Solve year {solve_year} not found in modeledyears.csv. "
-                        f"Available years: {sorted(available_solve_years)}"
-                    )
-                    raise ValueError(msg)
+        modeled_years_data = self.read_data_file("modeledyears")
+        if modeled_years_data is None or modeled_years_data.limit(1).collect().is_empty():
+            msg = f"{modeledyears_file.fpath} is empty or missing. Check input folder."
+            raise ValueError(msg)
 
-        # Validate weather years exist in hmap_allyrs.csv
-        hour_map_data = self.read_data_file("hour_map").collect()
-        if hour_map_data is not None and "year" in hour_map_data.columns:
-            available_weather_years = set(hour_map_data["year"].unique().to_list())
+        hour_map_data = self.read_data_file("hour_map")
+        if hour_map_data is None or hour_map_data.limit(1).collect().is_empty():
+            msg = f"{hour_map_file.fpath} is empty or missing. Check input folder."
+            raise ValueError(msg)
 
-            for weather_year in self.config.weather_years:
-                if weather_year not in available_weather_years:
-                    msg = (
-                        f"Weather year {weather_year} not found in hmap_allyrs.csv. "
-                        f"Available years: {sorted(available_weather_years)}"
-                    )
-                    raise ValueError(msg)
+        solve_years = (
+            [self.config.solve_year]
+            if isinstance(self.config.solve_year, int)
+            else list(self.config.solve_year)
+        )
+        available_solve_years = set(modeled_years_data.collect().row(0))
+        missing_solve_years = [y for y in solve_years if y not in available_solve_years]
+        if missing_solve_years:
+            msg = f"Solve year(s) {missing_solve_years} not found in {modeledyears_file.fpath}. "
+            msg += f"Available years: {sorted(available_solve_years)}"
+            raise ValueError(msg)
+
+        weather_years = (
+            [self.config.weather_year]
+            if isinstance(self.config.weather_year, int)
+            else list(self.config.weather_year)
+        )
+        available_weather_years = set(
+            hour_map_data.select(pl.col("year")).unique().collect().to_series().to_list()
+        )
+        missing_weather_years = [y for y in weather_years if y not in available_weather_years]
+        if missing_weather_years:
+            msg = f"Weather year(s) {missing_weather_years} not found in {hour_map_file.fpath}. "
+            msg += f"Available years: {sorted(available_weather_years)}"
+            raise ValueError(msg)
 
         logger.info("Input validation complete")
 
@@ -204,8 +217,8 @@ class ReEDSParser(BaseParser):
         self.system.description = (
             f"ReEDS model system for case '{self.config.case_name}', "
             f"scenario '{self.config.scenario}', "
-            f"solve years: {self.config.solve_years}, "
-            f"weather years: {self.config.weather_years}"
+            f"solve years: {self.config.solve_year}, "
+            f"weather years: {self.config.weather_year}"
         )
 
         total_components = len(list(self.system.get_components(Component)))
@@ -286,9 +299,7 @@ class ReEDSParser(BaseParser):
             return
 
         solve_year = (
-            self.config.solve_years[0]
-            if isinstance(self.config.solve_years, list)
-            else self.config.solve_years
+            self.config.solve_year[0] if isinstance(self.config.solve_year, list) else self.config.solve_year
         )
         capacity_data = capacity_data.filter(pl.col("year") == solve_year)
 
@@ -508,9 +519,7 @@ class ReEDSParser(BaseParser):
 
         weather_year = self.config.primary_weather_year
         solve_year = (
-            self.config.solve_years[0]
-            if isinstance(self.config.solve_years, list)
-            else self.config.solve_years
+            self.config.solve_year[0] if isinstance(self.config.solve_year, list) else self.config.solve_year
         )
 
         df = df.filter((pl.col("datetime").dt.year() == weather_year) & (pl.col("solve_year") == solve_year))
@@ -951,9 +960,6 @@ class ReEDSParser(BaseParser):
 
         for generator in self.system.get_components(ReEDSGenerator):
             if generator.category not in hydro_categories:
-                continue
-
-            if "can-imports" in generator.name.lower():
                 continue
 
             region_id = generator.region.name
