@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
 from infrasys import SupplementalAttribute
 from pydantic import Field, PositiveFloat
@@ -103,7 +103,7 @@ class ReEDSGenerator(ReEDSComponent):
 
     region: Annotated[ReEDSRegion, Field(description="ReEDS region where generator is located")]
     technology: Annotated[str | None, Field(None, description="ReEDS technology type")] = None
-    capacity_mw: Annotated[float, Field(description="Existing capacity in MW", ge=0)]
+    capacity: Annotated[float, Field(description="Existing capacity in MW", ge=0)]
     heat_rate: Annotated[float | None, Field(None, description="Heat rate in MMBtu/MWh", ge=0)] = None
     forced_outage_rate: Annotated[
         float | None,
@@ -121,16 +121,7 @@ class ReEDSGenerator(ReEDSComponent):
     fuel_type: Annotated[str | None, Field(None, description="Fuel type (e.g., 'coal', 'gas')")] = None
     fuel_price: Annotated[float | None, Field(None, description="Fuel price in $/MMBtu", ge=0)] = None
     vom_cost: Annotated[float | None, Field(None, description="Variable O&M cost in $/MWh", ge=0)] = None
-    prime_mover: Annotated[str | None, Field(None, description="Prime mover type")] = None
-    capacity_factor_profile: Annotated[
-        dict[str, Any] | None,
-        Field(None, description="Capacity factor timeseries"),
-    ] = None
-    fuel_price_profile: Annotated[
-        dict[str, Any] | None,
-        Field(None, description="Fuel price timeseries"),
-    ] = None
-    vintage: Annotated[int | None, Field(None, description="Vintage year")] = None
+    vintage: Annotated[str | None, Field(None, description="Vintage bin identifier")] = None
     retirement_year: Annotated[int | None, Field(None, description="Planned retirement year")] = None
 
 
@@ -182,7 +173,7 @@ class ReEDSResourceClass(ReEDSComponent):
     technology: Annotated[str, Field(description="Technology type (e.g., 'upv', 'wind-ons')")]
     region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
     resource_class: Annotated[str, Field(description="Resource class identifier")]
-    capacity_mw: Annotated[float, Field(description="Available capacity in MW", ge=0)]
+    capacity: Annotated[float, Field(description="Available capacity in MW", ge=0)]
     capacity_factor: Annotated[
         float | None,
         Field(None, description="Average capacity factor", ge=0, le=1),

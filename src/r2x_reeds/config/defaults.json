@@ -1,4 +1,8 @@
 {
+  "excluded_techs": [
+    "can-imports",
+    "electrolyzer"
+  ],
   "data_validation": {
     "max_capacity_mw": 100000.0,
     "max_fuel_price": 1000.0,
@@ -29,6 +33,120 @@
       "WECC"
     ]
   },
+  "tech_categories": {
+    "solar": {
+      "prefixes": [
+        "upv",
+        "distpv",
+        "dupv",
+        "csp",
+        "pvb"
+      ],
+      "exact": []
+    },
+    "wind": {
+      "prefixes": [
+        "wind-ons",
+        "wind-ofs"
+      ],
+      "exact": []
+    },
+    "thermal": {
+      "prefixes": [
+        "coal",
+        "gas-cc",
+        "gas-ct",
+        "nuclear",
+        "o-g-s",
+        "biopower",
+        "beccs"
+      ],
+      "exact": []
+    },
+    "hydro": {
+      "prefixes": [
+        "hyd"
+      ],
+      "exact": [
+        "pumped-hydro",
+        "pumped-hydro-flex"
+      ]
+    },
+    "hydro_dispatchable": {
+      "prefixes": [
+        "hydED",
+        "hydro-d"
+      ],
+      "exact": []
+    },
+    "hydro_nondispatchable": {
+      "prefixes": [
+        "hydEND",
+        "hydro-and"
+      ],
+      "exact": []
+    },
+    "pumped_storage": {
+      "prefixes": [
+        "pumped-hydro"
+      ],
+      "exact": []
+    },
+    "storage": {
+      "prefixes": [
+        "battery",
+        "caes"
+      ],
+      "exact": []
+    },
+    "electrolyzer": {
+      "prefixes": [
+        "electrolyzer"
+      ],
+      "exact": []
+    },
+    "hydrogen": {
+      "prefixes": [
+        "smr",
+        "h2-ct",
+        "h2-cc"
+      ],
+      "exact": [
+        "electrolyzer"
+      ]
+    },
+    "geothermal": {
+      "prefixes": [
+        "geothermal",
+        "geohydro",
+        "egs"
+      ],
+      "exact": []
+    },
+    "renewable": {
+      "prefixes": [
+        "upv",
+        "distpv",
+        "dupv",
+        "csp",
+        "pvb",
+        "wind-ons",
+        "wind-ofs",
+        "geothermal",
+        "geohydro",
+        "egs"
+      ],
+      "exact": []
+    },
+    "variable_renewable": {
+      "prefixes": [
+        "upv",
+        "wind-ons",
+        "wind-ofs"
+      ],
+      "exact": []
+    }
+  },
   "default_values": {
     "base_year": 2020,
     "default_heat_rate": 10.0,
@@ -56,5 +174,100 @@
     "mw_to_kw": 1000.0,
     "mwh_to_kwh": 1000.0,
     "percent_to_fraction": 0.01
+  },
+  "default_reserve_types": [
+    "SPINNING",
+    "FLEXIBILITY",
+    "REGULATION"
+  ],
+  "reserve_duration": {
+    "FLEXIBILITY": 3600,
+    "REGULATION": 3600,
+    "SPINNING": 3600
+  },
+  "reserve_time_frame": {
+    "FLEXIBILITY": 600,
+    "REGULATION": 1200,
+    "SPINNING": 300
+  },
+  "reserve_vors": {
+    "FLEXIBILITY": 390000,
+    "REGULATION": 410000,
+    "SPINNING": 400000
+  },
+  "reserve_direction": {
+    "FLEXIBILITY": "Up",
+    "REGULATION": "Up",
+    "SPINNING": "Up"
+  },
+  "wind_reserves": {
+    "FLEXIBILITY": 0.1,
+    "REGULATION": 0.05,
+    "SPINNING": 0.0
+  },
+  "solar_reserves": {
+    "FLEXIBILITY": 0.04,
+    "REGULATION": 0.003,
+    "SPINNING": 0.0
+  },
+  "load_reserves": {
+    "FLEXIBILITY": 0.0,
+    "REGULATION": 0.01,
+    "SPINNING": 0.03
+  },
+  "excluded_from_reserves": {
+    "SPINNING": [
+      "solar",
+      "wind"
+    ],
+    "REGULATION": [
+      "solar",
+      "wind"
+    ],
+    "FLEXIBILITY": [
+      "thermal"
+    ]
+  },
+  "month_map": {
+    "1": "M1",
+    "2": "M2",
+    "3": "M3",
+    "4": "M4",
+    "5": "M5",
+    "6": "M6",
+    "7": "M7",
+    "8": "M8",
+    "9": "M9",
+    "10": "M10",
+    "11": "M11",
+    "12": "M12"
+  },
+  "month_hours": {
+    "M1": 744,
+    "M2": 672,
+    "M3": 744,
+    "M4": 720,
+    "M5": 744,
+    "M6": 720,
+    "M7": 744,
+    "M8": 744,
+    "M9": 720,
+    "M10": 744,
+    "M11": 720,
+    "M12": 744
+  },
+  "month_days": {
+    "M1": 31,
+    "M2": 28,
+    "M3": 31,
+    "M4": 30,
+    "M5": 31,
+    "M6": 30,
+    "M7": 31,
+    "M8": 31,
+    "M9": 30,
+    "M10": 31,
+    "M11": 30,
+    "M12": 31
   }
 }

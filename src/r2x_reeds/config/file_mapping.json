@@ -155,8 +155,8 @@
       "rr": "to_region"
     },
     "description": "Transmission line losses",
-    "fpath": "inputs_case/tranloss.csv",
-    "input": true,
+    "fpath": "outputs/tranloss.csv",
+    "input": false,
     "name": "transmission_losses",
     "optional": false,
     "units": "%"
@@ -167,7 +167,16 @@
     "input": true,
     "name": "load_data",
     "optional": false,
-    "units": "MW"
+    "units": "MW",
+    "file_type": "H5Format",
+    "reader_kwargs": {
+      "data_key": "data",
+      "columns_key": "columns",
+      "datetime_key": "index_datetime",
+      "additional_keys": [
+        "index_year"
+      ]
+    }
   },
   {
     "column_mapping": {
@@ -226,7 +235,7 @@
       "i": "technology"
     },
     "drop_columns": [
-      "Value"
+      "value"
     ],
     "description": "Fuel to technology mapping",
     "fpath": "outputs/fuel2tech.csv",
@@ -265,8 +274,11 @@
     "name": "renewable_cf",
     "optional": false,
     "units": "-",
-    "filters": {
-      "datetime": "weather_year"
+    "file_type": "H5Format",
+    "reader_kwargs": {
+      "data_key": "data",
+      "columns_key": "columns",
+      "datetime_key": "index_datetime"
     }
   },
   {
@@ -317,7 +329,10 @@
     "fpath": "inputs_case/modeledyears.csv",
     "input": true,
     "name": "modeledyears",
-    "optional": false
+    "optional": false,
+    "reader_kwargs": {
+      "has_header": false
+    }
   },
   {
     "column_mapping": {
@@ -374,7 +389,14 @@
     "input": true,
     "name": "maxage",
     "optional": false,
-    "units": "years"
+    "units": "years",
+    "reader_kwargs": {
+      "has_header": false,
+      "new_columns": [
+        "technology",
+        "maxage_years"
+      ]
+    }
   },
   {
     "column_mapping": {

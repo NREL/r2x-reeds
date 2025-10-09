@@ -44,21 +44,21 @@ def test_reeds_region_negative_max_power_fails():
 def test_reeds_generator_creation():
     """Test creating a ReEDS generator."""
     region = ReEDSRegion(name="p1")
-    gen = ReEDSGenerator(name="gen1", region=region, capacity_mw=500.0)
-    assert gen.capacity_mw == 500.0
+    gen = ReEDSGenerator(name="gen1", region=region, capacity=500.0)
+    assert gen.capacity == 500.0
 
 
 def test_reeds_generator_negative_capacity_fails():
     """Test that negative capacity raises validation error."""
     region = ReEDSRegion(name="p1")
     with pytest.raises(ValidationError):
-        ReEDSGenerator(name="gen1", region=region, capacity_mw=-100.0)
+        ReEDSGenerator(name="gen1", region=region, capacity=-100.0)
 
 
 def test_reeds_generator_with_technology():
     """Test generator with technology field."""
     region = ReEDSRegion(name="p1")
-    gen = ReEDSGenerator(name="gen1", region=region, capacity_mw=500.0, technology="gas-cc")
+    gen = ReEDSGenerator(name="gen1", region=region, capacity=500.0, technology="gas-cc")
     assert gen.technology == "gas-cc"
 
 
