@@ -40,6 +40,7 @@ dev = [
     "pre-commit>=4.3.0",
     "pytest>=8.4.2",
     "pytest-coverage>=0.0",
+    "pytest-mock>=3.15.1",
     "ruff>=0.13.3",
 ]
 docs = [
@@ -130,3 +131,6 @@ section-order = ["future", "standard-library", "third-party", "first-party", "lo
 [tool.ruff.lint.mccabe]
 # Cyclomatic complexity threshold
 max-complexity = 10
+
+[tool.uv.sources]
+r2x-core = { path = "../../r2x-core/dev", editable = true }

@@ -103,7 +103,7 @@ def test_reeds_config_default_case_name():
         solve_years=2030,
         weather_years=2012,
     )
-    assert config.case_name == "Unknown"
+    assert config.case_name is None
 
 
 def test_reeds_config_with_defaults():

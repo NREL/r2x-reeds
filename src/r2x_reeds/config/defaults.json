@@ -1,4 +1,5 @@
 {
+  "excluded_techs": [],
   "data_validation": {
     "max_capacity_mw": 100000.0,
     "max_fuel_price": 1000.0,
@@ -29,6 +30,72 @@
       "WECC"
     ]
   },
+  "tech_categories": {
+    "solar": [
+      "upv",
+      "upv_1",
+      "upv_2",
+      "upv_3",
+      "upv_4",
+      "upv_5",
+      "upv_6",
+      "upv_7",
+      "upv_8",
+      "upv_9",
+      "upv_10",
+      "distpv",
+      "dupv",
+      "csp"
+    ],
+    "wind": [
+      "wind-ons",
+      "wind-ons_1",
+      "wind-ons_2",
+      "wind-ons_3",
+      "wind-ons_4",
+      "wind-ons_5",
+      "wind-ons_6",
+      "wind-ons_7",
+      "wind-ons_8",
+      "wind-ons_9",
+      "wind-ons_10",
+      "wind-ofs",
+      "wind-ofs_1",
+      "wind-ofs_2",
+      "wind-ofs_3",
+      "wind-ofs_4",
+      "wind-ofs_5",
+      "wind-ofs_6",
+      "wind-ofs_7",
+      "wind-ofs_8",
+      "wind-ofs_9",
+      "wind-ofs_10"
+    ],
+    "thermal": [
+      "coal",
+      "coal-ccs",
+      "coal-igcc",
+      "gas-cc",
+      "gas-ct",
+      "nuclear",
+      "o-g-s"
+    ],
+    "hydro": [
+      "hydro",
+      "hydro-d",
+      "pumped-hydro",
+      "pumped-hydro-flex"
+    ],
+    "storage": [
+      "battery",
+      "battery_2",
+      "battery_4",
+      "battery_6",
+      "battery_8",
+      "battery_10",
+      "caes"
+    ]
+  },
   "default_values": {
     "base_year": 2020,
     "default_heat_rate": 10.0,
@@ -56,5 +123,109 @@
     "mw_to_kw": 1000.0,
     "mwh_to_kwh": 1000.0,
     "percent_to_fraction": 0.01
+  },
+  "default_reserve_types": [
+    "SPINNING",
+    "FLEXIBILITY",
+    "REGULATION"
+  ],
+  "reserve_duration": {
+    "FLEXIBILITY": 3600,
+    "REGULATION": 3600,
+    "SPINNING": 3600
+  },
+  "reserve_time_frame": {
+    "FLEXIBILITY": 600,
+    "REGULATION": 1200,
+    "SPINNING": 300
+  },
+  "reserve_vors": {
+    "FLEXIBILITY": 390000,
+    "REGULATION": 410000,
+    "SPINNING": 400000
+  },
+  "reserve_direction": {
+    "FLEXIBILITY": "Up",
+    "REGULATION": "Up",
+    "SPINNING": "Up"
+  },
+  "wind_reserves": {
+    "FLEXIBILITY": 0.1,
+    "REGULATION": 0.05,
+    "SPINNING": 0.0
+  },
+  "solar_reserves": {
+    "FLEXIBILITY": 0.04,
+    "REGULATION": 0.003,
+    "SPINNING": 0.0
+  },
+  "load_reserves": {
+    "FLEXIBILITY": 0.0,
+    "REGULATION": 0.01,
+    "SPINNING": 0.03
+  },
+  "reserve_providers": {
+    "solar": [
+      "FLEXIBILITY"
+    ],
+    "wind": [
+      "FLEXIBILITY"
+    ],
+    "thermal": [
+      "SPINNING",
+      "REGULATION"
+    ],
+    "hydro": [
+      "SPINNING",
+      "REGULATION",
+      "FLEXIBILITY"
+    ],
+    "storage": [
+      "SPINNING",
+      "REGULATION",
+      "FLEXIBILITY"
+    ]
+  },
+  "month_map": {
+    "1": "M1",
+    "2": "M2",
+    "3": "M3",
+    "4": "M4",
+    "5": "M5",
+    "6": "M6",
+    "7": "M7",
+    "8": "M8",
+    "9": "M9",
+    "10": "M10",
+    "11": "M11",
+    "12": "M12"
+  },
+  "month_hours": {
+    "M1": 744,
+    "M2": 672,
+    "M3": 744,
+    "M4": 720,
+    "M5": 744,
+    "M6": 720,
+    "M7": 744,
+    "M8": 744,
+    "M9": 720,
+    "M10": 744,
+    "M11": 720,
+    "M12": 744
+  },
+  "month_days": {
+    "M1": 31,
+    "M2": 28,
+    "M3": 31,
+    "M4": 30,
+    "M5": 31,
+    "M6": 30,
+    "M7": 31,
+    "M8": 31,
+    "M9": 30,
+    "M10": 31,
+    "M11": 30,
+    "M12": 31
   }
 }

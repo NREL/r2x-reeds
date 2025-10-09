@@ -6,6 +6,8 @@ into the R2X framework using infrasys components.
 
 from importlib.metadata import version
 
+from loguru import logger
+
 __version__ = version("r2x_reeds")
 
 from .config import ReEDSConfig
@@ -31,6 +33,10 @@ from .models import (
     TimeHours,
 )
 from .parser import ReEDSParser
+
+# Disable default loguru handler for library usage
+# Applications using this library should configure their own handlers
+logger.disable("r2x_reeds")
 
 __all__ = [
     "EmissionRate",

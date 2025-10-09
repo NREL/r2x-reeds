@@ -77,7 +77,7 @@ class ReEDSConfig(PluginConfig):
         list[int],
         Field(description="Weather data year(s) - automatically converted to list"),
     ]
-    case_name: Annotated[str, Field(default="Unknown", description="Case name")]
+    case_name: Annotated[str | None, Field(default=None, description="Case name")] = None
     scenario: Annotated[str, Field(default="base", description="Scenario identifier")]
 
     @field_validator("solve_years", mode="before")
@@ -124,6 +124,3 @@ class ReEDSConfig(PluginConfig):
             The first weather year in the list
         """
         return self.weather_years[0]
-
-    # Note: load_defaults() and get_file_mapping_path() are inherited from PluginConfig
-    # and automatically discover the package location using cls.__module__

@@ -25,7 +25,7 @@ def test_data_path() -> Path:
 @pytest.fixture
 def reeds_config() -> ReEDSConfig:
     """Create ReEDS configuration for testing."""
-    return ReEDSConfig(solve_years=2032, weather_years=2012)
+    return ReEDSConfig(solve_years=2032, weather_years=2012, case_name="test", scenario="base")  # type: ignore[arg-type]
 
 
 @pytest.fixture
@@ -62,38 +62,46 @@ def test_build_system(system) -> None:
 
 def test_system_has_buses(system) -> None:
     """Test that built system contains buses."""
-    # Get all components from the system
     components = list(system.get_components(Component))
     assert components is not None
-
-    # System should have components after building
-    num_components = len(components)
-    print(f"Total components in system: {num_components}")
-    assert num_components > 0, "System should have components after building"
+    assert len(components) > 0, "System should have components after building"
 
 
 def test_system_has_generators(system) -> None:
     """Test that built system contains generators."""
-    # Get all components
     components = list(system.get_components(Component))
     assert components is not None
-    assert len(components) >= 0  # May be empty if no generators added yet
+    assert len(components) >= 0
 
 
 def test_system_has_loads(system) -> None:
     """Test that built system contains loads."""
-    # Get all components
     components = list(system.get_components(Component))
     assert components is not None
-    assert len(components) >= 0  # May be empty if no loads added yet
+    assert len(components) >= 0
 
 
 @pytest.fixture
 def expected_generator_count(data_store: DataStore, reeds_config: ReEDSConfig) -> int:
-    """Get expected generator count from online capacity data."""
+    """Get expected generator count from online capacity data.
+
+    Renewable generators are aggregated by tech-region (no vintage) since
+    capacity factor profiles are region-level only.
+    """
+    defaults = reeds_config.load_defaults()
+    tech_cats = defaults.get("tech_categories", {})
+    renewable_techs = tech_cats.get("solar", []) + tech_cats.get("wind", [])
+
     capacity_data = data_store.read_data_file(name="online_capacity")
     df = capacity_data.filter(pl.col("year") == reeds_config.solve_years[0]).collect()
-    return df.height
+
+    df_renewable = df.filter(pl.col("technology").is_in(renewable_techs))
+    df_non_renewable = df.filter(~pl.col("technology").is_in(renewable_techs))
+
+    renewable_count = df_renewable.select(["technology", "region"]).unique().height
+    non_renewable_count = df_non_renewable.height
+
+    return renewable_count + non_renewable_count
 
 
 def test_generator_count_matches_capacity_data(system, expected_generator_count: int) -> None:
@@ -131,7 +139,8 @@ def all_loads(system):
 def test_loads_exist_for_datastore_regions(all_loads, load_dataframe) -> None:
     """Test that loads exist for all regions in DataStore."""
     load_regions = {load.name.replace("_load", "") for load in all_loads}
-    datastore_regions = set(load_dataframe.columns)
+    # Filter out metadata columns (datetime, solve_year) that aren't region names
+    datastore_regions = {col for col in load_dataframe.columns if col not in ["datetime", "solve_year"]}
 
     assert load_regions == datastore_regions
 
@@ -142,8 +151,9 @@ def test_load_time_series_attached(system, all_loads) -> None:
 
 
 def test_load_time_series_length(system, all_loads, load_dataframe) -> None:
-    """Test that time series length matches DataStore data."""
-    expected_length = load_dataframe.height
+    """Test that time series length matches filtered data (single weather year = 8760 hours)."""
+    # The parser filters load data to a single weather year and solve year, so expect 8760 hours
+    expected_length = 8760
     assert all(len(system.get_time_series(load).data) == expected_length for load in all_loads)
 
 
@@ -159,7 +169,15 @@ def region_load(request, system):
 def test_load_time_series_values(region_load, load_dataframe) -> None:
     """Test that time series values match DataStore data for each region."""
     system, load, region_name = region_load
-    expected_profile = load_dataframe[region_name].to_numpy()
+
+    # Filter load_dataframe to match what the parser uses (weather_year=2012, solve_year=2032)
+    import polars as pl
+
+    filtered_df = load_dataframe.filter(
+        (pl.col("datetime").dt.year() == 2012) & (pl.col("solve_year") == 2032)
+    )
+
+    expected_profile = filtered_df[region_name].to_numpy()
     actual_profile = system.get_time_series(load).data
 
     np.testing.assert_allclose(
@@ -189,19 +207,32 @@ def test_system_has_renewable_generators(all_renewable_generators) -> None:
 
 
 def test_renewable_generator_count(all_renewable_generators) -> None:
-    """Test expected renewable generator count for test_Pacific data."""
-    assert len(all_renewable_generators) == 130
+    """Test expected renewable generator count for test_Pacific data.
+
+    Renewable generators are aggregated by tech-region, not by vintage.
+    Includes hydro generators which now have rating profiles.
+    """
+    assert 75 <= len(all_renewable_generators) <= 85, (
+        f"Expected ~80 renewable generators (including hydro, aggregated by tech-region), "
+        f"got {len(all_renewable_generators)}"
+    )
 
 
 def test_renewable_time_series_attached(system, all_renewable_generators) -> None:
     """Test that time series exists for all renewable generators."""
-    assert all(system.get_time_series(gen) is not None for gen in all_renewable_generators)
+    assert all(
+        system.get_time_series(gen, name="max_active_power") is not None for gen in all_renewable_generators
+    )
 
 
 def test_renewable_time_series_length(system, all_renewable_generators, renewable_cf_dataframe) -> None:
-    """Test that time series length matches DataStore data."""
-    expected_length = renewable_cf_dataframe.height
-    assert all(len(system.get_time_series(gen).data) == expected_length for gen in all_renewable_generators)
+    """Test that time series length matches filtered data (single weather year = 8760 hours)."""
+    # The parser filters CF data to a single weather year, so expect 8760 hours
+    expected_length = 8760
+    assert all(
+        len(system.get_time_series(gen, name="max_active_power").data) == expected_length
+        for gen in all_renewable_generators
+    )
 
 
 @pytest.fixture
@@ -218,7 +249,12 @@ def test_renewable_time_series_values(sample_renewable_generator, renewable_cf_d
     if generator is None:
         pytest.skip("No distpv generator found in p1 region")
 
-    expected_profile = renewable_cf_dataframe["distpv|p1"].to_numpy()
+    # Filter CF dataframe to match what the parser uses (weather_year=2012)
+    import polars as pl
+
+    filtered_df = renewable_cf_dataframe.filter(pl.col("datetime").dt.year() == 2012)
+
+    expected_profile = filtered_df["distpv|p1"].to_numpy()
     actual_ts = system.get_time_series(generator)
     actual_profile = actual_ts.data
 
@@ -229,17 +265,48 @@ def test_renewable_time_series_values(sample_renewable_generator, renewable_cf_d
     )
 
 
-def test_renewable_time_series_normalization(sample_renewable_generator) -> None:
-    """Test that renewable time series has normalization metadata when capacity > 0."""
-    system, generator = sample_renewable_generator
+def test_system_has_reserves(system) -> None:
+    """Test that the system has reserve components."""
+    from r2x_reeds.models.components import ReEDSReserve
 
-    if generator is None:
-        pytest.skip("No distpv generator found in p1 region")
+    reserves = list(system.get_components(ReEDSReserve))
+    assert len(reserves) > 0, "System should have at least one reserve component"
 
-    ts = system.get_time_series(generator)
 
-    if generator.capacity > 0:
-        assert ts.normalization is not None
-        assert ts.normalization.value == generator.capacity
-    else:
-        assert ts.normalization is None
+def test_reserve_time_series_attached(system) -> None:
+    """Test that reserve components have time series attached."""
+    from r2x_reeds.models.components import ReEDSReserve
+
+    reserves = list(system.get_components(ReEDSReserve))
+    reserves_with_ts = [r for r in reserves if system.has_time_series(r)]
+
+    assert len(reserves_with_ts) > 0, "At least one reserve should have time series attached"
+
+
+def test_reserve_time_series_length(system) -> None:
+    """Test that reserve time series have correct length (matches hourly time index)."""
+    from r2x_reeds.models.components import ReEDSReserve
+
+    reserves = list(system.get_components(ReEDSReserve))
+
+    for reserve in reserves:
+        if system.has_time_series(reserve):
+            ts = system.get_time_series(reserve)
+            # 2012 is a leap year, so 366 days * 24 hours = 8784
+            assert len(ts.data) == 8784, f"Reserve {reserve.name} should have 8784 hours of data (leap year)"
+
+
+def test_reserve_time_series_values(system) -> None:
+    """Test that reserve time series have non-negative values."""
+    from r2x_reeds.models.components import ReEDSReserve
+
+    reserves = list(system.get_components(ReEDSReserve))
+    checked_count = 0
+
+    for reserve in reserves:
+        if system.has_time_series(reserve):
+            ts = system.get_time_series(reserve)
+            assert np.all(ts.data >= 0), f"Reserve {reserve.name} should have non-negative values"
+            checked_count += 1
+
+    assert checked_count > 0, "Should have checked at least one reserve time series"

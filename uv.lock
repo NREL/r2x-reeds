@@ -1196,6 +1196,18 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-mock"
+version = "3.15.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/68/14/eb014d26be205d38ad5ad20d9a80f7d201472e08167f0bb4361e251084a9/pytest_mock-3.15.1.tar.gz", hash = "sha256:1849a238f6f396da19762269de72cb1814ab44416fa73a8686deac10b0d87a0f", size = 34036, upload-time = "2025-09-16T16:37:27.081Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5a/cc/06253936f4a7fa2e0f48dfe6d851d9c56df896a9ab09ac019d70b760619c/pytest_mock-3.15.1-py3-none-any.whl", hash = "sha256:0a25e2eb88fe5168d535041d09a4529a188176ae608a6d249ee65abc0949630d", size = 10095, upload-time = "2025-09-16T16:37:25.734Z" },
+]
+
+[[package]]
 name = "python-dateutil"
 version = "2.9.0.post0"
 source = { registry = "https://pypi.org/simple" }
@@ -1292,7 +1304,7 @@ wheels = [
 [[package]]
 name = "r2x-core"
 version = "0.0.6"
-source = { registry = "https://pypi.org/simple" }
+source = { editable = "../../r2x-core/dev" }
 dependencies = [
     { name = "h5py" },
     { name = "infrasys" },
@@ -1300,9 +1312,35 @@ dependencies = [
     { name = "polars" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/30/47/7364312251600b987e8e1034357933cc884a300af7161f854812651db133/r2x_core-0.0.6.tar.gz", hash = "sha256:4037517a19d35d1f470641642ce01184fb8569357beb1d4da280b636f391f190", size = 38109, upload-time = "2025-10-07T03:12:54.293Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/bd/2a/83396c0232d8dda7d789254702d38d8353a5277d8c50dcf7f10eba0e7869/r2x_core-0.0.6-py3-none-any.whl", hash = "sha256:626a1122ef4731b8ea09ab559d2685963975f996b63c9e960600234a1f5e84e9", size = 44710, upload-time = "2025-10-07T03:12:52.833Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "h5py", specifier = ">=3.13.0" },
+    { name = "infrasys", specifier = ">=1.0.0rc1" },
+    { name = "loguru", specifier = ">=0.7.3" },
+    { name = "polars", specifier = ">=1.33.1" },
+    { name = "pydantic", specifier = ">=2.11.9,<3" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "h5py-stubs", specifier = ">=0.1.2" },
+    { name = "mypy", specifier = ">=1.18.2" },
+    { name = "pre-commit", specifier = ">=4.3.0" },
+    { name = "pytest", specifier = ">=8.4.2" },
+    { name = "pytest-coverage", specifier = ">=0.0" },
+    { name = "ruff", specifier = ">=0.13.2" },
+]
+docs = [
+    { name = "autodoc-pydantic" },
+    { name = "docstr-coverage", specifier = ">=2.3.2" },
+    { name = "furo", specifier = ">=2025.9.25" },
+    { name = "ghp-import" },
+    { name = "myst-parser" },
+    { name = "sphinx", specifier = ">=8.0.0" },
+    { name = "sphinx-copybutton" },
+    { name = "sphinx-reports" },
+    { name = "sphinx-tabs" },
 ]
 
 [[package]]
@@ -1325,6 +1363,7 @@ dev = [
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-coverage" },
+    { name = "pytest-mock" },
     { name = "ruff" },
 ]
 docs = [
@@ -1347,7 +1386,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=1.20.0" },
     { name = "polars", specifier = ">=1.33.0" },
     { name = "pydantic", specifier = ">=2.11.0,<3" },
-    { name = "r2x-core", specifier = ">=0.0.6" },
+    { name = "r2x-core", editable = "../../r2x-core/dev" },
 ]
 
 [package.metadata.requires-dev]
@@ -1356,6 +1395,7 @@ dev = [
     { name = "pre-commit", specifier = ">=4.3.0" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-coverage", specifier = ">=0.0" },
+    { name = "pytest-mock", specifier = ">=3.15.1" },
     { name = "ruff", specifier = ">=0.13.3" },
 ]
 docs = [
