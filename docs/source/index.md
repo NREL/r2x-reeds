@@ -11,7 +11,7 @@ references/index
 
 # R2X ReEDS Documentation
 
-R2X ReEDS is an R2X Core plugin for translating Regional Energy Deployment System (ReEDS) power system models to/from the R2X Core common format.
+R2X ReEDS is an R2X Core plugin for parsing Regional Energy Deployment System (ReEDS) power system model data.
 
 ## About R2X ReEDS
 
