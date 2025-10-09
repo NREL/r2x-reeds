@@ -832,10 +832,10 @@ class ReEDSParser(BaseParser):
         logger.info("Attaching reserve profiles...")
 
         defaults = self.config.load_defaults()
-        reserve_providers = defaults.get("reserve_providers", {})
+        excluded_from_reserves = defaults.get("excluded_from_reserves", {})
 
-        if not reserve_providers:
-            logger.warning("No reserve_providers configured in defaults, skipping reserve profiles")
+        if not excluded_from_reserves:
+            logger.warning("No excluded_from_reserves configured in defaults, skipping reserve profiles")
             return
 
         for reserve in self.system.get_components(ReEDSReserve):
@@ -905,7 +905,7 @@ class ReEDSParser(BaseParser):
                 for gen in self.system.get_components(ReEDSGenerator)
                 if gen.region
                 and gen.region.transmission_region == region_name
-                and gen.category in ["wind-ons", "wind-ofs"]
+                and self._tech_matches_category(gen.technology, "wind", defaults)
             ]
 
             for gen in wind_generators:
@@ -920,10 +920,10 @@ class ReEDSParser(BaseParser):
                 for gen in self.system.get_components(ReEDSGenerator)
                 if gen.region
                 and gen.region.transmission_region == region_name
-                and gen.category in ["upv", "distpv", "pvb"]
+                and self._tech_matches_category(gen.technology, "solar", defaults)
             ]
 
-            total_solar_capacity = sum(gen.capacity_mw for gen in solar_generators)
+            total_solar_capacity = sum(gen.capacity for gen in solar_generators)
             solar_active = np.zeros(num_hours)
 
             for gen in solar_generators:

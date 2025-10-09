@@ -215,26 +215,17 @@
     "REGULATION": 0.01,
     "SPINNING": 0.03
   },
-  "reserve_providers": {
-    "solar": [
-      "FLEXIBILITY"
+  "excluded_from_reserves": {
+    "SPINNING": [
+      "solar",
+      "wind"
     ],
-    "wind": [
-      "FLEXIBILITY"
+    "REGULATION": [
+      "solar",
+      "wind"
     ],
-    "thermal": [
-      "SPINNING",
-      "REGULATION"
-    ],
-    "hydro": [
-      "SPINNING",
-      "REGULATION",
-      "FLEXIBILITY"
-    ],
-    "storage": [
-      "SPINNING",
-      "REGULATION",
-      "FLEXIBILITY"
+    "FLEXIBILITY": [
+      "thermal"
     ]
   },
   "month_map": {
