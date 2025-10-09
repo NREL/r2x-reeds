@@ -329,7 +329,10 @@
     "fpath": "inputs_case/modeledyears.csv",
     "input": true,
     "name": "modeledyears",
-    "optional": false
+    "optional": false,
+    "reader_kwargs": {
+      "has_header": false
+    }
   },
   {
     "column_mapping": {

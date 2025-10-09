@@ -91,9 +91,13 @@ def expected_generator_count(data_store: DataStore, reeds_config: ReEDSConfig) -
     defaults = reeds_config.load_defaults()
     tech_cats = defaults.get("tech_categories", {})
     renewable_techs = tech_cats.get("solar", []) + tech_cats.get("wind", [])
+    excluded_techs = defaults.get("excluded_techs", [])
 
     capacity_data = data_store.read_data_file(name="online_capacity")
     df = capacity_data.filter(pl.col("year") == reeds_config.solve_years[0]).collect()
+
+    # Filter out excluded technologies
+    df = df.filter(~pl.col("technology").is_in(excluded_techs))
 
     df_renewable = df.filter(pl.col("technology").is_in(renewable_techs))
     df_non_renewable = df.filter(~pl.col("technology").is_in(renewable_techs))

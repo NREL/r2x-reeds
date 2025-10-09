@@ -130,11 +130,32 @@ class ReEDSParser(BaseParser):
         """Validate input data before building system."""
         logger.info("Validating ReEDS input data...")
 
-        required_files = ["hierarchy", "modeledyears"]
-        for file_name in required_files:
-            if file_name not in self.data_store:
-                msg = f"Required file '{file_name}' not found in DataStore"
-                raise ValueError(msg)
+        # Validate solve years exist in modeledyears.csv
+        modeled_years_data = self.read_data_file("modeledyears").collect()
+        if modeled_years_data is not None and len(modeled_years_data) > 0:
+            # Extract years from the first row
+            available_solve_years = set(modeled_years_data.row(0))
+
+            for solve_year in self.config.solve_years:
+                if solve_year not in available_solve_years:
+                    msg = (
+                        f"Solve year {solve_year} not found in modeledyears.csv. "
+                        f"Available years: {sorted(available_solve_years)}"
+                    )
+                    raise ValueError(msg)
+
+        # Validate weather years exist in hmap_allyrs.csv
+        hour_map_data = self.read_data_file("hour_map").collect()
+        if hour_map_data is not None and "year" in hour_map_data.columns:
+            available_weather_years = set(hour_map_data["year"].unique().to_list())
+
+            for weather_year in self.config.weather_years:
+                if weather_year not in available_weather_years:
+                    msg = (
+                        f"Weather year {weather_year} not found in hmap_allyrs.csv. "
+                        f"Available years: {sorted(available_weather_years)}"
+                    )
+                    raise ValueError(msg)
 
         logger.info("Input validation complete")
 

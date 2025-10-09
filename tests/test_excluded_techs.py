@@ -23,7 +23,7 @@ def file_mapping_path():
 
 
 def test_excluded_techs_empty_list_default(data_folder, file_mapping_path):
-    """Test that default excluded_techs is empty list and doesn't filter anything."""
+    """Test that default excluded_techs includes can-imports and electrolyzer."""
     config = ReEDSConfig(
         solve_years=[2032],
         weather_years=[2012],
@@ -32,7 +32,7 @@ def test_excluded_techs_empty_list_default(data_folder, file_mapping_path):
     )
 
     defaults = config.load_defaults()
-    assert defaults.get("excluded_techs") == []
+    assert defaults.get("excluded_techs") == ["can-imports", "electrolyzer"]
 
     data_store = DataStore.from_json(file_mapping_path, folder=data_folder)
     parser = ReEDSParser(config, data_store, name="test_no_exclusion")

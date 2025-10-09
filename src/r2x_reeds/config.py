@@ -83,25 +83,14 @@ class ReEDSConfig(PluginConfig):
     @field_validator("solve_years", mode="before")
     @classmethod
     def validate_solve_years(cls, v: int | list[int]) -> list[int]:
-        """Validate solve years and convert to list."""
-        years = [v] if isinstance(v, int) else v
-        for year in years:
-            if year < 2020 or year > 2100:
-                msg = f"Solve year {year} must be between 2020 and 2100"
-                raise ValueError(msg)
-        return years
+        """Convert solve years to list."""
+        return [v] if isinstance(v, int) else v
 
     @field_validator("weather_years", mode="before")
     @classmethod
     def validate_weather_years(cls, v: int | list[int]) -> list[int]:
-        """Validate weather years and convert to list."""
-        years = [v] if isinstance(v, int) else v
-        # ReEDS typically uses 2007-2013 weather years
-        for year in years:
-            if year < 2007 or year > 2013:
-                msg = f"Weather year {year} should be between 2007 and 2013 for ReEDS"
-                raise ValueError(msg)
-        return years
+        """Convert weather years to list."""
+        return [v] if isinstance(v, int) else v
 
     @property
     def primary_solve_year(self) -> int:

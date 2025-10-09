@@ -1,8 +1,5 @@
 """Tests for ReEDS configuration."""
 
-import pytest
-from pydantic import ValidationError
-
 from r2x_reeds.config import ReEDSConfig
 
 
@@ -62,21 +59,21 @@ def test_reeds_config_scenario_field():
 
 
 def test_reeds_config_invalid_solve_year():
-    """Test that invalid solve year raises error."""
-    with pytest.raises(ValidationError):
-        ReEDSConfig(
-            solve_years=1999,  # Too early
-            weather_years=2012,
-        )
+    """Test that config accepts any solve year (validation happens in parser)."""
+    config = ReEDSConfig(
+        solve_years=1999,
+        weather_years=2012,
+    )
+    assert config.solve_years == [1999]
 
 
 def test_reeds_config_invalid_weather_year():
-    """Test that invalid weather year raises error."""
-    with pytest.raises(ValidationError):
-        ReEDSConfig(
-            solve_years=2030,
-            weather_years=2020,  # Outside ReEDS range
-        )
+    """Test that config accepts any weather year (validation happens in parser)."""
+    config = ReEDSConfig(
+        solve_years=2030,
+        weather_years=2020,
+    )
+    assert config.weather_years == [2020]
 
 
 def test_reeds_config_primary_solve_year():

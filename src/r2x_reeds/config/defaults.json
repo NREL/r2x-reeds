@@ -1,5 +1,8 @@
 {
-  "excluded_techs": [],
+  "excluded_techs": [
+    "can-imports",
+    "electrolyzer"
+  ],
   "data_validation": {
     "max_capacity_mw": 100000.0,
     "max_fuel_price": 1000.0,
