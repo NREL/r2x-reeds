@@ -8,26 +8,26 @@ from r2x_reeds.models.base import FromTo_ToFrom, ReEDSComponent
 
 def test_fromto_tofrom_creation():
     """Test creating a FromTo_ToFrom instance with valid values."""
-    model = FromTo_ToFrom(name="test_flow", from_to=100.0, to_from=150.0)
+    model = FromTo_ToFrom(from_to=100.0, to_from=150.0)
     assert model.from_to == 100.0
 
 
 def test_fromto_tofrom_to_from_value():
     """Test that to_from value is correctly set."""
-    model = FromTo_ToFrom(name="test_flow", from_to=100.0, to_from=150.0)
+    model = FromTo_ToFrom(from_to=100.0, to_from=150.0)
     assert model.to_from == 150.0
 
 
 def test_fromto_tofrom_negative_from_to_fails():
     """Test that negative from_to value raises validation error."""
     with pytest.raises(ValidationError):
-        FromTo_ToFrom(name="test", from_to=-10.0, to_from=100.0)
+        FromTo_ToFrom(from_to=-10.0, to_from=100.0)
 
 
 def test_fromto_tofrom_negative_to_from_fails():
     """Test that negative to_from value raises validation error."""
     with pytest.raises(ValidationError):
-        FromTo_ToFrom(name="test", from_to=100.0, to_from=-10.0)
+        FromTo_ToFrom(from_to=100.0, to_from=-10.0)
 
 
 def test_reeds_component_creation():
