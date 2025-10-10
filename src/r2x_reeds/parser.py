@@ -546,9 +546,7 @@ class ReEDSParser(BaseParser):
             line = ReEDSTransmissionLine(
                 name=line_name,
                 interface=interface,
-                max_active_power=FromTo_ToFrom(
-                    name=f"{line_name}_capacity", from_to=forward_cap, to_from=reverse_cap
-                ),
+                max_active_power=FromTo_ToFrom(from_to=forward_cap, to_from=reverse_cap),
                 category=line_type,
                 line_type=line_type,
             )
