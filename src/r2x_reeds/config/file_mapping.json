@@ -1,6 +1,20 @@
 [
   {
     "column_mapping": {
+      "computer": "computer",
+      "repo": "repo",
+      "branch": "branch",
+      "commit": "commit",
+      "description": "description"
+    },
+    "description": "Read meta information from reeds case",
+    "fpath": "meta.csv",
+    "input": true,
+    "name": "meta",
+    "optional": false
+  },
+  {
+    "column_mapping": {
       "i": "technology",
       "r": "region",
       "value": "capacity_mw"

@@ -1,0 +1,3 @@
+﻿fname,new_fname,header,index,new_fpath,method,method_args
+hmap_allyrs.csv,,,,inputs_case/rep/hmap_allyrs.csv,move_file,
+storage_duration_out.csv,,"i,v,r,t,value",,outputs/storage_duration_out.csv,"apply_header,move_file",
