@@ -132,14 +132,13 @@ class ReEDSParser(BaseParser):
         logger.info("Validating ReEDS input data...")
 
         # Get file paths from DataStore
-        modeledyears_file = self.data_store.get_data_file_by_name("modeledyears")
+        modeledyears_file = self.data_store.get_data_file_by_name("modeled_years")
         hour_map_file = self.data_store.get_data_file_by_name("hour_map")
 
-        modeled_years_data = self.read_data_file("modeledyears")
+        modeled_years_data = self.read_data_file("modeled_years")
         if modeled_years_data is None or modeled_years_data.limit(1).collect().is_empty():
             msg = f"{modeledyears_file.fpath} is empty or missing. Check input folder."
             raise ValueError(msg)
-
         hour_map_data = self.read_data_file("hour_map")
         if hour_map_data is None or hour_map_data.limit(1).collect().is_empty():
             msg = f"{hour_map_file.fpath} is empty or missing. Check input folder."
@@ -150,7 +149,8 @@ class ReEDSParser(BaseParser):
             if isinstance(self.config.solve_year, int)
             else list(self.config.solve_year)
         )
-        available_solve_years = set(modeled_years_data.collect().row(0))
+        # Handle from row to column-like modeled_years dataframe
+        available_solve_years = set(modeled_years_data.collect()["modeled_years"].to_list())
         missing_solve_years = [y for y in solve_years if y not in available_solve_years]
         if missing_solve_years:
             msg = f"Solve year(s) {missing_solve_years} not found in {modeledyears_file.fpath}. "
