@@ -149,6 +149,7 @@ class ReEDSParser(BaseParser):
             if isinstance(self.config.solve_year, int)
             else list(self.config.solve_year)
         )
+        # Handle from row to column-like modeled_years dataframe
         available_solve_years = set(modeled_years_data.collect()["modeled_years"].to_list())
         missing_solve_years = [y for y in solve_years if y not in available_solve_years]
         if missing_solve_years:
