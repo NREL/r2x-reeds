@@ -325,13 +325,18 @@
     "units": "MW"
   },
   {
+    "column_schema": {
+      "modeledyears": "i16"
+    },
     "description": "List of modeled years",
     "fpath": "inputs_case/modeledyears.csv",
     "input": true,
-    "name": "modeledyears",
+    "name": "modeled_years",
     "optional": false,
+    "pivot_on": "modeled_years",
     "reader_kwargs": {
-      "has_header": false
+      "has_header": false,
+      "separator": ","
     }
   },
   {
