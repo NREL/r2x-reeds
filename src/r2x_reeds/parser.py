@@ -529,20 +529,19 @@ class ReEDSParser(BaseParser):
                 forward_cap = capacity_to_from
                 reverse_cap = capacity_from_to
 
-            if interface_name in self._interface_cache:
-                continue
-
-            interface = ReEDSInterface(
-                name=interface_name,
-                from_region=interface_from,
-                to_region=interface_to,
-                category=line_type,
-            )
-            self.system.add_component(interface)
-            self._interface_cache[interface_name] = interface
-            interface_count += 1
+            if interface_name not in self._interface_cache:
+                interface = ReEDSInterface(
+                    name=interface_name,
+                    from_region=interface_from,
+                    to_region=interface_to,
+                    category=line_type,
+                )
+                self.system.add_component(interface)
+                self._interface_cache[interface_name] = interface
+                interface_count += 1
 
             line_name = f"{from_region_name}_{to_region_name}_{line_type}"
+            interface = self._interface_cache[interface_name]
             line = ReEDSTransmissionLine(
                 name=line_name,
                 interface=interface,
