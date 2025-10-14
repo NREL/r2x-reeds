@@ -346,7 +346,7 @@
       "season": "season"
     },
     "description": "Hour mapping for representative periods",
-    "fpath": "inputs_case/hmap_allyrs.csv",
+    "fpath": "inputs_case/rep/hmap_allyrs.csv",
     "input": true,
     "name": "hour_map",
     "optional": false

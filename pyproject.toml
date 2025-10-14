@@ -6,9 +6,11 @@ description = "ReEDS model plugin"
 license = {file = "LICENSE.txt"}
 authors = [
     { name = "pesap", email = "pesap@users.noreply.github.com" },
+    { name = "kodiobika", email = "kodiobika@users.noreply.github.com" },
 ]
 maintainers = [
     { name = "pesap", email = "pesap@users.noreply.github.com" },
+    { name = "kodiobika", email = "kodiobika@users.noreply.github.com" },
 ]
 requires-python = ">=3.11"
 dependencies = [
