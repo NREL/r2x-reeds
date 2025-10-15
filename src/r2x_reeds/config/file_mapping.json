@@ -26,7 +26,7 @@
     "name": "online_capacity",
     "optional": true,
     "units": "MW",
-    "filters": {
+    "filter_by": {
       "year": "solve_year"
     }
   },
@@ -116,7 +116,7 @@
     "name": "transmission_capacity",
     "optional": true,
     "units": "MW",
-    "filters": {
+    "filter_by": {
       "year": "solve_year"
     }
   },
@@ -192,7 +192,7 @@
     "name": "heat_rate",
     "optional": true,
     "units": "MMBtu/MWh",
-    "filters": {
+    "filter_by": {
       "year": "solve_year"
     }
   },
@@ -209,7 +209,7 @@
     "name": "fuel_price",
     "optional": true,
     "units": "$/MMBtu",
-    "filters": {
+    "filter_by": {
       "year": "solve_year"
     }
   },
@@ -225,7 +225,7 @@
     "name": "biofuel_price",
     "optional": true,
     "units": "$/MMBtu",
-    "filters": {
+    "filter_by": {
       "year": "solve_year"
     }
   },
@@ -293,7 +293,7 @@
     "input": false,
     "name": "renewable_cf_adjustment",
     "optional": true,
-    "filters": {
+    "filter_by": {
       "year": "solve_year"
     }
   },
@@ -362,7 +362,7 @@
     "name": "co2_cap",
     "optional": true,
     "units": "tonne",
-    "filters": {
+    "filter_by": {
       "year": "solve_year"
     }
   },
@@ -380,7 +380,7 @@
     "name": "cost_vom",
     "optional": true,
     "units": "$/MWh",
-    "filters": {
+    "filter_by": {
       "year": "solve_year"
     }
   },
@@ -416,7 +416,7 @@
     "name": "cost_hurdle_rate",
     "optional": true,
     "units": "$/MWh",
-    "filters": {
+    "filter_by": {
       "year": "solve_year"
     }
   },
@@ -496,7 +496,7 @@
     "name": "emission_rates",
     "optional": true,
     "units": "kg/MWh",
-    "filters": {
+    "filter_by": {
       "year": "solve_year"
     }
   },
@@ -513,7 +513,7 @@
     "input": true,
     "name": "hydro_cf",
     "optional": false,
-    "filters": {
+    "filter_by": {
       "year": "solve_year"
     }
   }

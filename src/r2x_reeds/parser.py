@@ -127,6 +127,27 @@ class ReEDSParser(BaseParser):
         self._filtered_load_data: pl.DataFrame | None = None
         self._filtered_cf_data: pl.DataFrame | None = None
 
+        # Fill in the user-specified solve and weather years
+        # where they have been specified in the file mapping filters
+        for name, data_file in self.data_store._cache.items():
+            if data_file.filter_by:
+                for k, v in data_file.filter_by.items():
+                    match v:
+                        case "solve_year":
+                            data_file.filter_by[k] = self.config.solve_year
+                        case "weather_year":
+                            data_file.filter_by[k] = self.config.weather_year
+                        case _ if isinstance(v, list):
+                            data_file.filter_by[k] = [
+                                self.config.solve_year if _v == "solve_year" else _v for _v in v
+                            ]
+                            data_file.filter_by[k] = [
+                                self.config.weather_year if _v == "weather_year" else _v for _v in v
+                            ]
+                        case _:
+                            pass
+            self.data_store._cache[name] = data_file
+
     def validate_inputs(self) -> None:
         """Validate input data before building system."""
         logger.info("Validating ReEDS input data...")
@@ -242,6 +263,7 @@ class ReEDSParser(BaseParser):
         self._region_cache: dict[str, Any] = {}
         self._generator_cache: dict[str, Any] = {}
         self._interface_cache: dict[str, Any] = {}
+        self._line_cache: dict[str, Any] = {}
 
         self._build_regions()
         self._build_generators()
@@ -517,6 +539,10 @@ class ReEDSParser(BaseParser):
 
             regions_sorted = sorted([from_region_name, to_region_name])
             interface_name = f"{regions_sorted[0]}||{regions_sorted[1]}"
+            line_name = f"{regions_sorted[0]}_{regions_sorted[1]}_{line_type}"
+
+            if line_name in self._line_cache:
+                continue
 
             if from_region_name == regions_sorted[0]:
                 interface_from = from_region
@@ -542,7 +568,6 @@ class ReEDSParser(BaseParser):
                 self._interface_cache[interface_name] = interface
                 interface_count += 1
 
-            line_name = f"{from_region_name}_{to_region_name}_{line_type}"
             line = ReEDSTransmissionLine(
                 name=line_name,
                 interface=interface,
@@ -551,6 +576,7 @@ class ReEDSParser(BaseParser):
                 line_type=line_type,
             )
             self.system.add_component(line)
+            self._line_cache[line_name] = line
             line_count += 1
 
         logger.info("Built {} transmission interfaces and {} lines", interface_count, line_count)
