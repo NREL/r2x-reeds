@@ -146,7 +146,9 @@ class ReEDSParser(BaseParser):
                             ]
                         case _:
                             pass
-            self.data_store._cache[name] = data_file
+                self.data_store._cache[name] = data_file
+            else:
+                pass
 
     def validate_inputs(self) -> None:
         """Validate input data before building system."""
