@@ -11,7 +11,7 @@ from importlib.metadata import version  # noqa: E402
 from loguru import logger  # noqa: E402
 
 from .plugins import register_plugin  # noqa: E402
-from .upgrader.functions import move_hour_map  # noqa: E402
+from .upgrader.functions import move_file  # noqa: E402
 
 __version__ = version("r2x_reeds")
 
@@ -66,6 +66,6 @@ __all__ = [
     "ReserveType",
     "TimeHours",
     "__version__",
-    "move_hour_map",
+    "move_file",
     "register_plugin",
 ]

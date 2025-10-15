@@ -7,10 +7,8 @@ from r2x_core.versioning import GitVersioningStrategy
 
 
 class ReedsDataUpgrader(DataUpgrader):
-    # MUST set strategy (enforced by ABC)
     strategy = GitVersioningStrategy()
 
-    # MUST implement detect_version (enforced by ABC)
     @staticmethod
     def detect_from_csv(folder: Path) -> str | None:
         csv_path = folder / "meta.csv"

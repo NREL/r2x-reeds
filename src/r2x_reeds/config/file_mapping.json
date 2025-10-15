@@ -32,6 +32,24 @@
       "r": "region",
       "t": "year",
       "v": "vintage",
+      "Value": "seconds"
+    },
+    "description": "Storage duration by region, technology, and technology vintage",
+    "fpath": "outputs/storage_duration_out.csv",
+    "input": false,
+    "name": "online_capacity",
+    "optional": true,
+    "units": "s",
+    "filters": {
+      "year": "solve_year"
+    }
+  },
+  {
+    "column_mapping": {
+      "i": "technology",
+      "r": "region",
+      "t": "year",
+      "v": "vintage",
       "Value": "capacity_mw"
     },
     "description": "Online capacity by region, technology, and technology vintage",
@@ -488,11 +506,12 @@
       "r": "region_id",
       "tz": "timezone"
     },
-    "description": "test",
+    "description": "Region timezone mapping",
     "fpath": "inputs_case/reeds_region_tz_map.csv",
     "input": true,
     "name": "region_timezone_map",
-    "optional": true
+    "optional": true,
+    "removed": true
   },
   {
     "column_mapping": {
