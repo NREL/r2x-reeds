@@ -10,7 +10,7 @@ class ReedsDataUpgrader(DataUpgrader):
     strategy = GitVersioningStrategy()
 
     @staticmethod
-    def detect_from_csv(folder: Path) -> str | None:
+    def detect_version(folder: Path) -> str | None:
         csv_path = folder / "meta.csv"
         if csv_path.exists():
             df = pl.read_csv(csv_path)
