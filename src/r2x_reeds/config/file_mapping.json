@@ -182,13 +182,15 @@
     "name": "load_data",
     "optional": false,
     "units": "MW",
-    "file_type": "H5Format",
+    "column_mapping": {
+      "year": "solve_year"
+    },
     "reader_kwargs": {
       "data_key": "data",
       "columns_key": "columns",
-      "datetime_key": "index_datetime",
+      "datetime_key": "index_1",
       "additional_keys": [
-        "index_year"
+        "index_0"
       ]
     }
   },
@@ -284,15 +286,13 @@
   {
     "description": "Renewable capacity factor profiles",
     "fpath": "inputs_case/recf.h5",
-    "input": true,
     "name": "renewable_cf",
     "optional": false,
     "units": "-",
-    "file_type": "H5Format",
     "reader_kwargs": {
       "data_key": "data",
       "columns_key": "columns",
-      "datetime_key": "index_datetime"
+      "datetime_key": "index_0"
     }
   },
   {

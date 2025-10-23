@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 from loguru import logger
 
-from r2x_core import UpgradeType
+from r2x_core.upgrader import UpgradeType
 from r2x_reeds import latest_commit
 from r2x_reeds.upgrader.data_upgrader import ReedsDataUpgrader
 from r2x_reeds.upgrader.helpers import get_function_arguments, read_csv
