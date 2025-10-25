@@ -1,7 +1,7 @@
 from r2x_core.plugins import PluginManager
 from r2x_reeds.config import ReEDSConfig
 from r2x_reeds.parser import ReEDSParser
-from r2x_reeds.upgrader.data_upgrader import ReedsDataUpgrader
+from r2x_reeds.upgrader.data_upgrader import ReEDSUpgrader
 
 
 def register_plugin() -> str | None:
@@ -16,7 +16,7 @@ def register_plugin() -> str | None:
         name="reeds",
         config=ReEDSConfig,
         parser=ReEDSParser,
-        upgrader=ReedsDataUpgrader,  # Steps already registered via decorators
+        upgrader=ReEDSUpgrader,  # Steps already registered via decorators
     )
 
     return None

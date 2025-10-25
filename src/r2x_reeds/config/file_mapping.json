@@ -17,7 +17,7 @@
     "column_mapping": {
       "i": "technology",
       "r": "region",
-      "value": "capacity_mw"
+      "value": "capacity"
     },
     "description": "Existing non-renewable capacity by technology and region",
     "fpath": "inputs_case/capnonrsc.csv",
@@ -32,7 +32,7 @@
       "r": "region",
       "t": "year",
       "v": "vintage",
-      "Value": "capacity_mw"
+      "value": "capacity"
     },
     "description": "Online capacity by region, technology, and technology vintage",
     "fpath": "outputs/cap_ivrt.csv",
@@ -40,8 +40,8 @@
     "name": "online_capacity",
     "optional": true,
     "units": "MW",
-    "filters": {
-      "year": "solve_year"
+    "filter_by": {
+      "year": "{solve_year}"
     }
   },
   {
@@ -89,10 +89,10 @@
   },
   {
     "column_mapping": {
-      "MW_f0": "forward_capacity_mw",
-      "MW_f1": "forward_contingency_capacity_mw",
-      "MW_r0": "reverse_capacity_mw",
-      "MW_r1": "reverse_contingency_capacity_mw",
+      "MW_f0": "forward_capacity",
+      "MW_f1": "forward_contingency_capacity",
+      "MW_r0": "reverse_capacity",
+      "MW_r1": "reverse_contingency_capacity",
       "interface": "interface_name",
       "r": "from_region",
       "rr": "to_region"
@@ -106,7 +106,7 @@
   },
   {
     "column_mapping": {
-      "MW": "capacity_mw",
+      "MW": "capacity",
       "r": "from_region",
       "rr": "to_region"
     },
@@ -122,7 +122,7 @@
       "r": "from_region",
       "rr": "to_region",
       "t": "year",
-      "Value": "capacity_mw"
+      "value": "capacity"
     },
     "description": "Transmission capacity between regions",
     "fpath": "outputs/tran_cap_energy.csv",
@@ -130,8 +130,8 @@
     "name": "transmission_capacity",
     "optional": true,
     "units": "MW",
-    "filters": {
-      "year": "solve_year"
+    "filter_by": {
+      "year": "{solve_year}"
     }
   },
   {
@@ -179,11 +179,15 @@
     "description": "Hourly load profiles by region",
     "fpath": "inputs_case/load.h5",
     "input": true,
-    "name": "load_data",
+    "name": "load_profiles",
     "optional": false,
     "units": "MW",
     "column_mapping": {
       "year": "solve_year"
+    },
+    "filter_by": {
+      "solve_year": "{solve_year}",
+      "datetime": "{weather_year}"
     },
     "reader_kwargs": {
       "data_key": "data",
@@ -200,7 +204,7 @@
       "r": "region",
       "t": "year",
       "v": "vintage",
-      "Value": "heat_rate"
+      "value": "heat_rate"
     },
     "description": "Heat rate by technology, region, and vintage",
     "fpath": "outputs/heat_rate.csv",
@@ -208,8 +212,8 @@
     "name": "heat_rate",
     "optional": true,
     "units": "MMBtu/MWh",
-    "filters": {
-      "year": "solve_year"
+    "filter_by": {
+      "year": "{solve_year}"
     }
   },
   {
@@ -217,7 +221,7 @@
       "i": "technology",
       "r": "region",
       "t": "year",
-      "Value": "fuel_price"
+      "value": "fuel_price"
     },
     "description": "Fuel prices by technology and region",
     "fpath": "outputs/fuel_price.csv",
@@ -225,15 +229,15 @@
     "name": "fuel_price",
     "optional": true,
     "units": "$/MMBtu",
-    "filters": {
-      "year": "solve_year"
+    "filter_by": {
+      "year": "{solve_year}"
     }
   },
   {
     "column_mapping": {
       "r": "region",
       "t": "year",
-      "Value": "fuel_price"
+      "value": "fuel_price"
     },
     "description": "Fuel price for biomass fuel generators per solve year and region.",
     "fpath": "outputs/repbioprice.csv",
@@ -241,8 +245,8 @@
     "name": "biofuel_price",
     "optional": true,
     "units": "$/MMBtu",
-    "filters": {
-      "year": "solve_year"
+    "filter_by": {
+      "year": "{solve_year}"
     }
   },
   {
@@ -262,7 +266,7 @@
   {
     "column_mapping": {
       "i": "technology",
-      "Value": "forced_outage_rate"
+      "value": "forced_outage_rate"
     },
     "description": "Forced outage rates by technology",
     "fpath": "outputs/forced_outage.csv",
@@ -274,7 +278,7 @@
   {
     "column_mapping": {
       "i": "technology",
-      "Value": "planned_outage_rate"
+      "value": "planned_outage_rate"
     },
     "description": "Planned outage rates by technology",
     "fpath": "outputs/planned_outage.csv",
@@ -286,9 +290,13 @@
   {
     "description": "Renewable capacity factor profiles",
     "fpath": "inputs_case/recf.h5",
-    "name": "renewable_cf",
+    "name": "renewable_profiles",
     "optional": false,
     "units": "-",
+    "filter_by": {
+      "datetime": "{weather_year}",
+      "solve_year": "{solve_year}"
+    },
     "reader_kwargs": {
       "data_key": "data",
       "columns_key": "columns",
@@ -300,21 +308,21 @@
       "i": "tech",
       "v": "vintage",
       "t": "year",
-      "Value": "cf_adj"
+      "value": "cf_adj"
     },
     "description": "Adjustment factor for renewable capacity factors.",
     "fpath": "outputs/cf_adj_t.csv",
     "input": false,
     "name": "renewable_cf_adjustment",
     "optional": true,
-    "filters": {
-      "year": "solve_year"
+    "filter_by": {
+      "year": "{solve_year}"
     }
   },
   {
     "column_mapping": {
       "i": "tech",
-      "Value": "ilr"
+      "value": "ilr"
     },
     "description": "Inverter-loading-ratio per technology.",
     "fpath": "outputs/ilr.csv",
@@ -329,7 +337,7 @@
       "i": "technology",
       "r": "region",
       "rscbin": "resource_class",
-      "value": "capacity_mw"
+      "value": "capacity"
     },
     "description": "Renewable supply curve data",
     "fpath": "inputs_case/caprsc.csv",
@@ -360,7 +368,7 @@
       "season": "season"
     },
     "description": "Hour mapping for representative periods",
-    "fpath": "inputs_case/hmap_allyrs.csv",
+    "fpath": "inputs_case/rep/hmap_allyrs.csv",
     "input": true,
     "name": "hour_map",
     "optional": false
@@ -376,8 +384,8 @@
     "name": "co2_cap",
     "optional": true,
     "units": "tonne",
-    "filters": {
-      "year": "solve_year"
+    "filter_by": {
+      "year": "{solve_year}"
     }
   },
   {
@@ -386,7 +394,7 @@
       "r": "region",
       "t": "year",
       "v": "vintage",
-      "Value": "vom_price"
+      "value": "vom_price"
     },
     "description": "Variable O&M in $/MWh",
     "fpath": "outputs/cost_vom.csv",
@@ -394,8 +402,8 @@
     "name": "cost_vom",
     "optional": true,
     "units": "$/MWh",
-    "filters": {
-      "year": "solve_year"
+    "filter_by": {
+      "year": "{solve_year}"
     }
   },
   {
@@ -422,7 +430,7 @@
       "r": "from_region",
       "rr": "to_region",
       "allt": "year",
-      "Value": "cost_hurdle_rate"
+      "value": "cost_hurdle_rate"
     },
     "description": "Cost for transmission hurdle rate between regions",
     "fpath": "outputs/cost_hurdle.csv",
@@ -430,8 +438,8 @@
     "name": "cost_hurdle_rate",
     "optional": true,
     "units": "$/MWh",
-    "filters": {
-      "year": "solve_year"
+    "filter_by": {
+      "year": "{solve_year}"
     }
   },
   {
@@ -503,7 +511,7 @@
       "r": "region",
       "t": "year",
       "v": "vintage",
-      "Value": "rate"
+      "value": "rate"
     },
     "description": "Emission rate per technology.",
     "fpath": "outputs/emit_rate.csv",
@@ -511,13 +519,13 @@
     "name": "emission_rates",
     "optional": true,
     "units": "kg/MWh",
-    "filters": {
-      "year": "solve_year"
+    "filter_by": {
+      "year": "{solve_year}"
     }
   },
   {
     "column_mapping": {
-      "*i": "tech",
+      "*i": "technology",
       "month": "month",
       "r": "region",
       "t": "year",
@@ -527,9 +535,8 @@
     "fpath": "inputs_case/hydcf.csv",
     "input": true,
     "name": "hydro_cf",
-    "optional": false,
-    "filters": {
-      "year": "solve_year"
+    "filter_by": {
+      "year": "{solve_year}"
     }
   }
 ]

@@ -4,19 +4,16 @@ A plugin for parsing ReEDS (Regional Energy Deployment System) model data
 into the R2X framework using infrasys components.
 """
 
-latest_commit = "680ae98df23486ff43199e62d95beba85debe6fa"
+from importlib.metadata import version
 
-from importlib.metadata import version  # noqa: E402
+from loguru import logger
 
-from loguru import logger  # noqa: E402
-
-from .plugins import register_plugin  # noqa: E402
-from .upgrader.functions import move_file  # noqa: E402
+from .plugins import register_plugin
 
 __version__ = version("r2x_reeds")
 
-from .config import ReEDSConfig  # noqa: E402
-from .models import (  # noqa: E402
+from .config import ReEDSConfig
+from .models import (
     EmissionRate,
     EmissionType,
     EnergyMWh,
@@ -37,11 +34,13 @@ from .models import (  # noqa: E402
     ReserveType,
     TimeHours,
 )
-from .parser import ReEDSParser  # noqa: E402
+from .parser import ReEDSParser
 
 # Disable default loguru handler for library usage
 # Applications using this library should configure their own handlers
 logger.disable("r2x_reeds")
+
+latest_commit = "401c0bb15cbf93d2ff9696b14b799edad763247a"
 
 __all__ = [
     "EmissionRate",

@@ -1,20 +1,42 @@
 from pathlib import Path
+from typing import Any
 
-import polars as pl
+from r2x_core import GitVersioningStrategy, PluginUpgrader, UpgradeStep
+from r2x_core.versioning import VersionDetector
+from r2x_reeds.upgrader.helpers import COMMIT_HISTORY
 
-from r2x_core.upgrader import DataUpgrader
-from r2x_core.versioning import GitVersioningStrategy
+
+class ReEDSVersionDetector(VersionDetector):
+    def __init__(self, folder_path: Path | str) -> None:
+        super().__init__()
+        self.folder_path = folder_path
+
+    def detect_version(self) -> str | None:
+        import csv
+
+        folder_path = Path(self.folder_path)
+
+        csv_path = folder_path / "meta.csv"
+        if not csv_path.exists():
+            msg = f"ReEDS version file {csv_path} not found."
+            return FileNotFoundError(msg)
+
+        with open(csv_path) as f:
+            reader = csv.reader(f)
+            next(reader)  # Skip header row
+            second_row = next(reader)
+            assert len(second_row) == 5, "meta file format changed."
+            return second_row[3]
 
 
-class ReedsDataUpgrader(DataUpgrader):
-    strategy = GitVersioningStrategy()
-
-    @staticmethod
-    def detect_version(folder: Path) -> str | None:
-        csv_path = folder / "meta.csv"
-        if csv_path.exists():
-            df = pl.read_csv(csv_path)
-            version_row = df.select(pl.col("commit"))
-            if len(version_row) > 0:
-                return str(version_row["commit"][0])
-        return None
+class ReEDSUpgrader(PluginUpgrader):
+    def __init__(
+        self,
+        folder_path: Path | str,
+        steps: list[UpgradeStep] | None = None,
+        version: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        strategy = GitVersioningStrategy(commit_history=COMMIT_HISTORY)
+        version_detector = ReEDSVersionDetector(folder_path=folder_path)
+        super().__init__(strategy=strategy, steps=steps, version=version, version_detector=version_detector)

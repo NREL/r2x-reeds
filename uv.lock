@@ -1352,7 +1352,7 @@ wheels = [
 [[package]]
 name = "r2x-core"
 version = "0.0.11"
-source = { registry = "https://pypi.org/simple" }
+source = { editable = "../../r2x-core/fuzzy" }
 dependencies = [
     { name = "h5py" },
     { name = "infrasys" },
@@ -1361,9 +1361,36 @@ dependencies = [
     { name = "polars" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/47/f2/38564dc358ea49119cc4d5db3f866f9f6d94ca2c8e283f9902fafff433ef/r2x_core-0.0.11.tar.gz", hash = "sha256:c8de33433fe453321056ad26a62b1a07772eb48bc8e9f699e1f16f662904edc5", size = 58889, upload-time = "2025-10-22T03:12:17.455Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9f/c5/133a0e8ad9e3c2836dbf851b8e43a14b26529152b713720e56724e92547b/r2x_core-0.0.11-py3-none-any.whl", hash = "sha256:816187066c229ff97fa45fbc9480f176046584f373b4c5383cb008686a8c7e75", size = 69294, upload-time = "2025-10-22T03:12:15.734Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "h5py", specifier = ">=3.13.0" },
+    { name = "infrasys", specifier = ">=1.0.0rc2" },
+    { name = "loguru", specifier = ">=0.7.3" },
+    { name = "packaging", specifier = ">=24.0" },
+    { name = "polars", specifier = ">=1.33.1" },
+    { name = "pydantic", specifier = ">=2.11.9,<3" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "h5py-stubs", specifier = ">=0.1.2" },
+    { name = "mypy", specifier = ">=1.18.2" },
+    { name = "pre-commit", specifier = ">=4.3.0" },
+    { name = "pytest", specifier = ">=8.4.2" },
+    { name = "pytest-coverage", specifier = ">=0.0" },
+    { name = "ruff", specifier = ">=0.13.2" },
+]
+docs = [
+    { name = "autodoc-pydantic" },
+    { name = "docstr-coverage", specifier = ">=2.3.2" },
+    { name = "furo", specifier = ">=2025.9.25" },
+    { name = "ghp-import" },
+    { name = "myst-parser" },
+    { name = "sphinx", specifier = ">=8.0.0" },
+    { name = "sphinx-copybutton" },
+    { name = "sphinx-reports" },
+    { name = "sphinx-tabs" },
 ]
 
 [[package]]
@@ -1409,7 +1436,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=1.20.0" },
     { name = "polars", specifier = ">=1.33.0" },
     { name = "pydantic", specifier = ">=2.11.0,<3" },
-    { name = "r2x-core", specifier = ">=0.0.11" },
+    { name = "r2x-core", editable = "../../r2x-core/fuzzy" },
 ]
 
 [package.metadata.requires-dev]

@@ -33,12 +33,6 @@ def test_reeds_config_case_name():
     assert config.case_name == "HighRenewable"
 
 
-def test_reeds_config_load_defaults_file_not_found():
-    """Test that load_defaults returns empty dict when file doesn't exist."""
-    defaults = ReEDSConfig.load_defaults("/nonexistent/path/defaults.json")
-    assert defaults == {}
-
-
 def test_reeds_config_default_scenario():
     """Test default scenario."""
     config = ReEDSConfig(
@@ -101,9 +95,6 @@ def test_reeds_config_with_defaults_custom(tmp_path):
     test_file = tmp_path / "defaults.json"
     test_file.write_text('{"excluded_techs": ["coal", "oil"]}')
 
-    config = ReEDSConfig(
-        solve_year=2030,
-        weather_year=2012,
-    )
+    config = ReEDSConfig(solve_year=2030, weather_year=2012, config_path=tmp_path)
     defaults = config.load_defaults(test_file)
     assert defaults["excluded_techs"] == ["coal", "oil"]

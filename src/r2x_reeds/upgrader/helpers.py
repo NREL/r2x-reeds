@@ -7,6 +7,9 @@ from importlib.resources import files
 import polars as pl
 from loguru import logger
 
+COMMIT_HISTORY = files("r2x_reeds").joinpath("config/commits.txt").read_text().splitlines()
+LATEST_COMMIT = COMMIT_HISTORY[-1]
+
 
 def validate_string(value):
     """Read cases flag value and convert it to Python type."""
