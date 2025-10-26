@@ -1,6 +1,5 @@
 import pytest
 
-from r2x_core import GitVersioningStrategy
 from r2x_reeds.upgrader.data_upgrader import ReEDSUpgrader, ReEDSVersionDetector
 from r2x_reeds.upgrader.helpers import COMMIT_HISTORY
 
@@ -23,10 +22,11 @@ def upgraded_system(reeds_run_upgrader, example_reeds_config, caplog):
 
 def test_reeds_upgrader(reeds_run_upgrader):
     upgrader = ReEDSUpgrader(reeds_run_upgrader)
+    version_detector = ReEDSVersionDetector(folder_path=reeds_run_upgrader)
+    version = version_detector.detect_version()
 
-    assert isinstance(upgrader.strategy, GitVersioningStrategy)
+    assert upgrader.version == version
     assert upgrader.strategy.commit_history == COMMIT_HISTORY
-    assert isinstance(upgrader.version_detector, ReEDSVersionDetector)
 
 
 def test_upgraded_system(upgraded_system):
