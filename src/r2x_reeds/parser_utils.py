@@ -11,37 +11,6 @@ if TYPE_CHECKING:
     pass
 
 
-def expand_monthly_to_daily(monthly_values: list[float]) -> list[float]:
-    """Expand monthly values to daily values based on days in each month."""
-    days_per_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    daily_values = []
-    for month_idx, value in enumerate(monthly_values):
-        days = days_per_month[month_idx]
-        daily_values.extend([value] * days)
-
-    return daily_values
-
-
-def expand_daily_to_hourly(daily_values: list[float]) -> list[float]:
-    """Expand daily values to hourly values (24 hours per day)."""
-    hourly_values = []
-    for value in daily_values:
-        hourly_values.extend([value] * 24)
-    return hourly_values
-
-
-def expand_monthly_to_hourly(monthly_values: list[float]) -> list[float]:
-    """Expand monthly values to hourly values based on hours in each month."""
-    hours_per_month = [744, 672, 744, 720, 744, 720, 744, 744, 720, 744, 720, 744]
-
-    hourly_values = []
-    for month_idx, value in enumerate(monthly_values):
-        hours = hours_per_month[month_idx]
-        hourly_values.extend([value] * hours)
-
-    return hourly_values
-
-
 def tech_matches_category(tech: str, category_name: str, tech_categories: dict[str, Any]) -> bool:
     """Check if a technology matches a category using prefix or exact matching.
 

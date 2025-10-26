@@ -2,11 +2,9 @@
 
 import ast
 import inspect
-import io
 from collections.abc import Callable
 from importlib.resources import files
 
-import polars as pl
 from loguru import logger
 
 COMMIT_HISTORY = files("r2x_reeds").joinpath("config/commits.txt").read_text().splitlines()
@@ -36,22 +34,6 @@ def validate_string(value):
         logger.trace("Could not parse {}: {}", value, e)
     finally:
         return value  # noqa: B012
-
-
-def read_csv(fname: str, package_data: str = "r2x.defaults", **kwargs) -> pl.LazyFrame:
-    """Helper function to read csv string data from package data.
-
-    Args:
-        fname: Name of the csv file
-        package_data: Location of file in package. Default location is r2x.defaults
-        **kwargs: Additional keys passed to pandas read_csv function
-
-    Returns
-    -------
-        A pandas dataframe of the csv requested
-    """
-    csv_file = files(package_data).joinpath(fname).read_text(encoding="utf-8-sig")
-    return pl.LazyFrame(pl.read_csv(io.StringIO(csv_file), **kwargs))
 
 
 def get_function_arguments(argument_input: dict, function: Callable) -> dict:
