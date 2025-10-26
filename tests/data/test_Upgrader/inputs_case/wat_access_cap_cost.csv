@@ -1,0 +1,177 @@
+*wst,sc_cat,r,value
+fg,cap,p1,3318182.0
+fg,cost,p1,41.9
+fg,cap,p10,0.0
+fg,cost,p10,0.1
+fg,cap,p11,0.0
+fg,cost,p11,0.1
+fg,cap,p2,5730914.0
+fg,cost,p2,49.6
+fg,cap,p3,340782.0
+fg,cost,p3,76.2
+fg,cap,p4,10411.0
+fg,cost,p4,15.3
+fg,cap,p5,5154937.0
+fg,cost,p5,122.8
+fg,cap,p6,1825413.0
+fg,cost,p6,76.6
+fg,cap,p7,545943.0
+fg,cost,p7,136.2
+fg,cap,p8,0.0
+fg,cost,p8,0.1
+fg,cap,p9,0.0
+fg,cost,p9,0.1
+fsa,cap,p1,3411.0
+fsa,cost,p1,90.2
+fsa,cap,p10,0.0
+fsa,cost,p10,0.1
+fsa,cap,p11,0.0
+fsa,cost,p11,0.1
+fsa,cap,p2,10851.0
+fsa,cost,p2,82.1
+fsa,cap,p3,9625.0
+fsa,cost,p3,90.2
+fsa,cap,p4,6954.0
+fsa,cost,p4,90.2
+fsa,cap,p5,15587.0
+fsa,cost,p5,58.6
+fsa,cap,p6,3420.0
+fsa,cost,p6,96.2
+fsa,cap,p7,10905.0
+fsa,cost,p7,147.9
+fsa,cap,p8,0.0
+fsa,cost,p8,0.1
+fsa,cap,p9,0.0
+fsa,cost,p9,0.1
+fsl,cap,p1,0.0
+fsl,cost,p1,0.1
+fsl,cap,p10,0.0
+fsl,cost,p10,0.1
+fsl,cap,p11,0.0
+fsl,cost,p11,0.1
+fsl,cap,p2,0.0
+fsl,cost,p2,0.1
+fsl,cap,p3,0.0
+fsl,cost,p3,0.1
+fsl,cap,p4,0.0
+fsl,cost,p4,0.1
+fsl,cap,p5,0.0
+fsl,cost,p5,0.1
+fsl,cap,p6,0.0
+fsl,cost,p6,0.1
+fsl,cap,p7,0.0
+fsl,cost,p7,0.1
+fsl,cap,p8,0.0
+fsl,cost,p8,0.1
+fsl,cap,p9,0.0
+fsl,cost,p9,0.1
+fsl ,cap,p1,0.0
+fsl ,cost,p1,0.0
+fsl ,cap,p10,0.0
+fsl ,cost,p10,0.0
+fsl ,cap,p11,0.0
+fsl ,cost,p11,0.0
+fsl ,cap,p2,0.0
+fsl ,cost,p2,0.0
+fsl ,cap,p3,0.0
+fsl ,cost,p3,0.0
+fsl ,cap,p4,0.0
+fsl ,cost,p4,0.0
+fsl ,cap,p5,0.0
+fsl ,cost,p5,0.0
+fsl ,cap,p6,0.0
+fsl ,cost,p6,0.0
+fsl ,cap,p7,0.0
+fsl ,cost,p7,0.0
+fsl ,cap,p8,0.0
+fsl ,cost,p8,0.0
+fsl ,cap,p9,0.0
+fsl ,cost,p9,0.0
+fsu,cap,p1,0.0
+fsu,cost,p1,0.1
+fsu,cap,p10,0.0
+fsu,cost,p10,0.1
+fsu,cap,p11,0.0
+fsu,cost,p11,0.1
+fsu,cap,p2,2108105.0
+fsu,cost,p2,0.1
+fsu,cap,p3,6047.0
+fsu,cost,p3,0.1
+fsu,cap,p4,0.0
+fsu,cost,p4,0.1
+fsu,cap,p5,2827000.0
+fsu,cost,p5,0.1
+fsu,cap,p6,697633.0
+fsu,cost,p6,0.1
+fsu,cap,p7,853740.0
+fsu,cost,p7,0.1
+fsu,cap,p8,0.0
+fsu,cost,p8,0.1
+fsu,cap,p9,0.0
+fsu,cost,p9,0.1
+sg,cap,p1,1538009.0
+sg,cost,p1,2234.2
+sg,cap,p10,3386403.0
+sg,cost,p10,2368.4
+sg,cap,p11,490683.0
+sg,cost,p11,2409.3
+sg,cap,p2,1618376.0
+sg,cost,p2,2474.2
+sg,cap,p3,804130.0
+sg,cost,p3,2350.3
+sg,cap,p4,2847.0
+sg,cost,p4,1495.5
+sg,cap,p5,1811333.0
+sg,cost,p5,2495.3
+sg,cap,p6,1222565.0
+sg,cost,p6,2627.0
+sg,cap,p7,90102.0
+sg,cost,p7,2430.1
+sg,cap,p8,923776.0
+sg,cost,p8,2501.3
+sg,cap,p9,6353640.0
+sg,cost,p9,2405.0
+ss,cap,p1,0.0
+ss,cost,p1,0.1
+ss,cap,p10,0.0
+ss,cost,p10,0.1
+ss,cap,p11,0.0
+ss,cost,p11,0.1
+ss,cap,p2,0.0
+ss,cost,p2,0.1
+ss,cap,p3,0.0
+ss,cost,p3,0.1
+ss,cap,p4,0.0
+ss,cost,p4,0.1
+ss,cap,p5,0.0
+ss,cost,p5,0.1
+ss,cap,p6,0.0
+ss,cost,p6,0.1
+ss,cap,p7,0.0
+ss,cost,p7,0.1
+ss,cap,p8,0.0
+ss,cost,p8,0.1
+ss,cap,p9,0.0
+ss,cost,p9,0.1
+ww,cap,p1,1673.0
+ww,cost,p1,633.4
+ww,cap,p10,60769.0
+ww,cost,p10,408.4
+ww,cap,p11,8375.0
+ww,cost,p11,712.3
+ww,cap,p2,1463.0
+ww,cost,p2,492.0
+ww,cap,p3,2891.0
+ww,cost,p3,621.0
+ww,cap,p4,811.0
+ww,cost,p4,1015.0
+ww,cap,p5,153.0
+ww,cost,p5,234.5
+ww,cap,p6,62.0
+ww,cost,p6,157.0
+ww,cap,p7,215.0
+ww,cost,p7,69.1
+ww,cap,p8,0.0
+ww,cost,p8,38.6
+ww,cap,p9,132601.0
+ww,cost,p9,990.6

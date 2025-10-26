@@ -1,0 +1,1 @@
+scalar max_hintage_number "--number-- the maximum number of bins used in this ReEDS run" /6/ ;

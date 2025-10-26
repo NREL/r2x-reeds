@@ -20,7 +20,6 @@ from r2x_reeds.parser_utils import (
     monthly_to_hourly_polars,
     tech_matches_category,
 )
-from r2x_reeds.upgrader.data_upgrader import ReEDSUpgrader
 
 from .models.base import FromTo_ToFrom
 from .models.components import (
@@ -121,7 +120,6 @@ class ReEDSParser(BaseParser):
         data_store: DataStore,
         auto_add_composed_components: bool = True,
         skip_validation: bool = False,
-        upgrader: ReEDSUpgrader | None = None,
         **kwargs,
     ) -> None:
         """Initialize ReEDS parser."""
@@ -130,7 +128,6 @@ class ReEDSParser(BaseParser):
             data_store=data_store,
             auto_add_composed_components=auto_add_composed_components,
             skip_validation=skip_validation,
-            upgrader=upgrader,
             **kwargs,
         )
 

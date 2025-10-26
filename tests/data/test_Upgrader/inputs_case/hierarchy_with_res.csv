@@ -1,0 +1,134 @@
+*r,ba,nercr,transreg,transgrp,cendiv,st,interconnect,st_interconnect,country,usda_region,h2ptcreg,hurdlereg,aggreg,offshore,county_name,county,resolution
+p1,p1,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Puget_Sound_Energy_Inc,p1,0,chelan,p53007,aggreg
+p1,p1,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Puget_Sound_Energy_Inc,p1,0,island,p53029,aggreg
+p1,p1,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Puget_Sound_Energy_Inc,p1,0,king,p53033,aggreg
+p1,p1,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Puget_Sound_Energy_Inc,p1,0,kitsap,p53035,aggreg
+p1,p1,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Puget_Sound_Energy_Inc,p1,0,kittitas,p53037,aggreg
+p1,p1,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Puget_Sound_Energy_Inc,p1,0,pierce,p53053,aggreg
+p1,p1,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Puget_Sound_Energy_Inc,p1,0,san juan,p53055,aggreg
+p1,p1,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Puget_Sound_Energy_Inc,p1,0,skagit,p53057,aggreg
+p1,p1,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Puget_Sound_Energy_Inc,p1,0,snohomish,p53061,aggreg
+p1,p1,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Puget_Sound_Energy_Inc,p1,0,thurston,p53067,aggreg
+p1,p1,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Puget_Sound_Energy_Inc,p1,0,whatcom,p53073,aggreg
+p2,p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Bonneville_Power_Administration,p2,0,asotin,p53003,aggreg
+p2,p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Bonneville_Power_Administration,p2,0,benton,p53005,aggreg
+p2,p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Bonneville_Power_Administration,p2,0,clallam,p53009,aggreg
+p2,p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Bonneville_Power_Administration,p2,0,clark,p53011,aggreg
+p2,p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Bonneville_Power_Administration,p2,0,columbia,p53013,aggreg
+p2,p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Bonneville_Power_Administration,p2,0,cowlitz,p53015,aggreg
+p2,p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Bonneville_Power_Administration,p2,0,garfield,p53023,aggreg
+p2,p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Bonneville_Power_Administration,p2,0,grays harbor,p53027,aggreg
+p2,p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Bonneville_Power_Administration,p2,0,jefferson,p53031,aggreg
+p2,p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Bonneville_Power_Administration,p2,0,klickitat,p53039,aggreg
+p2,p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Bonneville_Power_Administration,p2,0,lewis,p53041,aggreg
+p2,p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Bonneville_Power_Administration,p2,0,mason,p53045,aggreg
+p2,p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Bonneville_Power_Administration,p2,0,pacific,p53049,aggreg
+p2,p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Bonneville_Power_Administration,p2,0,skamania,p53059,aggreg
+p2,p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Bonneville_Power_Administration,p2,0,wahkiakum,p53069,aggreg
+p2,p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Bonneville_Power_Administration,p2,0,walla walla,p53071,aggreg
+p2,p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Bonneville_Power_Administration,p2,0,yakima,p53077,aggreg
+p3,p3,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Avista_Corp,p3,0,adams,p53001,aggreg
+p3,p3,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Avista_Corp,p3,0,ferry,p53019,aggreg
+p3,p3,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Avista_Corp,p3,0,franklin,p53021,aggreg
+p3,p3,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Avista_Corp,p3,0,lincoln,p53043,aggreg
+p3,p3,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Avista_Corp,p3,0,okanogan,p53047,aggreg
+p3,p3,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Avista_Corp,p3,0,pend oreille,p53051,aggreg
+p3,p3,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Avista_Corp,p3,0,spokane,p53063,aggreg
+p3,p3,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Avista_Corp,p3,0,stevens,p53065,aggreg
+p3,p3,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,Avista_Corp,p3,0,whitman,p53075,aggreg
+p4,p4,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,PUD_No2_of_Grant_County,p4,0,douglas,p53017,aggreg
+p4,p4,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,WA,USA,pacific,Northwest,PUD_No2_of_Grant_County,p4,0,grant,p53025,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,benton,p41003,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,clackamas,p41005,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,clatsop,p41007,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,columbia,p41009,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,crook,p41013,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,deschutes,p41017,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,gilliam,p41021,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,grant,p41023,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,hood river,p41027,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,jefferson,p41031,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,lane,p41039,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,lincoln,p41041,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,linn,p41043,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,marion,p41047,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,morrow,p41049,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,multnomah,p41051,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,polk,p41053,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,sherman,p41055,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,tillamook,p41057,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,umatilla,p41059,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,union,p41061,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,wallowa,p41063,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,wasco,p41065,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,washington,p41067,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,wheeler,p41069,aggreg
+p5,p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p5,0,yamhill,p41071,aggreg
+p6,p6,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,PacifiCorp_West,p6,0,coos,p41011,aggreg
+p6,p6,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,PacifiCorp_West,p6,0,curry,p41015,aggreg
+p6,p6,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,PacifiCorp_West,p6,0,douglas,p41019,aggreg
+p6,p6,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,PacifiCorp_West,p6,0,jackson,p41029,aggreg
+p6,p6,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,PacifiCorp_West,p6,0,josephine,p41033,aggreg
+p6,p6,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,PacifiCorp_West,p6,0,klamath,p41035,aggreg
+p7,p7,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p7,0,baker,p41001,aggreg
+p7,p7,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p7,0,harney,p41025,aggreg
+p7,p7,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p7,0,lake,p41037,aggreg
+p7,p7,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,OR,USA,pacific,Northwest,Bonneville_Power_Administration,p7,0,malheur,p41045,aggreg
+p8,p8,WECC_NW,NorthernGrid,NorthernGrid_South,Pacific,CA,western,CA,USA,pacific,California,PacifiCorp_West,p8,0,lassen,p06035,aggreg
+p8,p8,WECC_NW,NorthernGrid,NorthernGrid_South,Pacific,CA,western,CA,USA,pacific,California,PacifiCorp_West,p8,0,modoc,p06049,aggreg
+p8,p8,WECC_NW,NorthernGrid,NorthernGrid_South,Pacific,CA,western,CA,USA,pacific,California,PacifiCorp_West,p8,0,siskiyou,p06093,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,alameda,p06001,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,alpine,p06003,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,amador,p06005,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,butte,p06007,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,calaveras,p06009,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,colusa,p06011,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,contra costa,p06013,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,del norte,p06015,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,el dorado,p06017,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,fresno,p06019,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,glenn,p06021,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,humboldt,p06023,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,kings,p06031,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,lake,p06033,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,madera,p06039,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,marin,p06041,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,mariposa,p06043,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,mendocino,p06045,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,merced,p06047,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,monterey,p06053,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,napa,p06055,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,nevada,p06057,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,placer,p06061,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,plumas,p06063,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,sacramento,p06067,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,san benito,p06069,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,san francisco,p06075,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,san joaquin,p06077,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,san luis obispo,p06079,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,san mateo,p06081,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,santa barbara,p06083,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,santa clara,p06085,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,santa cruz,p06087,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,shasta,p06089,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,sierra,p06091,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,solano,p06095,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,sonoma,p06097,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,stanislaus,p06099,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,sutter,p06101,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,tehama,p06103,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,trinity,p06105,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,tuolumne,p06109,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,yolo,p06113,aggreg
+p9,p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p9,0,yuba,p06115,aggreg
+p10,p10,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p10,0,imperial,p06025,aggreg
+p10,p10,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p10,0,inyo,p06027,aggreg
+p10,p10,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p10,0,kern,p06029,aggreg
+p10,p10,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p10,0,los angeles,p06037,aggreg
+p10,p10,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p10,0,mono,p06051,aggreg
+p10,p10,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p10,0,orange,p06059,aggreg
+p10,p10,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p10,0,riverside,p06065,aggreg
+p10,p10,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p10,0,san bernardino,p06071,aggreg
+p10,p10,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p10,0,tulare,p06107,aggreg
+p10,p10,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p10,0,ventura,p06111,aggreg
+p11,p11,WECC_CA,CAISO,CAISO,Pacific,CA,western,CA,USA,pacific,California,CAISO,p11,0,san diego,p06073,aggreg

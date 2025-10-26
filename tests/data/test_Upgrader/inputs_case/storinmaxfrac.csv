@@ -1,0 +1,5 @@
+*i,v,r,frac
+pumped-hydro,init-1,p10,0.96
+pumped-hydro,init-1,p11,1.0
+pumped-hydro,init-1,p3,1.0
+pumped-hydro,init-1,p9,0.81

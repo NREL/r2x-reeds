@@ -1,0 +1,7 @@
+eall,Value
+CO2,c_bool(False)
+SO2,c_bool(False)
+NOX,c_bool(False)
+CH4,c_bool(False)
+N2O,c_bool(False)
+H2,c_bool(False)

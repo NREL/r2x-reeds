@@ -1,0 +1,13 @@
+*tg,MW
+csp,100
+gas,300
+h2,100
+nuclear,600
+pv,100
+battery,100
+hydro,100
+wind-ofs,600
+wind-ons,100
+pumped-hydro,600
+biomass,50
+dr_shed,1000

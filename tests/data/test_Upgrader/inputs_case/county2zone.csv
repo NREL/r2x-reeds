@@ -1,0 +1,134 @@
+FIPS,ba,county_name,state
+53007,p1,chelan,WA
+53029,p1,island,WA
+53033,p1,king,WA
+53035,p1,kitsap,WA
+53037,p1,kittitas,WA
+53053,p1,pierce,WA
+53055,p1,san juan,WA
+53057,p1,skagit,WA
+53061,p1,snohomish,WA
+53067,p1,thurston,WA
+53073,p1,whatcom,WA
+53003,p2,asotin,WA
+53005,p2,benton,WA
+53009,p2,clallam,WA
+53011,p2,clark,WA
+53013,p2,columbia,WA
+53015,p2,cowlitz,WA
+53023,p2,garfield,WA
+53027,p2,grays harbor,WA
+53031,p2,jefferson,WA
+53039,p2,klickitat,WA
+53041,p2,lewis,WA
+53045,p2,mason,WA
+53049,p2,pacific,WA
+53059,p2,skamania,WA
+53069,p2,wahkiakum,WA
+53071,p2,walla walla,WA
+53077,p2,yakima,WA
+53001,p3,adams,WA
+53019,p3,ferry,WA
+53021,p3,franklin,WA
+53043,p3,lincoln,WA
+53047,p3,okanogan,WA
+53051,p3,pend oreille,WA
+53063,p3,spokane,WA
+53065,p3,stevens,WA
+53075,p3,whitman,WA
+53017,p4,douglas,WA
+53025,p4,grant,WA
+41003,p5,benton,OR
+41005,p5,clackamas,OR
+41007,p5,clatsop,OR
+41009,p5,columbia,OR
+41013,p5,crook,OR
+41017,p5,deschutes,OR
+41021,p5,gilliam,OR
+41023,p5,grant,OR
+41027,p5,hood river,OR
+41031,p5,jefferson,OR
+41039,p5,lane,OR
+41041,p5,lincoln,OR
+41043,p5,linn,OR
+41047,p5,marion,OR
+41049,p5,morrow,OR
+41051,p5,multnomah,OR
+41053,p5,polk,OR
+41055,p5,sherman,OR
+41057,p5,tillamook,OR
+41059,p5,umatilla,OR
+41061,p5,union,OR
+41063,p5,wallowa,OR
+41065,p5,wasco,OR
+41067,p5,washington,OR
+41069,p5,wheeler,OR
+41071,p5,yamhill,OR
+41011,p6,coos,OR
+41015,p6,curry,OR
+41019,p6,douglas,OR
+41029,p6,jackson,OR
+41033,p6,josephine,OR
+41035,p6,klamath,OR
+41001,p7,baker,OR
+41025,p7,harney,OR
+41037,p7,lake,OR
+41045,p7,malheur,OR
+06035,p8,lassen,CA
+06049,p8,modoc,CA
+06093,p8,siskiyou,CA
+06001,p9,alameda,CA
+06003,p9,alpine,CA
+06005,p9,amador,CA
+06007,p9,butte,CA
+06009,p9,calaveras,CA
+06011,p9,colusa,CA
+06013,p9,contra costa,CA
+06015,p9,del norte,CA
+06017,p9,el dorado,CA
+06019,p9,fresno,CA
+06021,p9,glenn,CA
+06023,p9,humboldt,CA
+06031,p9,kings,CA
+06033,p9,lake,CA
+06039,p9,madera,CA
+06041,p9,marin,CA
+06043,p9,mariposa,CA
+06045,p9,mendocino,CA
+06047,p9,merced,CA
+06053,p9,monterey,CA
+06055,p9,napa,CA
+06057,p9,nevada,CA
+06061,p9,placer,CA
+06063,p9,plumas,CA
+06067,p9,sacramento,CA
+06069,p9,san benito,CA
+06075,p9,san francisco,CA
+06077,p9,san joaquin,CA
+06079,p9,san luis obispo,CA
+06081,p9,san mateo,CA
+06083,p9,santa barbara,CA
+06085,p9,santa clara,CA
+06087,p9,santa cruz,CA
+06089,p9,shasta,CA
+06091,p9,sierra,CA
+06095,p9,solano,CA
+06097,p9,sonoma,CA
+06099,p9,stanislaus,CA
+06101,p9,sutter,CA
+06103,p9,tehama,CA
+06105,p9,trinity,CA
+06109,p9,tuolumne,CA
+06113,p9,yolo,CA
+06115,p9,yuba,CA
+06025,p10,imperial,CA
+06027,p10,inyo,CA
+06029,p10,kern,CA
+06037,p10,los angeles,CA
+06051,p10,mono,CA
+06059,p10,orange,CA
+06065,p10,riverside,CA
+06071,p10,san bernardino,CA
+06107,p10,tulare,CA
+06111,p10,ventura,CA
+06073,p11,san diego,CA
