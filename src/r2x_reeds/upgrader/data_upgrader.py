@@ -7,14 +7,13 @@ from r2x_reeds.upgrader.helpers import COMMIT_HISTORY
 
 
 class ReEDSVersionDetector(VersionDetector):
-    def __init__(self, folder_path: Path | str) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.folder_path = folder_path
 
-    def detect_version(self) -> str | None:
+    def detect_version(self, folder_path: Path) -> str | None:
         import csv
 
-        folder_path = Path(self.folder_path)
+        folder_path = Path(folder_path)
 
         csv_path = folder_path / "meta.csv"
         if not csv_path.exists():
@@ -38,5 +37,11 @@ class ReEDSUpgrader(PluginUpgrader):
         **kwargs: Any,
     ) -> None:
         strategy = GitVersioningStrategy(commit_history=COMMIT_HISTORY)
-        version_detector = ReEDSVersionDetector(folder_path=folder_path)
-        super().__init__(strategy=strategy, steps=steps, version=version, version_detector=version_detector)
+        version_detector = ReEDSVersionDetector()
+        super().__init__(
+            folder_path=folder_path,
+            strategy=strategy,
+            steps=steps,
+            version=version,
+            version_detector=version_detector,
+        )

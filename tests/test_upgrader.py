@@ -22,8 +22,8 @@ def upgraded_system(reeds_run_upgrader, example_reeds_config, caplog):
 
 def test_reeds_upgrader(reeds_run_upgrader):
     upgrader = ReEDSUpgrader(reeds_run_upgrader)
-    version_detector = ReEDSVersionDetector(folder_path=reeds_run_upgrader)
-    version = version_detector.detect_version()
+    version_detector = ReEDSVersionDetector()
+    version = version_detector.detect_version(folder_path=reeds_run_upgrader)
 
     assert upgrader.version == version
     assert upgrader.strategy.commit_history == COMMIT_HISTORY
