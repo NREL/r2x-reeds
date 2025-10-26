@@ -1,4 +1,27 @@
-"""ReEDS parser implementation for r2x-core framework."""
+"""
+Example usage of ReEDSParser.
+
+The :class:`ReEDSParser` is used to build an infrasys.System from ReEDS model output.
+
+>>> import json
+>>> from pathlib import Path
+>>> from r2x_core.store import DataStore
+>>> from r2x_reeds.config import ReEDSConfig
+>>> from r2x_reeds.parser import ReEDSParser
+>>>
+>>> # Load configuration and create DataStore
+>>> config = ReEDSConfig(solve_years=2030, weather_years=2012, case_name="High_Renewable")
+>>> mapping_path = ReEDSConfig.get_file_mapping_path()
+>>> data_folder = Path("tests/data/test_Pacific")
+>>> data_store = DataStore.from_json(mapping_path, folder=data_folder)
+>>>
+>>> # Create parser and build system
+>>> parser = ReEDSParser(config, data_store=data_store, name="ReEDS_System")
+>>> system = parser.build_system()
+>>> regions = list(system.get_components(ReEDSRegion))
+>>> print(f"Built system with {len(regions)} regions")
+Built system with 5 regions
+"""
 
 from __future__ import annotations
 
@@ -20,6 +43,7 @@ from r2x_reeds.parser_utils import (
     monthly_to_hourly_polars,
     tech_matches_category,
 )
+from r2x_reeds.upgrader.helpers import LATEST_COMMIT
 
 from .models.base import FromTo_ToFrom
 from .models.components import (
@@ -42,22 +66,22 @@ if TYPE_CHECKING:
 class ReEDSParser(BaseParser):
     """Parser for ReEDS model data following r2x-core framework patterns.
 
-    The parser builds an infrasys.System from ReEDS model output by:
+    This parser builds an :class:`infrasys.System` from ReEDS model output through three main phases:
 
-    1. **Component Building** (`build_system_components`):
-       - Regions from hierarchy data (buses with regional attributes)
+    1. **Component Building** (:meth:`build_system_components`):
+       - Regions from hierarchy data with regional attributes
        - Generators split into renewable (aggregated by tech-region) and non-renewable (with vintage)
        - Transmission interfaces and lines with bi-directional ratings
        - Loads with peak demand by region
        - Reserves by transmission region and type
        - Emissions as supplemental attributes on generators
 
-    2. **Time Series Attachment** (`build_time_series`):
+    2. **Time Series Attachment** (:meth:`build_time_series`):
        - Load profiles filtered by weather year and solve year
        - Renewable capacity factors from CF data
        - Reserve requirements calculated from wind/solar/load contributions
 
-    3. **Post-Processing** (`post_process_system`):
+    3. **Post-Processing** (:meth:`post_process_system`):
        - System metadata and description
 
     Key Implementation Details
@@ -75,41 +99,60 @@ class ReEDSParser(BaseParser):
         ReEDS-specific configuration with solve years, weather years, etc.
     data_store : DataStore
         Initialized DataStore with ReEDS file mappings loaded
-    name : str, optional
-        Name for the system being built
     auto_add_composed_components : bool, default=True
         Whether to automatically add composed components
     skip_validation : bool, default=False
         Skip Pydantic validation for performance (use with caution)
+    **kwargs
+        Additional keyword arguments passed to parent :class:`BaseParser`
+
+    Attributes
+    ----------
+    system : infrasys.System
+        The constructed power system model
+    config : ReEDSConfig
+        The ReEDS configuration instance
+    data_store : DataStore
+        The DataStore for accessing ReEDS data files
+
+    Methods
+    -------
+    build_system()
+        Build and return the complete infrasys.System
+    build_system_components()
+        Construct all system components (regions, generators, transmission, loads, reserves)
+    build_time_series()
+        Attach time series data to components
+    post_process_system()
+        Apply post-processing steps to the system
+
+    See Also
+    --------
+    :class:`BaseParser` : Parent class with core system building logic
+    :class:`ReEDSConfig` : Configuration class for ReEDS parser
+    :class:`DataStore` : Data storage and access interface
 
     Examples
     --------
-    Basic usage:
+    Build a ReEDS system from test data:
 
-    >>> import json
     >>> from pathlib import Path
     >>> from r2x_core.store import DataStore
     >>> from r2x_reeds.config import ReEDSConfig
     >>> from r2x_reeds.parser import ReEDSParser
     >>>
-    >>> # Load defaults and create DataStore
-    >>> defaults = ReEDSConfig.load_defaults()
+    >>> config = ReEDSConfig(solve_years=2030, weather_years=2012, case_name="High_Renewable")
     >>> mapping_path = ReEDSConfig.get_file_mapping_path()
     >>> data_folder = Path("tests/data/test_Pacific")
-    >>>
-    >>> # Create config (defaults loaded separately, not passed to config)
-    >>> config = ReEDSConfig(
-    ...     solve_years=2030,
-    ...     weather_years=2012,
-    ...     case_name="High_Renewable",
-    ... )
-    >>>
-    >>> # Create DataStore from file mapping
     >>> data_store = DataStore.from_json(mapping_path, folder=data_folder)
-    >>>
-    >>> # Create parser and build system
-    >>> parser = ReEDSParser(config, data_store, name="ReEDS_System")
+    >>> parser = ReEDSParser(config, data_store=data_store, name="ReEDS_System")
     >>> system = parser.build_system()
+
+    Notes
+    -----
+    The parser uses internal caches for regions and generators to optimize cross-referencing
+    during component construction. These caches are populated during :meth:`build_system_components`
+    and are used for all subsequent operations.
     """
 
     def __init__(
@@ -132,7 +175,18 @@ class ReEDSParser(BaseParser):
         )
 
     def validate_inputs(self) -> Result[None, ValidationError]:
-        """Validate input data before building system."""
+        """Validate input data and configuration before building system.
+
+        Checks that:
+        - Required data files (modeled_years, hour_map) are non-empty
+        - Configured solve_years exist in the modeled data
+        - Configured weather_years exist in the hour_map data
+
+        Returns
+        -------
+        Result[None, ValidationError]
+            Ok() if all validations pass, Err() with ValidationError details if any fail
+        """
         assert self._store, "REeDS parser requires DataStore object."
 
         modeled_years = self.read_data_file("modeled_years")
@@ -179,6 +233,20 @@ class ReEDSParser(BaseParser):
         return Ok()
 
     def prepare_data(self) -> Result[None, ParserError]:
+        """Prepare and normalize configuration and time-related data.
+
+        Initializes internal data structures required for component building:
+        - Normalizes solve_years and weather_years to lists
+        - Creates hourly and daily time indices based on primary weather year
+        - Builds lookup tables for month/year/day/hour calculations
+        - Loads default technology categories and exclusion lists
+        - Initializes component caches for efficient cross-referencing
+
+        Returns
+        -------
+        Result[None, ParserError]
+            Ok() on success, Err() with ParserError on failure
+        """
         self.solve_years = (
             [self.config.solve_year]
             if isinstance(self.config.solve_year, int)
@@ -249,7 +317,18 @@ class ReEDSParser(BaseParser):
         )
 
     def build_time_series(self) -> None:
-        """Attach time series data to components."""
+        """Attach time series data to all system components.
+
+        Applies time series in order:
+        1. Load profiles to demand components
+        2. Renewable capacity factors to renewable generators
+        3. Reserve requirement profiles
+        4. Hydro budget constraints
+
+        Returns
+        -------
+        None
+        """
         logger.info("Building time series data...")
         self._attach_load_profiles()
         self._attach_renewable_profiles()
@@ -258,10 +337,20 @@ class ReEDSParser(BaseParser):
         logger.info("Time series attachment complete")
 
     def post_process_system(self) -> None:
-        """Perform post-processing on the built system."""
+        """Perform post-processing on the built system.
+
+        Sets system metadata including:
+        - Data format version
+        - System description with case, scenario, and year information
+        - Logs component summary statistics
+
+        Returns
+        -------
+        None
+        """
         logger.info("Post-processing ReEDS system...")
 
-        self.system.data_format_version = "ReEDS v1.0"
+        self.system.data_format_version = LATEST_COMMIT
         self.system.description = (
             f"ReEDS model system for case '{self.config.case_name}', "
             f"scenario '{self.config.scenario}', "
@@ -678,7 +767,20 @@ class ReEDSParser(BaseParser):
         logger.info("Attached {} emissions to generators", emission_count)
 
     def _attach_load_profiles(self) -> Result[None, ParserError]:
-        """Attach load time series to demand components using filtered data from _build_loads()."""
+        """Attach load time series to demand components.
+
+        Extracts hourly load profiles from load data filtered by weather and solve years.
+        Matches profile columns to demand components by region name.
+
+        Returns
+        -------
+        Result[None, ParserError]
+            Ok() on success, Err() with ParserError if data is empty or demands not found
+
+        Notes
+        -----
+        Load data must be filtered during :meth:`_build_loads` before calling this method.
+        """
         logger.info("Attaching load profiles...")
 
         load_profiles = self.read_data_file("load_profiles").collect()
@@ -706,9 +808,20 @@ class ReEDSParser(BaseParser):
         return Ok()
 
     def _attach_renewable_profiles(self) -> Result[None, ParserError]:
-        """Attach renewable capacity factor profiles to generators.
+        """Attach renewable capacity factor profiles to generator components.
 
-        Matches CF data columns (format: tech|region) to generators.
+        Matches renewable profile columns (format: technology|region) to generators.
+        Validates that weather years in profiles match configured weather years.
+
+        Returns
+        -------
+        Result[None, ParserError]
+            Ok() on success, Err() with ParserError if data is empty or years mismatch
+
+        Raises
+        ------
+        ParserError
+            If renewable profiles are empty or contain unexpected weather years
         """
         logger.info("Attaching renewable profiles to generators...")
 
@@ -775,7 +888,20 @@ class ReEDSParser(BaseParser):
         return Ok()
 
     def _attach_reserve_profiles(self) -> None:
-        """Attach reserve requirement profiles based on wind, solar, and load data."""
+        """Attach reserve requirement time series to reserve components.
+
+        Calculates dynamic reserve requirements from wind, solar, and load contributions
+        using configurable percentages from defaults. Applies requirements to reserve
+        components by transmission region.
+
+        Returns
+        -------
+        None
+
+        See Also
+        --------
+        :meth:`_calculate_reserve_requirement` : Computes individual reserve requirements
+        """
         logger.info("Attaching reserve profiles...")
 
         defaults = self.config.load_defaults()
