@@ -1,27 +1,12 @@
 """Tests for input validation."""
 
-from pathlib import Path
-
-import pytest
-
+from r2x_core import ValidationError
 from r2x_core.store import DataStore
 from r2x_reeds.config import ReEDSConfig
 from r2x_reeds.parser import ReEDSParser
 
 
-@pytest.fixture
-def data_folder():
-    """Return path to test data folder."""
-    return Path(__file__).parent / "data" / "test_Pacific"
-
-
-@pytest.fixture
-def file_mapping_path():
-    """Return path to file mapping."""
-    return ReEDSConfig.get_file_mapping_path()
-
-
-def test_invalid_solve_year_raises_error(data_folder, file_mapping_path):
+def test_invalid_solve_year_raises_error(reeds_run_path):
     """Test that an invalid solve year raises a ValueError."""
     config = ReEDSConfig(
         solve_year=[2050],
@@ -30,14 +15,16 @@ def test_invalid_solve_year_raises_error(data_folder, file_mapping_path):
         case_name="test",
     )
 
-    data_store = DataStore.from_json(file_mapping_path, folder=data_folder)
-    parser = ReEDSParser(config, data_store, name="test_invalid_solve")
+    data_store = DataStore.from_json(config.file_mapping_path, folder_path=reeds_run_path)
+    parser = ReEDSParser(config, data_store=data_store)
 
-    with pytest.raises(ValueError, match=r"Solve year"):
-        parser.validate_inputs()
+    result = parser.validate_inputs()
+    assert result.is_err()
+    assert isinstance(result.error, ValidationError)
+    assert "Solve year" in result.error.args[0]
 
 
-def test_invalid_weather_year_raises_error(data_folder, file_mapping_path):
+def test_invalid_weather_year_raises_error(reeds_run_path):
     """Test that an invalid weather year raises a ValueError."""
     config = ReEDSConfig(
         solve_year=[2032],
@@ -46,14 +33,15 @@ def test_invalid_weather_year_raises_error(data_folder, file_mapping_path):
         case_name="test",
     )
 
-    data_store = DataStore.from_json(file_mapping_path, folder=data_folder)
-    parser = ReEDSParser(config, data_store, name="test_invalid_weather")
+    data_store = DataStore.from_json(config.file_mapping_path, folder_path=reeds_run_path)
+    parser = ReEDSParser(config, data_store=data_store)
+    result = parser.validate_inputs()
+    assert result.is_err()
+    assert isinstance(result.error, ValidationError)
+    assert "Weather year" in result.error.args[0]
 
-    with pytest.raises(ValueError, match=r"Weather year\(s\).*not found"):
-        parser.validate_inputs()
 
-
-def test_valid_years_pass_validation(data_folder, file_mapping_path):
+def test_valid_years_pass_validation(reeds_run_path):
     """Test that valid years pass validation without errors."""
     config = ReEDSConfig(
         solve_year=[2032],
@@ -62,7 +50,8 @@ def test_valid_years_pass_validation(data_folder, file_mapping_path):
         case_name="test",
     )
 
-    data_store = DataStore.from_json(file_mapping_path, folder=data_folder)
-    parser = ReEDSParser(config, data_store, name="test_valid_years")
+    data_store = DataStore.from_json(config.file_mapping_path, folder_path=reeds_run_path)
+    parser = ReEDSParser(config, data_store=data_store, name="test_valid_years")
 
-    parser.validate_inputs()
+    result = parser.validate_inputs()
+    assert result

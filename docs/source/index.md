@@ -41,30 +41,31 @@ R2X ReEDS provides a comprehensive parser for NREL's [ReEDS](https://github.com/
 ## Quick Start
 
 ```python
-from r2x_reeds import ReEDSParser, ReEDSConfig, ReEDSGenerator
+from pathlib import Path
+from r2x_reeds import ReEDSParser, ReEDSConfig, ReEDSRegion
 from r2x_core.store import DataStore
 
 # Configure
 config = ReEDSConfig(
-    solve_year=2030,
-    weather_year=2012,
-    case_name="test_Pacific"
+    solve_years=2030,
+    weather_years=2012,
+    case_name="High_Renewable"
 )
 
 # Load data using the default file mapping
 file_mapping = ReEDSConfig.get_file_mapping_path()
 data_store = DataStore.from_json(
     file_mapping,
-    folder="path/to/reeds/outputs"
+    folder=Path("path/to/reeds/outputs")
 )
 
 # Parse
-parser = ReEDSParser(config, data_store)
+parser = ReEDSParser(config, data_store=data_store, name="ReEDS_System")
 system = parser.build_system()
 
 # Access components
-generators = list(system.get_components(ReEDSGenerator))
-print(f"Built system with {len(generators)} generators")
+regions = list(system.get_components(ReEDSRegion))
+print(f"Built system with {len(regions)} regions")
 ```
 
 ## Documentation Sections

@@ -77,10 +77,9 @@ def reeds_config() -> ReEDSConfig:
 
 
 @pytest.fixture
-def data_store(test_data_path: Path) -> DataStore:
+def data_store(test_data_path: Path, reeds_config: ReEDSConfig) -> DataStore:
     """Create DataStore from file mapping."""
-    mapping_path = ReEDSConfig.get_file_mapping_path()
-    return DataStore.from_json(mapping_path, folder=test_data_path)
+    return DataStore.from_json(reeds_config.file_mapping_path, folder_path=test_data_path)
 
 
 @pytest.fixture
