@@ -1,3 +1,5 @@
+"""Helpers for upgrader."""
+
 import ast
 import inspect
 import io

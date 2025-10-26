@@ -1,3 +1,5 @@
+"""Utilities for the parser."""
+
 import calendar
 from typing import TYPE_CHECKING, Any
 

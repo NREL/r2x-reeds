@@ -295,7 +295,7 @@ class ReEDSParser(BaseParser):
         self._interface_cache: dict[str, Any] = {}
         return Ok()
 
-    def build_system_components(self) -> None:
+    def build_system_components(self) -> Result[None, ParserError]:
         """Create all system components from ReEDS data.
 
         Components are built in dependency order:
@@ -315,8 +315,9 @@ class ReEDSParser(BaseParser):
             "Built {} total components: regions, generators, transmission, loads, reserves, emissions",
             total_components,
         )
+        return Ok()
 
-    def build_time_series(self) -> None:
+    def build_time_series(self) -> Result[None, ParserError]:
         """Attach time series data to all system components.
 
         Applies time series in order:
@@ -335,8 +336,9 @@ class ReEDSParser(BaseParser):
         self._attach_reserve_profiles()
         self._attach_hydro_budgets()
         logger.info("Time series attachment complete")
+        return Ok()
 
-    def post_process_system(self) -> None:
+    def post_process_system(self) -> Result[None, ParserError]:
         """Perform post-processing on the built system.
 
         Sets system metadata including:
@@ -362,6 +364,7 @@ class ReEDSParser(BaseParser):
         logger.info("System name: {}", self.system.name)
         logger.info("Total components: {}", total_components)
         logger.info("Post-processing complete")
+        return Ok()
 
     def _build_regions(self) -> None:
         """Build region components from hierarchy data.

@@ -1,3 +1,5 @@
+"""R2X-core plugin discovery."""
+
 from r2x_core.plugins import PluginManager
 from r2x_reeds.config import ReEDSConfig
 from r2x_reeds.parser import ReEDSParser
