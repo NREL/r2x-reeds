@@ -46,7 +46,7 @@ jobs:
 
       - name: Running package tests
         run: |
-          uv run --frozen pytest -vvl --cov=src/r2x_reeds --cov-report=xml
+          uv run --frozen pytest -vl --cov=src --cov-report=xml tests/
 
       - name: codecov
         uses: codecov/codecov-action@v5

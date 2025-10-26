@@ -1,0 +1,12 @@
+r,nercr,transreg,transgrp,cendiv,st,interconnect,country,usda_region,h2ptcreg,hurdlereg,ccreg,Value
+p1,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,USA,Pacific,Northwest,Puget_Sound_Energy_Inc,NorthernGrid,c_bool(False)
+p2,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,USA,Pacific,Northwest,Bonneville_Power_Administration,NorthernGrid,c_bool(False)
+p3,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,USA,Pacific,Northwest,Avista_Corp,NorthernGrid,c_bool(False)
+p4,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,WA,western,USA,Pacific,Northwest,PUD_No2_of_Grant_County,NorthernGrid,c_bool(False)
+p5,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,USA,Pacific,Northwest,Bonneville_Power_Administration,NorthernGrid,c_bool(False)
+p6,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,USA,Pacific,Northwest,PacifiCorp_West,NorthernGrid,c_bool(False)
+p7,WECC_NW,NorthernGrid,NorthernGrid_West,Pacific,OR,western,USA,Pacific,Northwest,Bonneville_Power_Administration,NorthernGrid,c_bool(False)
+p8,WECC_NW,NorthernGrid,NorthernGrid_South,Pacific,CA,western,USA,Pacific,California,PacifiCorp_West,NorthernGrid,c_bool(False)
+p9,WECC_CA,CAISO,CAISO,Pacific,CA,western,USA,Pacific,California,CAISO,CAISO,c_bool(False)
+p10,WECC_CA,CAISO,CAISO,Pacific,CA,western,USA,Pacific,California,CAISO,CAISO,c_bool(False)
+p11,WECC_CA,CAISO,CAISO,Pacific,CA,western,USA,Pacific,California,CAISO,CAISO,c_bool(False)

@@ -8,6 +8,8 @@ from importlib.metadata import version
 
 from loguru import logger
 
+from .plugins import register_plugin
+
 __version__ = version("r2x_reeds")
 
 from .config import ReEDSConfig
@@ -38,6 +40,8 @@ from .parser import ReEDSParser
 # Applications using this library should configure their own handlers
 logger.disable("r2x_reeds")
 
+latest_commit = "401c0bb15cbf93d2ff9696b14b799edad763247a"
+
 __all__ = [
     "EmissionRate",
     "EmissionType",
@@ -61,24 +65,6 @@ __all__ = [
     "ReserveType",
     "TimeHours",
     "__version__",
+    "move_file",
+    "register_plugin",
 ]
-
-
-def register_plugin() -> None:
-    """Register the ReEDS plugin with the R2X plugin manager.
-
-    This function is called automatically when the plugin is discovered
-    via entry points. It registers the ReEDS parser, config, and optionally
-    an exporter with the PluginManager.
-    """
-    from r2x_core.plugins import PluginManager
-
-    from .config import ReEDSConfig
-    from .parser import ReEDSParser
-
-    PluginManager.register_model_plugin(
-        name="reeds",
-        config=ReEDSConfig,
-        parser=ReEDSParser,
-        exporter=None,  # Will be implemented later
-    )

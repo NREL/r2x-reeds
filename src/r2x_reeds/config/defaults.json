@@ -67,10 +67,7 @@
       "prefixes": [
         "hyd"
       ],
-      "exact": [
-        "pumped-hydro",
-        "pumped-hydro-flex"
-      ]
+      "exact": []
     },
     "hydro_dispatchable": {
       "prefixes": [

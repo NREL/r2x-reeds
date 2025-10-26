@@ -1,0 +1,7 @@
+*transgrp,transgrpp,trtype,MW
+CAISO,NorthernGrid_South,AC,7249.602
+CAISO,NorthernGrid_West,AC,3098.96
+NorthernGrid_South,CAISO,AC,6531.556
+NorthernGrid_South,NorthernGrid_West,AC,88.019
+NorthernGrid_West,CAISO,AC,3096.007
+NorthernGrid_West,NorthernGrid_South,AC,451.952

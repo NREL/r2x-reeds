@@ -1,7 +1,31 @@
-"""ReEDS parser implementation for r2x-core framework."""
+"""
+Example usage of ReEDSParser.
+
+The :class:`ReEDSParser` is used to build an infrasys.System from ReEDS model output.
+
+>>> import json
+>>> from pathlib import Path
+>>> from r2x_core.store import DataStore
+>>> from r2x_reeds.config import ReEDSConfig
+>>> from r2x_reeds.parser import ReEDSParser
+>>>
+>>> # Load configuration and create DataStore
+>>> config = ReEDSConfig(solve_years=2030, weather_years=2012, case_name="High_Renewable")
+>>> mapping_path = ReEDSConfig.get_file_mapping_path()
+>>> data_folder = Path("tests/data/test_Pacific")
+>>> data_store = DataStore.from_json(mapping_path, folder=data_folder)
+>>>
+>>> # Create parser and build system
+>>> parser = ReEDSParser(config, data_store=data_store, name="ReEDS_System")
+>>> system = parser.build_system()
+>>> regions = list(system.get_components(ReEDSRegion))
+>>> print(f"Built system with {len(regions)} regions")
+Built system with 5 regions
+"""
 
 from __future__ import annotations
 
+import calendar
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -10,8 +34,16 @@ import polars as pl
 from infrasys import Component
 from infrasys.time_series_models import SingleTimeSeries
 from loguru import logger
+from pluggy import Result
 
+from r2x_core import Err, Ok, ParserError, ValidationError
 from r2x_core.parser import BaseParser
+from r2x_reeds.parser_utils import (
+    get_technology_category,
+    monthly_to_hourly_polars,
+    tech_matches_category,
+)
+from r2x_reeds.upgrader.helpers import LATEST_COMMIT
 
 from .models.base import FromTo_ToFrom
 from .models.components import (
@@ -34,22 +66,22 @@ if TYPE_CHECKING:
 class ReEDSParser(BaseParser):
     """Parser for ReEDS model data following r2x-core framework patterns.
 
-    The parser builds an infrasys.System from ReEDS model output by:
+    This parser builds an :class:`infrasys.System` from ReEDS model output through three main phases:
 
-    1. **Component Building** (`build_system_components`):
-       - Regions from hierarchy data (buses with regional attributes)
+    1. **Component Building** (:meth:`build_system_components`):
+       - Regions from hierarchy data with regional attributes
        - Generators split into renewable (aggregated by tech-region) and non-renewable (with vintage)
        - Transmission interfaces and lines with bi-directional ratings
        - Loads with peak demand by region
        - Reserves by transmission region and type
        - Emissions as supplemental attributes on generators
 
-    2. **Time Series Attachment** (`build_time_series`):
+    2. **Time Series Attachment** (:meth:`build_time_series`):
        - Load profiles filtered by weather year and solve year
        - Renewable capacity factors from CF data
        - Reserve requirements calculated from wind/solar/load contributions
 
-    3. **Post-Processing** (`post_process_system`):
+    3. **Post-Processing** (:meth:`post_process_system`):
        - System metadata and description
 
     Key Implementation Details
@@ -67,181 +99,209 @@ class ReEDSParser(BaseParser):
         ReEDS-specific configuration with solve years, weather years, etc.
     data_store : DataStore
         Initialized DataStore with ReEDS file mappings loaded
-    name : str, optional
-        Name for the system being built
     auto_add_composed_components : bool, default=True
         Whether to automatically add composed components
     skip_validation : bool, default=False
         Skip Pydantic validation for performance (use with caution)
+    **kwargs
+        Additional keyword arguments passed to parent :class:`BaseParser`
+
+    Attributes
+    ----------
+    system : infrasys.System
+        The constructed power system model
+    config : ReEDSConfig
+        The ReEDS configuration instance
+    data_store : DataStore
+        The DataStore for accessing ReEDS data files
+
+    Methods
+    -------
+    build_system()
+        Build and return the complete infrasys.System
+    build_system_components()
+        Construct all system components (regions, generators, transmission, loads, reserves)
+    build_time_series()
+        Attach time series data to components
+    post_process_system()
+        Apply post-processing steps to the system
+
+    See Also
+    --------
+    :class:`BaseParser` : Parent class with core system building logic
+    :class:`ReEDSConfig` : Configuration class for ReEDS parser
+    :class:`DataStore` : Data storage and access interface
 
     Examples
     --------
-    Basic usage:
+    Build a ReEDS system from test data:
 
-    >>> import json
     >>> from pathlib import Path
     >>> from r2x_core.store import DataStore
     >>> from r2x_reeds.config import ReEDSConfig
     >>> from r2x_reeds.parser import ReEDSParser
     >>>
-    >>> # Load defaults and create DataStore
-    >>> defaults = ReEDSConfig.load_defaults()
+    >>> config = ReEDSConfig(solve_years=2030, weather_years=2012, case_name="High_Renewable")
     >>> mapping_path = ReEDSConfig.get_file_mapping_path()
     >>> data_folder = Path("tests/data/test_Pacific")
-    >>>
-    >>> # Create config (defaults loaded separately, not passed to config)
-    >>> config = ReEDSConfig(
-    ...     solve_years=2030,
-    ...     weather_years=2012,
-    ...     case_name="High_Renewable",
-    ... )
-    >>>
-    >>> # Create DataStore from file mapping
     >>> data_store = DataStore.from_json(mapping_path, folder=data_folder)
-    >>>
-    >>> # Create parser and build system
-    >>> parser = ReEDSParser(config, data_store, name="ReEDS_System")
+    >>> parser = ReEDSParser(config, data_store=data_store, name="ReEDS_System")
     >>> system = parser.build_system()
+
+    Notes
+    -----
+    The parser uses internal caches for regions and generators to optimize cross-referencing
+    during component construction. These caches are populated during :meth:`build_system_components`
+    and are used for all subsequent operations.
     """
 
     def __init__(
         self,
+        /,
         config: ReEDSConfig,
-        data_store: DataStore,
         *,
-        name: str | None = None,
+        data_store: DataStore,
         auto_add_composed_components: bool = True,
         skip_validation: bool = False,
+        **kwargs,
     ) -> None:
         """Initialize ReEDS parser."""
         super().__init__(
-            config,
-            data_store,
-            name=name,
+            config=config,
+            data_store=data_store,
             auto_add_composed_components=auto_add_composed_components,
             skip_validation=skip_validation,
+            **kwargs,
         )
 
-        self.config: ReEDSConfig = config
+    def validate_inputs(self) -> Result[None, ValidationError]:
+        """Validate input data and configuration before building system.
 
-        self._filtered_load_data: pl.DataFrame | None = None
-        self._filtered_cf_data: pl.DataFrame | None = None
+        Checks that:
+        - Required data files (modeled_years, hour_map) are non-empty
+        - Configured solve_years exist in the modeled data
+        - Configured weather_years exist in the hour_map data
 
-    def validate_inputs(self) -> None:
-        """Validate input data before building system."""
-        logger.info("Validating ReEDS input data...")
+        Returns
+        -------
+        Result[None, ValidationError]
+            Ok() if all validations pass, Err() with ValidationError details if any fail
+        """
+        assert self._store, "REeDS parser requires DataStore object."
 
-        # Get file paths from DataStore
-        modeledyears_file = self.data_store.get_data_file_by_name("modeled_years")
-        hour_map_file = self.data_store.get_data_file_by_name("hour_map")
-
-        modeled_years_data = self.read_data_file("modeled_years")
-        if modeled_years_data is None or modeled_years_data.limit(1).collect().is_empty():
-            msg = f"{modeledyears_file.fpath} is empty or missing. Check input folder."
-            raise ValueError(msg)
+        modeled_years = self.read_data_file("modeled_years")
+        if modeled_years.limit(1).collect().is_empty():
+            modeled_data_meta = self._store["modeled_years"]
+            msg = f"modeled_years data is empty. Check that file {modeled_data_meta.fpath} has data."
+            return Err(error=ValidationError(msg))
         hour_map_data = self.read_data_file("hour_map")
-        if hour_map_data is None or hour_map_data.limit(1).collect().is_empty():
-            msg = f"{hour_map_file.fpath} is empty or missing. Check input folder."
-            raise ValueError(msg)
+        if hour_map_data.limit(1).collect().is_empty():
+            hour_map_meta = self._store["hour_map"]
+            msg = f"hour_map data is empty. Check that file {hour_map_meta.fpath} has data."
+            return Err(ValidationError(msg))
 
         solve_years = (
             [self.config.solve_year]
             if isinstance(self.config.solve_year, int)
             else list(self.config.solve_year)
         )
-        # Handle from row to column-like modeled_years dataframe
-        available_solve_years = set(modeled_years_data.collect()["modeled_years"].to_list())
-        missing_solve_years = [y for y in solve_years if y not in available_solve_years]
+
+        model_solve_years = set(modeled_years.collect()["modeled_years"].to_list())
+        missing_solve_years = [y for y in solve_years if y not in model_solve_years]
         if missing_solve_years:
-            msg = f"Solve year(s) {missing_solve_years} not found in {modeledyears_file.fpath}. "
-            msg += f"Available years: {sorted(available_solve_years)}"
-            raise ValueError(msg)
+            modeled_data_meta = self._store["modeled_years"]
+            msg = f"Solve year(s) {missing_solve_years} not found in {modeled_data_meta.fpath}. "
+            msg += f"Available years: {sorted(model_solve_years)}"
+            return Err(ValidationError(msg))
 
         weather_years = (
             [self.config.weather_year]
             if isinstance(self.config.weather_year, int)
             else list(self.config.weather_year)
         )
-        available_weather_years = set(
+        model_weather_years = set(
             hour_map_data.select(pl.col("year")).unique().collect().to_series().to_list()
         )
-        missing_weather_years = [y for y in weather_years if y not in available_weather_years]
-        if missing_weather_years:
-            msg = f"Weather year(s) {missing_weather_years} not found in {hour_map_file.fpath}. "
-            msg += f"Available years: {sorted(available_weather_years)}"
-            raise ValueError(msg)
+        missing_weather_years = [y for y in weather_years if y not in model_weather_years]
+        if missing_weather_years := [y for y in weather_years if y not in model_weather_years]:
+            hour_map_meta = self._store["hour_map"]
+            msg = f"Weather year(s) {missing_weather_years} not found in {hour_map_meta.fpath}. "
+            msg += f"Available years: {sorted(model_weather_years)}"
+            return Err(ValidationError(msg))
 
-        logger.info("Input validation complete")
+        logger.debug("Input validation complete")
+        return Ok()
 
-    def _tech_matches_category(self, tech: str, category_name: str, defaults: dict[str, Any]) -> bool:
-        """Check if a technology matches a category using prefix or exact matching.
+    def prepare_data(self) -> Result[None, ParserError]:
+        """Prepare and normalize configuration and time-related data.
 
-        Parameters
-        ----------
-        tech : str
-            Technology name to check
-        category_name : str
-            Category name from tech_categories
-        defaults : dict
-            Defaults dictionary containing tech_categories
-
-        Returns
-        -------
-        bool
-            True if technology matches the category
-        """
-        tech_categories = defaults.get("tech_categories", {})
-        if category_name not in tech_categories:
-            return False
-
-        category = tech_categories[category_name]
-
-        if isinstance(category, list):
-            return tech in category
-
-        prefixes = category.get("prefixes", [])
-        exact = category.get("exact", [])
-
-        if tech in exact:
-            return True
-
-        return any(tech.startswith(prefix) for prefix in prefixes)
-
-    def _get_tech_category(self, tech: str, defaults: dict[str, Any]) -> str | None:
-        """Get the category for a technology.
-
-        Parameters
-        ----------
-        tech : str
-            Technology name
-        defaults : dict
-            Defaults dictionary containing tech_categories
+        Initializes internal data structures required for component building:
+        - Normalizes solve_years and weather_years to lists
+        - Creates hourly and daily time indices based on primary weather year
+        - Builds lookup tables for month/year/day/hour calculations
+        - Loads default technology categories and exclusion lists
+        - Initializes component caches for efficient cross-referencing
 
         Returns
         -------
-        str | None
-            Category name if found, None otherwise
+        Result[None, ParserError]
+            Ok() on success, Err() with ParserError on failure
         """
-        tech_categories = defaults.get("tech_categories", {})
-        for category_name in tech_categories:
-            category_name_str: str = str(category_name)
-            if self._tech_matches_category(tech, category_name_str, defaults):
-                return category_name_str
-        return None
+        self.solve_years = (
+            [self.config.solve_year]
+            if isinstance(self.config.solve_year, int)
+            else list(self.config.solve_year)
+        )
 
-    def build_system_components(self) -> None:
+        self.weather_years = (
+            [self.config.weather_year]
+            if isinstance(self.config.weather_year, int)
+            else list(self.config.weather_year)
+        )
+
+        weather_year = self.config.primary_weather_year
+
+        self.hourly_time_index = np.arange(f"{weather_year}", f"{weather_year + 1}", dtype="datetime64[h]")
+        self.daily_time_index = np.arange(f"{weather_year}", f"{weather_year + 1}", dtype="datetime64[D]")
+        self.initial_timestamp = self.hourly_time_index[0].astype("datetime64[s]").astype(datetime)
+        self.month_map = {calendar.month_abbr[i].lower(): i for i in range(1, 13)}
+        self.year_month_day_hours = pl.DataFrame(
+            {
+                "year": [y for y in self.solve_years for _ in range(1, 13)],
+                "month_num": [m for _ in self.solve_years for m in range(1, 13)],
+                "days_in_month": [
+                    calendar.monthrange(y, m)[1] for y in self.solve_years for m in range(1, 13)
+                ],
+                "hours_in_month": [
+                    calendar.monthrange(y, m)[1] * 24 for y in self.solve_years for m in range(1, 13)
+                ],
+            }
+        )
+
+        self.defaults = self.config.load_defaults()
+        self.technology_categories = self.defaults.get("tech_categories")
+        self.excluded_technologies = self.defaults.get("excluded_techs", [])
+
+        logger.debug(
+            "Created time indices for weather year {}: {} hours, {} days starting at {}",
+            weather_year,
+            len(self.hourly_time_index),
+            len(self.daily_time_index),
+            self.initial_timestamp,
+        )
+
+        self._region_cache: dict[str, Any] = {}
+        self._generator_cache: dict[str, Any] = {}
+        self._interface_cache: dict[str, Any] = {}
+        return Ok()
+
+    def build_system_components(self) -> Result[None, ParserError]:
         """Create all system components from ReEDS data.
 
         Components are built in dependency order:
         regions → generators → transmission → loads → reserves → emissions
         """
         logger.info("Building ReEDS system components...")
-
-        self._setup_time_indices()
-
-        self._region_cache: dict[str, Any] = {}
-        self._generator_cache: dict[str, Any] = {}
-        self._interface_cache: dict[str, Any] = {}
 
         self._build_regions()
         self._build_generators()
@@ -255,22 +315,44 @@ class ReEDSParser(BaseParser):
             "Built {} total components: regions, generators, transmission, loads, reserves, emissions",
             total_components,
         )
+        return Ok()
 
-    def build_time_series(self) -> None:
-        """Attach time series data to components."""
+    def build_time_series(self) -> Result[None, ParserError]:
+        """Attach time series data to all system components.
+
+        Applies time series in order:
+        1. Load profiles to demand components
+        2. Renewable capacity factors to renewable generators
+        3. Reserve requirement profiles
+        4. Hydro budget constraints
+
+        Returns
+        -------
+        None
+        """
         logger.info("Building time series data...")
         self._attach_load_profiles()
         self._attach_renewable_profiles()
         self._attach_reserve_profiles()
         self._attach_hydro_budgets()
-        self._attach_hydro_rating_profiles()
         logger.info("Time series attachment complete")
+        return Ok()
 
-    def post_process_system(self) -> None:
-        """Perform post-processing on the built system."""
+    def post_process_system(self) -> Result[None, ParserError]:
+        """Perform post-processing on the built system.
+
+        Sets system metadata including:
+        - Data format version
+        - System description with case, scenario, and year information
+        - Logs component summary statistics
+
+        Returns
+        -------
+        None
+        """
         logger.info("Post-processing ReEDS system...")
 
-        self.system.data_format_version = "ReEDS v1.0"
+        self.system.data_format_version = LATEST_COMMIT
         self.system.description = (
             f"ReEDS model system for case '{self.config.case_name}', "
             f"scenario '{self.config.scenario}', "
@@ -282,20 +364,7 @@ class ReEDSParser(BaseParser):
         logger.info("System name: {}", self.system.name)
         logger.info("Total components: {}", total_components)
         logger.info("Post-processing complete")
-
-    def _setup_time_indices(self) -> None:
-        """Create time indices for hourly and daily data."""
-        weather_year = self.config.primary_weather_year
-
-        self.hourly_time_index = np.arange(f"{weather_year}", f"{weather_year + 1}", dtype="datetime64[h]")
-        self.daily_time_index = np.arange(f"{weather_year}", f"{weather_year + 1}", dtype="datetime64[D]")
-
-        logger.debug(
-            "Created time indices for weather year {}: {} hours, {} days",
-            weather_year,
-            len(self.hourly_time_index),
-            len(self.daily_time_index),
-        )
+        return Ok()
 
     def _build_regions(self) -> None:
         """Build region components from hierarchy data.
@@ -355,11 +424,6 @@ class ReEDSParser(BaseParser):
             logger.warning("No capacity data found, skipping generators")
             return
 
-        solve_year = (
-            self.config.solve_year[0] if isinstance(self.config.solve_year, list) else self.config.solve_year
-        )
-        capacity_data = capacity_data.filter(pl.col("year") == solve_year)
-
         df = capacity_data
         fuel_price = self.read_data_file("fuel_price")
         biofuel = self.read_data_file("biofuel_price")
@@ -372,6 +436,7 @@ class ReEDSParser(BaseParser):
             )
             if not biofuel_mapped.collect().is_empty():
                 fuel_price = pl.concat([fuel_price, biofuel_mapped], how="diagonal")
+                # fuel_price = fuel_price.rename({"value": "fuel_price"})
 
         for next_df in [
             self.read_data_file("fuel_tech_map"),
@@ -391,12 +456,9 @@ class ReEDSParser(BaseParser):
             logger.warning("Generator data is empty, skipping generators")
             return
 
-        # Filter out excluded technologies
-        defaults = self.config.load_defaults()
-        excluded_techs = defaults.get("excluded_techs", [])
-        if excluded_techs:
+        if self.excluded_technologies:
             initial_count = len(df)
-            df = df.filter(~pl.col("technology").is_in(excluded_techs))
+            df = df.filter(~pl.col("technology").is_in(self.excluded_technologies))
             excluded_count = initial_count - len(df)
             if excluded_count > 0:
                 logger.info("Excluded {} generators with technologies in excluded_techs list", excluded_count)
@@ -405,17 +467,15 @@ class ReEDSParser(BaseParser):
             logger.warning("All generators were excluded, skipping generators")
             return
 
-        # Assign categories to technologies using pattern matching
         df = df.with_columns(
             pl.col("technology")
             .map_elements(
-                lambda tech: self._get_tech_category(tech, defaults),
+                lambda tech: get_technology_category(tech, self.technology_categories).unwrap_or(None),
                 return_dtype=pl.String,
             )
             .alias("category")
         )
 
-        # Separate renewable from non-renewable generators
         df_renewable = df.filter(pl.col("category").is_in(["wind", "solar"]))
         df_non_renewable = df.filter(
             (~pl.col("category").is_in(["wind", "solar"])) | pl.col("category").is_null()
@@ -432,7 +492,7 @@ class ReEDSParser(BaseParser):
                 "fuel_price",
                 "vom_price",
             ]
-            agg_exprs = [pl.col("value").sum().alias("capacity_mw")] + [
+            agg_exprs = [pl.col("capacity").sum()] + [
                 pl.col(col).first() if col in df_renewable.columns else pl.lit(None).alias(col)
                 for col in agg_cols
             ]
@@ -488,7 +548,7 @@ class ReEDSParser(BaseParser):
             from_region_name = row.get("from_region")
             to_region_name = row.get("to_region")
             line_type = row.get("trtype", "AC")
-            capacity_from_to = float(row.get("capacity_mw") or row.get("value") or 0.0)
+            capacity_from_to = float(row.get("capacity") or 0.0)
 
             if not from_region_name or not to_region_name:
                 continue
@@ -506,12 +566,7 @@ class ReEDSParser(BaseParser):
                 & (pl.col("trtype") == line_type)
             )
             if not reverse_row.is_empty():
-                val = (
-                    reverse_row["capacity_mw"][0]
-                    if "capacity_mw" in reverse_row.columns
-                    else reverse_row["value"][0]
-                )
-                capacity_to_from = float(val)
+                capacity_to_from = reverse_row["capacity"].item()
             else:
                 capacity_to_from = capacity_from_to
 
@@ -529,18 +584,18 @@ class ReEDSParser(BaseParser):
                 forward_cap = capacity_to_from
                 reverse_cap = capacity_from_to
 
-            if interface_name in self._interface_cache:
-                continue
-
-            interface = ReEDSInterface(
-                name=interface_name,
-                from_region=interface_from,
-                to_region=interface_to,
-                category=line_type,
-            )
-            self.system.add_component(interface)
-            self._interface_cache[interface_name] = interface
-            interface_count += 1
+            if interface_name not in self._interface_cache:
+                interface = ReEDSInterface(
+                    name=interface_name,
+                    from_region=interface_from,
+                    to_region=interface_to,
+                    category=line_type,
+                )
+                self.system.add_component(interface)
+                self._interface_cache[interface_name] = interface
+                interface_count += 1
+            else:
+                interface = self._interface_cache[interface_name]
 
             line_name = f"{from_region_name}_{to_region_name}_{line_type}"
             line = ReEDSTransmissionLine(
@@ -555,7 +610,7 @@ class ReEDSParser(BaseParser):
 
         logger.info("Built {} transmission interfaces and {} lines", interface_count, line_count)
 
-    def _build_loads(self) -> None:
+    def _build_loads(self) -> Result[None, ParserError]:
         """Build load components from demand data.
 
         Filters load data by weather year and solve year.
@@ -563,41 +618,19 @@ class ReEDSParser(BaseParser):
         """
         logger.info("Building loads...")
 
-        load_data = self.read_data_file("load_data")
-        if load_data is None:
-            logger.warning("No load data found, skipping loads")
-            return
+        load_profiles = self.read_data_file("load_profiles").collect()
 
-        df = load_data.collect() if isinstance(load_data, pl.LazyFrame) else load_data
-
-        if df.is_empty():
-            logger.warning("Load data is empty, skipping loads")
-            return
-
-        weather_year = self.config.primary_weather_year
-        solve_year = (
-            self.config.solve_year[0] if isinstance(self.config.solve_year, list) else self.config.solve_year
-        )
-
-        df = df.filter((pl.col("datetime").dt.year() == weather_year) & (pl.col("solve_year") == solve_year))
-
-        logger.debug(
-            "Filtered load data to weather year {} and solve year {}: {} hours",
-            weather_year,
-            solve_year,
-            df.height,
-        )
-
-        self._filtered_load_data = df
+        if load_profiles.is_empty():
+            msg = "Load data is empty and must exist for proper translation."
+            return ParserError(msg)
 
         load_count = 0
-
         for region_name, region_obj in self._region_cache.items():
-            if region_name not in df.columns:
+            if region_name not in load_profiles.columns:
                 logger.debug("No load data for region {}", region_name)
                 continue
 
-            load_profile = df[region_name].to_numpy()
+            load_profile = load_profiles[region_name].to_numpy()
             peak_load = float(load_profile.max())
 
             demand = self.create_component(
@@ -611,6 +644,7 @@ class ReEDSParser(BaseParser):
             load_count += 1
 
         logger.info("Built {} load components", load_count)
+        return Ok()
 
     def _build_reserves(self) -> None:
         """Build reserve requirement components.
@@ -707,7 +741,7 @@ class ReEDSParser(BaseParser):
             tech = row.get("technology") or row.get("tech") or row.get("i")
             region = row.get("region") or row.get("r")
             emission_type = row.get("emission_type") or row.get("e")
-            rate = row.get("emission_rate") or row.get("rate") or row.get("value")
+            rate = row.get("emission_rate")
             emission_source = row.get("emission_source", "combustion")
 
             if not tech or not region or not emission_type or rate is None:
@@ -735,99 +769,142 @@ class ReEDSParser(BaseParser):
 
         logger.info("Attached {} emissions to generators", emission_count)
 
-    def _attach_load_profiles(self) -> None:
-        """Attach load time series to demand components using filtered data from _build_loads()."""
+    def _attach_load_profiles(self) -> Result[None, ParserError]:
+        """Attach load time series to demand components.
+
+        Extracts hourly load profiles from load data filtered by weather and solve years.
+        Matches profile columns to demand components by region name.
+
+        Returns
+        -------
+        Result[None, ParserError]
+            Ok() on success, Err() with ParserError if data is empty or demands not found
+
+        Notes
+        -----
+        Load data must be filtered during :meth:`_build_loads` before calling this method.
+        """
         logger.info("Attaching load profiles...")
 
-        if self._filtered_load_data is None:
-            logger.warning("No filtered load data available, skipping load profile attachment")
-            return
-
-        df = self._filtered_load_data
+        load_profiles = self.read_data_file("load_profiles").collect()
         demands = list(self.system.get_components(ReEDSDemand))
 
-        if df.is_empty() or not demands:
-            logger.warning("Load data empty or no demands found, skipping load profile attachment")
-            return
+        if load_profiles.is_empty() or not demands:
+            return ParserError("Load data is empty or demands not found on the system.")
 
-        initial_timestamp = self.hourly_time_index[0].astype("datetime64[us]").item()
         resolution = (self.hourly_time_index[1] - self.hourly_time_index[0]).astype("timedelta64[us]").item()
 
         attached_count = 0
         for demand in demands:
             region_name = demand.name.replace("_load", "")
-            if region_name in df.columns:
+            if region_name in load_profiles.columns:
                 ts = SingleTimeSeries.from_array(
-                    data=df[region_name].to_numpy(),
+                    data=load_profiles[region_name].to_numpy(),
                     name="max_active_power",
-                    initial_timestamp=initial_timestamp,
+                    initial_timestamp=self.initial_timestamp,
                     resolution=resolution,
                 )
                 self.system.add_time_series(ts, demand)
                 attached_count += 1
 
-        logger.info("Attached {} load profiles to demand components", attached_count)
+        logger.debug("Attached {} load profiles to demand components", attached_count)
+        return Ok()
 
-    def _attach_renewable_profiles(self) -> None:
-        """Attach renewable capacity factor profiles to generators.
+    def _attach_renewable_profiles(self) -> Result[None, ParserError]:
+        """Attach renewable capacity factor profiles to generator components.
 
-        Matches CF data columns (format: tech|region) to generators.
+        Matches renewable profile columns (format: technology|region) to generators.
+        Validates that weather years in profiles match configured weather years.
+
+        Returns
+        -------
+        Result[None, ParserError]
+            Ok() on success, Err() with ParserError if data is empty or years mismatch
+
+        Raises
+        ------
+        ParserError
+            If renewable profiles are empty or contain unexpected weather years
         """
         logger.info("Attaching renewable profiles to generators...")
 
-        renewable_cf_data = self.read_data_file("renewable_cf")
-        if renewable_cf_data is None:
-            logger.warning("No renewable CF data found, skipping renewable profiles")
-            return
+        renewable_profiles = self.read_data_file("renewable_profiles").collect()
+        if renewable_profiles.is_empty():
+            renewable_profile_meta = self.read_data("renewable_profiles")
+            return ParserError(f"Renewable profile is empty. Check {renewable_profile_meta.fpath}")
 
-        cf_df = renewable_cf_data.collect()
-        if cf_df.is_empty():
-            logger.warning("Renewable CF data is empty, skipping profiles")
-            return
+        if not renewable_profiles["datetime"].dt.year().unique().is_in(self.weather_years).all():
+            year_list = renewable_profiles["datetime"].dt.year().unique().to_list()
+            msg = "Weather year filter process failed. "
+            msg += f"Renewable profiles have the following weather_years {year_list}"
+            return ParserError(msg)
 
-        weather_year = self.config.primary_weather_year
-        cf_df = cf_df.filter(pl.col("datetime").dt.year() == weather_year)
-
-        logger.debug("Filtered CF data to weather year {}: {} hours", weather_year, cf_df.height)
-
-        self._filtered_cf_data = cf_df
-
-        initial_timestamp = self.hourly_time_index[0].astype("datetime64[s]").astype(datetime)
-        resolution = timedelta(
-            seconds=int((self.hourly_time_index[1] - self.hourly_time_index[0]) / np.timedelta64(1, "s"))
-        )
+        resolution = (self.hourly_time_index[1] - self.hourly_time_index[0]).astype("timedelta64[us]").item()
 
         profile_count = 0
-        for col_name in cf_df.columns:
-            if col_name == "datetime":
-                continue
+        tech_regions = (
+            pl.DataFrame({"col": renewable_profiles.columns})
+            .filter(pl.col("col") != "datetime")
+            .with_columns(
+                [
+                    pl.col("col").str.split("|").alias("parts"),
+                    pl.col("col").str.split("|").list.len().alias("len"),
+                ]
+            )
+            .filter(pl.col("len") == 2)
+            .with_columns(
+                [
+                    pl.col("parts").list.get(0).alias("tech"),
+                    pl.col("parts").list.get(1).alias("region"),
+                ]
+            )
+            .select("col", "tech", "region")
+        )
 
-            parts = col_name.split("|")
-            if len(parts) != 2:
-                continue
+        for row in tech_regions.iter_rows(named=True):
+            tech = row["tech"]
+            region_name = row["region"]
+            col_name = row["col"]
 
-            tech, region_name = parts
             matching_generators = [
                 gen
                 for gen in self._generator_cache.values()
                 if gen.technology == tech and gen.region.name == region_name
             ]
 
+            if not matching_generators:
+                continue
+
+            data = renewable_profiles[col_name].to_numpy()
+            ts = SingleTimeSeries.from_array(
+                data=data,
+                name="max_active_power",
+                initial_timestamp=self.initial_timestamp,
+                resolution=resolution,
+            )
+
             for generator in matching_generators:
-                ts = SingleTimeSeries.from_array(
-                    data=cf_df[col_name].to_numpy(),
-                    name="max_active_power",
-                    initial_timestamp=initial_timestamp,
-                    resolution=resolution,
-                    normalization=None,
-                )
                 self.system.add_time_series(ts, generator)
                 profile_count += 1
 
         logger.info("Attached {} renewable profiles", profile_count)
+        return Ok()
 
     def _attach_reserve_profiles(self) -> None:
-        """Attach reserve requirement profiles based on wind, solar, and load data."""
+        """Attach reserve requirement time series to reserve components.
+
+        Calculates dynamic reserve requirements from wind, solar, and load contributions
+        using configurable percentages from defaults. Applies requirements to reserve
+        components by transmission region.
+
+        Returns
+        -------
+        None
+
+        See Also
+        --------
+        :meth:`_calculate_reserve_requirement` : Computes individual reserve requirements
+        """
         logger.info("Attaching reserve profiles...")
 
         defaults = self.config.load_defaults()
@@ -904,7 +981,7 @@ class ReEDSParser(BaseParser):
                 for gen in self.system.get_components(ReEDSGenerator)
                 if gen.region
                 and gen.region.transmission_region == region_name
-                and self._tech_matches_category(gen.technology, "wind", defaults)
+                and tech_matches_category(gen.technology, "wind", self.technology_categories)
             ]
 
             for gen in wind_generators:
@@ -919,7 +996,7 @@ class ReEDSParser(BaseParser):
                 for gen in self.system.get_components(ReEDSGenerator)
                 if gen.region
                 and gen.region.transmission_region == region_name
-                and self._tech_matches_category(gen.technology, "solar", defaults)
+                and tech_matches_category(gen.technology, "solar", self.technology_categories)
             ]
 
             total_solar_capacity = sum(gen.capacity for gen in solar_generators)
@@ -978,7 +1055,7 @@ class ReEDSParser(BaseParser):
             category=row.get("category"),
             region=region_obj,
             technology=tech,
-            capacity=float(row.get("capacity_mw", 0.0)),  # type: ignore[arg-type]
+            capacity=row.get("capacity"),
             heat_rate=row.get("heat_rate"),
             forced_outage_rate=row.get("forced_outage_rate"),
             planned_outage_rate=row.get("planned_outage_rate"),
@@ -1001,188 +1078,64 @@ class ReEDSParser(BaseParser):
         logger.info("Attaching hydro budget profiles...")
 
         hydro_cf = self.read_data_file("hydro_cf")
-        if hydro_cf is None:
-            logger.warning("No hydro_cf data found, skipping hydro budgets")
-            return
-
-        defaults = self.config.load_defaults()
-        month_map = defaults.get("month_map", {})
-        month_hours = defaults.get("month_hours", {})
-        if not month_map or not month_hours:
-            logger.warning("No month_map or month_hours in defaults, skipping hydro budgets")
-            return
-
-        hydro_cf_columns = hydro_cf.collect_schema().names()
-
-        hydro_generators = list(
-            self.system.get_components(
-                ReEDSGenerator,
-                filter_func=lambda gen: self._tech_matches_category(gen.technology, "hydro", defaults),
-            )
-        )
+        hydro_generators = [
+            gen
+            for gen_name, gen in self._generator_cache.items()
+            if tech_matches_category(gen.technology, "hydro", self.technology_categories)
+        ]
 
         if not hydro_generators:
             logger.warning("No hydro generators found, skipping hydro budgets")
             return
 
-        for generator in hydro_generators:
-            region_id = generator.region.name
-            tech = generator.technology
-
-            gen_cf_data = (
-                hydro_cf.filter((pl.col("region") == region_id) & (pl.col("technology") == tech))
-                if "technology" in hydro_cf_columns
-                else hydro_cf.filter(pl.col("region") == region_id)
+        hydro_cf: pl.DataFrame = (
+            hydro_cf.with_columns(
+                pl.col("month")
+                .map_elements(lambda x: self.month_map.get(x, x), return_dtype=pl.Int16)
+                .alias("month_num"),
             )
-
-            gen_cf_collected = gen_cf_data.collect()
-            if len(gen_cf_collected) == 0:
-                continue
-
-            month_budgets = []
-            for month_num in range(1, 13):
-                month_str = str(month_num)
-                month_name = month_map.get(month_str, month_str)
-
-                month_cf = gen_cf_collected.filter(pl.col("month") == month_name)
-                if len(month_cf) == 0:
-                    month_budgets.append(0.0)
-                    continue
-
-                cf_value = float(month_cf.select(pl.col("hydro_cf")).item())
-                hours = month_hours.get(month_name, 730.0)
-
-                budget_gwh = generator.capacity * cf_value * hours / 1000.0
-                month_budgets.append(budget_gwh)
-
-            daily_budgets = self._expand_monthly_to_daily(month_budgets)
-            hourly_budgets = self._expand_daily_to_hourly(daily_budgets)
-
-            initial_timestamp = self.hourly_time_index[0].astype("datetime64[s]").astype(datetime)
-            resolution = timedelta(hours=1)
-
-            ts = SingleTimeSeries.from_array(
-                data=np.array(hourly_budgets),
-                name="hydro_budget",
-                initial_timestamp=initial_timestamp,
-                resolution=resolution,
-            )
-            self.system.add_time_series(ts, generator)
-
-        logger.info("Hydro budget attachment complete")
-
-    def _attach_hydro_rating_profiles(self) -> None:
-        """Attach hourly max active power profiles to hydro energy reservoir generators.
-
-        Creates capacity limits based on monthly capacity factors.
-        Rating = capacity * monthly_cf
-        """
-        logger.info("Attaching hydro rating profiles...")
-
-        hydro_cf = self.read_data_file("hydro_cf")
-        if hydro_cf is None:
-            logger.warning("No hydro_cf data found, skipping hydro rating profiles")
-            return
-
-        defaults = self.config.load_defaults()
-        month_map = defaults.get("month_map", {})
-        if not month_map:
-            logger.warning("No month_map in defaults, skipping hydro rating profiles")
-            return
-
-        hydro_cf_columns = hydro_cf.collect_schema().names()
-
-        hydro_generators = list(
-            self.system.get_components(
-                ReEDSGenerator,
-                filter_func=lambda gen: self._tech_matches_category(gen.technology, "hydro", defaults),
-            )
+            .sort(["year", "technology", "region", "month_num"])
+            .collect()
         )
 
-        if not hydro_generators:
-            logger.warning("No hydro generators found, skipping hydro rating profiles")
-            return
+        hydro_cf = hydro_cf.join(self.year_month_day_hours, on=["year", "month_num"], how="left")
+
+        hydro_capacity = pl.DataFrame(
+            [
+                (gen.name, gen.technology, gen.region.name, gen.capacity, gen.vintage)
+                for gen in hydro_generators
+            ],
+            schema=["name", "technology", "region", "capacity", "vintage"],
+            orient="row",
+        )
+
+        hydro_data = hydro_capacity.join(hydro_cf, on=["technology", "region"], how="left")
+
+        # Daily Energy budget units in MWh
+        hydro_data = hydro_data.with_columns(
+            (
+                pl.col("hydro_cf") * pl.col("hours_in_month") * pl.col("capacity") / pl.col("days_in_month")
+            ).alias("daily_energy_budget")
+        )
 
         for generator in hydro_generators:
-            region_id = generator.region.name
-            tech = generator.technology
-
-            gen_cf_data = (
-                hydro_cf.filter((pl.col("region") == region_id) & (pl.col("technology") == tech))
-                if "technology" in hydro_cf_columns
-                else hydro_cf.filter(pl.col("region") == region_id)
+            tech_region_filter = (
+                (pl.col("technology") == generator.technology)
+                & (pl.col("region") == generator.region.name)
+                & (pl.col("vintage") == generator.vintage)
             )
+            for row, month_budget_by_vintage in hydro_data.filter(tech_region_filter).group_by(
+                ["year", "vintage"]
+            ):
+                year = row[0]
+                hourly_budget = monthly_to_hourly_polars(year, month_budget_by_vintage["daily_energy_budget"])
+                ts = SingleTimeSeries.from_array(
+                    data=hourly_budget.unwrap(),
+                    name="hydro_budget",
+                    initial_timestamp=self.initial_timestamp,
+                    resolution=timedelta(hours=1),
+                )
 
-            gen_cf_collected = gen_cf_data.collect()
-            if len(gen_cf_collected) == 0:
-                continue
-
-            month_ratings = []
-            for month_num in range(1, 13):
-                month_str = str(month_num)
-                month_name = month_map.get(month_str, month_str)
-
-                month_cf = gen_cf_collected.filter(pl.col("month") == month_name)
-                if len(month_cf) == 0:
-                    month_ratings.append(generator.capacity)
-                    continue
-
-                cf_value = float(month_cf.select(pl.col("hydro_cf")).item())
-                rating_mw = generator.capacity * cf_value
-                month_ratings.append(rating_mw)
-
-            hourly_ratings = self._expand_monthly_to_hourly(month_ratings)
-
-            initial_timestamp = self.hourly_time_index[0].astype("datetime64[s]").astype(datetime)
-            resolution = timedelta(hours=1)
-
-            ts = SingleTimeSeries.from_array(
-                data=np.array(hourly_ratings),
-                name="max_active_power",
-                initial_timestamp=initial_timestamp,
-                resolution=resolution,
-            )
-            self.system.add_time_series(ts, generator)
-
-        logger.info("Hydro rating profile attachment complete")
-
-    def _expand_monthly_to_daily(self, monthly_values: list[float]) -> list[float]:
-        """Expand monthly values to daily values based on days in each month."""
-        defaults = self.config.load_defaults()
-        month_days = defaults.get("month_days", {})
-
-        if not month_days:
-            days_per_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-        else:
-            days_per_month = [month_days.get(f"M{i}", 30) for i in range(1, 13)]
-
-        daily_values = []
-        for month_idx, value in enumerate(monthly_values):
-            days = days_per_month[month_idx]
-            daily_values.extend([value] * days)
-
-        return daily_values
-
-    def _expand_daily_to_hourly(self, daily_values: list[float]) -> list[float]:
-        """Expand daily values to hourly values (24 hours per day)."""
-        hourly_values = []
-        for value in daily_values:
-            hourly_values.extend([value] * 24)
-        return hourly_values
-
-    def _expand_monthly_to_hourly(self, monthly_values: list[float]) -> list[float]:
-        """Expand monthly values to hourly values based on hours in each month."""
-        defaults = self.config.load_defaults()
-        month_hours = defaults.get("month_hours", {})
-
-        if not month_hours:
-            hours_per_month = [744, 672, 744, 720, 744, 720, 744, 744, 720, 744, 720, 744]
-        else:
-            hours_per_month = [month_hours.get(f"M{i}", 730) for i in range(1, 13)]
-
-        hourly_values = []
-        for month_idx, value in enumerate(monthly_values):
-            hours = hours_per_month[month_idx]
-            hourly_values.extend([value] * hours)
-
-        return hourly_values
+                self.system.add_time_series(ts, generator, solve_year=year)
+                logger.debug("Adding hydro budget to {}", generator.label)
+        return

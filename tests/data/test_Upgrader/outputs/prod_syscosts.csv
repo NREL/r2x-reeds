@@ -1,0 +1,6 @@
+sys_costs,i,r,t,Value
+inv_h2_production,electrolyzer,p10,2029,143069350.8065
+op_consume_fom,electrolyzer,p10,2029,2859365.837539
+op_consume_fom,electrolyzer,p10,2032,2859365.837539
+op_h2_ptc_payments_negative,electrolyzer,p10,2029,-21696188.032715
+op_h2_ptc_payments_negative,electrolyzer,p10,2032,-21696188.032715
