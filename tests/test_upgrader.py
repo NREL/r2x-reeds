@@ -14,7 +14,6 @@ def upgraded_system(reeds_run_upgrader, example_reeds_config, caplog):
     store = DataStore.from_plugin_config(
         example_reeds_config, folder_path=reeds_run_upgrader, upgrader=upgrader
     )
-    store.upgrade_data()
 
     parser = ReEDSParser(example_reeds_config, data_store=store, system_name="Upgraded System")
     return parser.build_system()
