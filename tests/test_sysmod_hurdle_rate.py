@@ -6,14 +6,13 @@ from r2x_reeds.config import ReEDSConfig
 from r2x_reeds.models.base import FromTo_ToFrom
 from r2x_reeds.models.components import ReEDSInterface, ReEDSRegion, ReEDSTransmissionLine
 from r2x_reeds.parser import ReEDSParser
-from r2x_reeds.plugins.hurdle_rate import update_system
+from r2x_reeds.sysmods.hurdle_rate import add_tx_hurdle_rate
 
 
 @pytest.fixture
 def simple_config():
     """Create a simple ReEDS config."""
     return ReEDSConfig(
-        name="TestHurdleRate",
         weather_year=2012,
         solve_year=2035,
     )
@@ -86,7 +85,7 @@ def test_hurdle_rate_basic(simple_config, system_with_transmission):
     system = system_with_transmission
     hurdle_rate_value = 0.006
 
-    new_system = update_system(
+    new_system = add_tx_hurdle_rate(
         config=simple_config, system=system, parser=None, hurdle_rate=hurdle_rate_value
     )
 
@@ -105,7 +104,7 @@ def test_hurdle_rate_preserves_existing_rates(simple_config, system_with_transmi
 
     original_lines = {line.name: line.hurdle_rate for line in system.get_components(ReEDSTransmissionLine)}
 
-    new_system = update_system(config=simple_config, system=system, parser=None, hurdle_rate=None)
+    new_system = add_tx_hurdle_rate(config=simple_config, system=system, parser=None, hurdle_rate=None)
 
     assert isinstance(new_system, System)
 
@@ -123,7 +122,7 @@ def test_hurdle_rate_with_parser(simple_config, system_with_transmission, mock_d
 
     hurdle_rate_value = 0.008
 
-    new_system = update_system(
+    new_system = add_tx_hurdle_rate(
         config=simple_config, parser=parser, system=system, hurdle_rate=hurdle_rate_value
     )
 
@@ -139,7 +138,7 @@ def test_hurdle_rate_zero_value(simple_config, system_with_transmission):
     system = system_with_transmission
     hurdle_rate_value = 0.0
 
-    new_system = update_system(
+    new_system = add_tx_hurdle_rate(
         config=simple_config, system=system, parser=None, hurdle_rate=hurdle_rate_value
     )
 
@@ -160,7 +159,7 @@ def test_hurdle_rate_no_transmission_lines(simple_config):
 
     hurdle_rate_value = 0.005
 
-    new_system = update_system(
+    new_system = add_tx_hurdle_rate(
         config=simple_config, system=system, parser=None, hurdle_rate=hurdle_rate_value
     )
 
@@ -210,7 +209,7 @@ def test_hurdle_rate_selective_update(simple_config):
 
     hurdle_rate_value = 0.010
 
-    new_system = update_system(
+    new_system = add_tx_hurdle_rate(
         config=simple_config, system=system, parser=None, hurdle_rate=hurdle_rate_value
     )
 
@@ -226,7 +225,7 @@ def test_hurdle_rate_large_value(simple_config, system_with_transmission):
     system = system_with_transmission
     hurdle_rate_value = 100.0  # Large hurdle rate
 
-    new_system = update_system(
+    new_system = add_tx_hurdle_rate(
         config=simple_config, system=system, parser=None, hurdle_rate=hurdle_rate_value
     )
 
@@ -244,7 +243,7 @@ def test_hurdle_rate_system_modification(simple_config, system_with_transmission
 
     original_rates = {line.name: line.hurdle_rate for line in system.get_components(ReEDSTransmissionLine)}
 
-    new_system = update_system(
+    new_system = add_tx_hurdle_rate(
         config=simple_config, system=system, parser=None, hurdle_rate=hurdle_rate_value
     )
 

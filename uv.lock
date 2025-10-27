@@ -1351,7 +1351,7 @@ wheels = [
 
 [[package]]
 name = "r2x-core"
-version = "0.1.0rc1"
+version = "0.1.0rc2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "h5py" },
@@ -1361,9 +1361,9 @@ dependencies = [
     { name = "polars" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0f/9c/ecab3df9851d8d9a4f6e02c4a424bc151043a2e0f33837abef30f487801b/r2x_core-0.1.0rc1.tar.gz", hash = "sha256:2dc3a55e91f7c437bbfc358ebd156e8a5d80f78050be52f52625abf2a24f1e30", size = 56396, upload-time = "2025-10-26T22:39:29.419Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9f/b5/6b7d07fa52aa05e832f5b4ddea443c06d0365bf852b8962c4a2d40ee7677/r2x_core-0.1.0rc2.tar.gz", hash = "sha256:136f208d5603475a57a5348fdf1ca34465469d1fba8cee6c94b768e56c5891f8", size = 56420, upload-time = "2025-10-26T23:32:00.189Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3b/ae/b74bceeb55c7175ef54a24d92e729490b025255636c980b4d60f322b01a0/r2x_core-0.1.0rc1-py3-none-any.whl", hash = "sha256:64b2a25bcad300733ccc0c4954e88ecb598655a9654a55b34c1f7aa42894f1f5", size = 68539, upload-time = "2025-10-26T22:39:27.775Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/95/64be97f412f6ec0182c0a36bf598d11fe093ec0f5ad7ed63b40c1c79fbad/r2x_core-0.1.0rc2-py3-none-any.whl", hash = "sha256:1f7fb2f98603670b1d04f73ba3611a691d22afad3392be73b804f3f2b160acc7", size = 68553, upload-time = "2025-10-26T23:31:58.689Z" },
 ]
 
 [[package]]
@@ -1409,7 +1409,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=1.20.0" },
     { name = "polars", specifier = ">=1.33.0" },
     { name = "pydantic", specifier = ">=2.11.0,<3" },
-    { name = "r2x-core", specifier = ">=0.1.0rc1" },
+    { name = "r2x-core", specifier = ">=0.1.0rc2" },
 ]
 
 [package.metadata.requires-dev]

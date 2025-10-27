@@ -15,6 +15,7 @@ from infrasys.time_series_models import SingleTimeSeries
 from loguru import logger
 
 # Local imports
+from r2x_core import PluginManager
 from r2x_reeds.config import ReEDSConfig
 from r2x_reeds.models.components import ReEDSDemand, ReEDSGenerator, ReEDSRegion
 from r2x_reeds.parser import ReEDSParser
@@ -23,8 +24,8 @@ ELECTROLYZER_LOAD_FMAP = "electrolyzer_load"
 MONTHLY_H2_FPRICE_FMAP = "h2_fuel_price"
 
 
-# @PluginManager.register_system_update("electrolyzer")
-def update_system(config: ReEDSConfig, system: System, parser: ReEDSParser, **kwargs) -> System:
+@PluginManager.register_system_modifier("add_electrolizer_load")
+def add_electrolizer_load(config: ReEDSConfig, system: System, parser: ReEDSParser, **kwargs) -> System:
     """Modify infrasys system to include electrolyzer load and monthly hydrogen fuel price.
 
     Parameters

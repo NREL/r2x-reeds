@@ -7,13 +7,14 @@ import polars as pl
 from infrasys import System
 from loguru import logger
 
+from r2x_core import PluginManager
 from r2x_reeds.config import ReEDSConfig
 from r2x_reeds.models.components import ReEDSGenerator
 from r2x_reeds.parser import ReEDSParser
 
 
-# @PluginManager.register_system_update("ccs_credit")
-def update_system(config: ReEDSConfig, system: System, parser: ReEDSParser | None, **kwargs) -> System:
+@PluginManager.register_system_modifier("add_ccs_credit")
+def add_ccs_credit(config: ReEDSConfig, system: System, parser: ReEDSParser | None, **kwargs) -> System:
     """Apply CCS incentive to CCS eligible technologies.
 
     The incentive is calculated with the capture incentive ($/ton) and capture rate
