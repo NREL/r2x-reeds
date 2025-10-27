@@ -3,7 +3,7 @@ from infrasys import System
 
 from r2x_reeds.models.components import ReEDSEmission, ReEDSGenerator, ReEDSRegion
 from r2x_reeds.models.enums import EmissionType
-from r2x_reeds.plugins.break_gens import break_generators
+from r2x_reeds.sysmods.break_gens import break_generators
 
 
 @pytest.fixture

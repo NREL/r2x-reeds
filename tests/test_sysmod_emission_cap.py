@@ -7,7 +7,7 @@ from r2x_reeds.config import ReEDSConfig
 from r2x_reeds.models.components import ReEDSEmission, ReEDSGenerator, ReEDSRegion
 from r2x_reeds.models.enums import EmissionType
 from r2x_reeds.parser import ReEDSParser
-from r2x_reeds.plugins.emission_cap import add_precombustion, update_system
+from r2x_reeds.sysmods.emission_cap import add_emission_cap, add_precombustion
 
 
 @pytest.fixture
@@ -23,7 +23,6 @@ def simple_region():
 def simple_config():
     """Create a simple ReEDS config."""
     return ReEDSConfig(
-        name="TestEmissionCap",
         weather_year=2012,
         solve_year=2035,
     )
@@ -120,7 +119,7 @@ def test_update_system_with_cap(simple_config, system_with_emissions, mock_parse
     system = system_with_emissions
     parser = mock_parser_with_data
 
-    new_system = update_system(config=simple_config, parser=parser, system=system)
+    new_system = add_emission_cap(config=simple_config, parser=parser, system=system)
 
     assert isinstance(new_system, System)
     assert new_system is not None
@@ -130,7 +129,7 @@ def test_update_system_with_custom_cap(simple_config, system_with_emissions):
     """Test emission cap with custom value."""
     system = system_with_emissions
 
-    new_system = update_system(
+    new_system = add_emission_cap(
         config=simple_config,
         parser=None,
         system=system,
@@ -157,7 +156,7 @@ def test_no_emission_types(simple_config):
     )
     system.add_component(gen)
 
-    new_system = update_system(config=simple_config, parser=None, system=system, emission_cap=1000.0)
+    new_system = add_emission_cap(config=simple_config, parser=None, system=system, emission_cap=1000.0)
 
     # Since there are no CO2 emissions in the system, it should return unchanged
     assert new_system == system
@@ -167,7 +166,7 @@ def test_no_emission_cap_provided(simple_config, system_with_emissions):
     """Test behavior when no emission cap is provided."""
     system = system_with_emissions
 
-    new_system = update_system(config=simple_config, parser=None, system=system, emission_cap=None)
+    new_system = add_emission_cap(config=simple_config, parser=None, system=system, emission_cap=None)
 
     # Since no emission cap is provided, it should return unchanged
     assert new_system == system
@@ -292,7 +291,7 @@ def test_update_system_with_precombustion(simple_config, system_with_emissions, 
         "co2_cap": co2_cap_data,
     }
 
-    new_system = update_system(config=simple_config, parser=parser, system=system)
+    new_system = add_emission_cap(config=simple_config, parser=parser, system=system)
 
     # Check that SO2 emissions were updated
     generator = new_system.get_component(ReEDSGenerator, "biopower_init-2_p10")
@@ -324,7 +323,7 @@ def test_emission_constraint_storage_with_ext(simple_config, system_with_emissio
     if not hasattr(system, "ext"):
         system.ext = {}
 
-    new_system = update_system(config=simple_config, parser=None, system=system, emission_cap=1000000.0)
+    new_system = add_emission_cap(config=simple_config, parser=None, system=system, emission_cap=1000000.0)
 
     # Check constraint storage
     if hasattr(new_system, "ext") and "emission_constraints" in new_system.ext:
@@ -347,7 +346,7 @@ def test_emission_constraint_storage_without_ext(simple_config, system_with_emis
     if hasattr(system, "ext"):
         delattr(system, "ext")
 
-    new_system = update_system(config=simple_config, parser=None, system=system, emission_cap=500000.0)
+    new_system = add_emission_cap(config=simple_config, parser=None, system=system, emission_cap=500000.0)
 
     # Check that constraint was stored in _emission_constraints
     assert hasattr(new_system, "_emission_constraints")
@@ -394,7 +393,7 @@ def test_precombustion_switches_conversion(simple_config, system_with_emissions,
         "co2_cap": co2_cap_data,
     }
 
-    new_system = update_system(config=simple_config, parser=parser, system=system)
+    new_system = add_emission_cap(config=simple_config, parser=parser, system=system)
 
     # Verify the system was updated (precombustion was applied)
     generator = new_system.get_component(ReEDSGenerator, "biopower_init-2_p10")

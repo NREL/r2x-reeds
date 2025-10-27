@@ -7,13 +7,14 @@ import polars as pl
 from infrasys import System
 from loguru import logger
 
+from r2x_core import PluginManager
 from r2x_reeds.config import ReEDSConfig
 from r2x_reeds.models.components import ReEDSGenerator, ReEDSRegion, ReEDSTransmissionLine
 from r2x_reeds.parser import ReEDSParser
 
 
-# @PluginManager.register_system_update("cambium")
-def update_system(
+@PluginManager.register_system_modifier("cambium_assumptions")
+def cambium_assumptions(
     config: ReEDSConfig, system: System, parser: ReEDSParser, perturb: float, **kwargs
 ) -> System:
     """Apply hurdle rate between regions.

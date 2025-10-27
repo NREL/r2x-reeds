@@ -13,13 +13,14 @@ from infrasys import System
 from infrasys.time_series_models import SingleTimeSeries
 from loguru import logger
 
+from r2x_core import PluginManager
 from r2x_reeds.config import ReEDSConfig
 from r2x_reeds.models.components import ReEDSGenerator
 from r2x_reeds.parser import ReEDSParser
 
 
-# @PluginManager.register_system_update("imports")
-def update_system(config: ReEDSConfig, system: System, parser: ReEDSParser | None = None) -> System:
+@PluginManager.register_system_modifier("add_imports")
+def add_imports(config: ReEDSConfig, system: System, parser: ReEDSParser | None = None) -> System:
     """Add Canadian imports time series to the system.
 
     This function adds time series data for Canadian imports generators,

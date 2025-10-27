@@ -14,6 +14,7 @@ import pandas as pd
 from infrasys import System
 from loguru import logger
 
+from r2x_core import PluginManager
 from r2x_core.datafile import DataFile
 from r2x_core.store import DataStore
 from r2x_reeds.config import ReEDSConfig
@@ -23,8 +24,8 @@ from r2x_reeds.parser import ReEDSParser
 CAPACITY_THRESHOLD = 5
 
 
-# @PluginManager.register_system_update("break_gens")
-def update_system(
+@PluginManager.register_system_modifier("break_gens")
+def break_gens(
     config: ReEDSConfig,
     system: System,
     parser: ReEDSParser,

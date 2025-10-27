@@ -5,6 +5,7 @@ from pathlib import Path
 from infrasys import System
 from loguru import logger
 
+from r2x_core import PluginManager
 from r2x_core.datafile import DataFile
 from r2x_core.store import DataStore
 from r2x_reeds.config import ReEDSConfig
@@ -12,8 +13,8 @@ from r2x_reeds.models.components import ReEDSGenerator
 from r2x_reeds.parser import ReEDSParser
 
 
-# @PluginManager.register_system_update("pcm_defaults")
-def update_system(
+@PluginManager.register_system_modifier("add_pcm_defaults")
+def add_pcm_defaults(
     config: ReEDSConfig,
     system: System,
     parser: ReEDSParser | None = None,
@@ -62,10 +63,10 @@ def update_system(
     pcm_data_file = DataFile(
         name="pcm_defaults", fpath=pcm_path, description="PCM defaults for generator augmentation"
     )
-    data_store = DataStore(folder=pcm_path.parent)
-    data_store.add_data_file(pcm_data_file)
+    data_store = DataStore(folder_path=pcm_path.parent)
+    data_store.add_data(pcm_data_file)
 
-    pcm_defaults: dict = data_store.read_data_file(name="pcm_defaults")
+    pcm_defaults: dict = data_store.read_data(name="pcm_defaults")
 
     # Fields that need to be multiplied by generator capacity
     needs_multiplication = {"start_cost_per_MW", "ramp_limits"}

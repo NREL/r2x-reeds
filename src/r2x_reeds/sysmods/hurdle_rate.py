@@ -6,13 +6,14 @@ This plugin is only applicable for ReEDs, but could work with similarly arrange 
 from infrasys import System
 from loguru import logger
 
+from r2x_core import PluginManager
 from r2x_reeds.config import ReEDSConfig
 from r2x_reeds.models.components import ReEDSTransmissionLine
 from r2x_reeds.parser import ReEDSParser
 
 
-# @PluginManager.register_system_update("hurdle_rate")
-def update_system(
+@PluginManager.register_system_modifier("add_tx_hurdle_rate")
+def add_tx_hurdle_rate(
     config: ReEDSConfig,
     system: System,
     parser: ReEDSParser | None = None,

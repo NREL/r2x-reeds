@@ -7,14 +7,13 @@ from r2x_core.store import DataStore
 from r2x_reeds.config import ReEDSConfig
 from r2x_reeds.models.components import ReEDSGenerator, ReEDSRegion
 from r2x_reeds.parser import ReEDSParser
-from r2x_reeds.plugins.pcm_defaults import update_system
+from r2x_reeds.sysmods.pcm_defaults import add_pcm_defaults
 
 
 @pytest.fixture
 def simple_config():
     """Create a simple ReEDS config."""
     return ReEDSConfig(
-        name="TestPCMDefaults",
         weather_year=2012,
         solve_year=2035,
     )
@@ -68,9 +67,8 @@ def test_update_system_basic(simple_config, system_with_generators, mock_data_st
     """Test basic PCM defaults functionality."""
     system = system_with_generators
     parser = ReEDSParser(config=simple_config, data_store=mock_data_store)
-    parser.data = {}
 
-    new_system = update_system(config=simple_config, parser=parser, system=system)
+    new_system = add_pcm_defaults(config=simple_config, parser=parser, system=system)
 
     assert isinstance(new_system, System)
     assert new_system is not None
@@ -118,11 +116,8 @@ def test_custom_pcm_defaults(tmp_path, simple_config):
     with open(temp_file, "w") as f:
         json.dump(pcm_defaults, f)
 
-    new_system = update_system(
-        config=simple_config,
-        parser=None,
-        system=system,
-        pcm_defaults_fpath=str(temp_file)
+    new_system = add_pcm_defaults(
+        config=simple_config, parser=None, system=system, pcm_defaults_fpath=str(temp_file)
     )
 
     # Check that the system was modified in place or verify return value
@@ -170,12 +165,12 @@ def test_custom_pcm_defaults_override(tmp_path, simple_config):
         json.dump(pcm_defaults, f)
 
     # Test without override (should only fill None values)
-    new_system = update_system(
+    new_system = add_pcm_defaults(
         config=simple_config,
         parser=None,
         system=system,
         pcm_defaults_fpath=str(temp_file),
-        pcm_defaults_override=False
+        pcm_defaults_override=False,
     )
 
     updated_gen = new_system.get_component(ReEDSGenerator, "test_gen")
@@ -193,12 +188,12 @@ def test_custom_pcm_defaults_override(tmp_path, simple_config):
     generator.vom_cost = None
 
     # Test with override (should replace all values)
-    new_system = update_system(
+    new_system = add_pcm_defaults(
         config=simple_config,
         parser=None,
         system=system,
         pcm_defaults_fpath=str(temp_file),
-        pcm_defaults_override=True
+        pcm_defaults_override=True,
     )
 
     updated_gen = new_system.get_component(ReEDSGenerator, "test_gen")
@@ -249,18 +244,15 @@ def test_pcm_defaults_technology_specific(tmp_path, simple_config):
         },
         "wind-onshore": {
             "forced_outage_rate": 0.02,
-        }
+        },
     }
     temp_file = tmp_path / "pcm_data.json"
 
     with open(temp_file, "w") as f:
         json.dump(pcm_defaults, f)
 
-    new_system = update_system(
-        config=simple_config,
-        parser=None,
-        system=system,
-        pcm_defaults_fpath=str(temp_file)
+    new_system = add_pcm_defaults(
+        config=simple_config, parser=None, system=system, pcm_defaults_fpath=str(temp_file)
     )
 
     updated_gas_gen = new_system.get_component(ReEDSGenerator, "gas_gen")
@@ -302,11 +294,8 @@ def test_pcm_defaults_by_name(tmp_path, simple_config):
     with open(temp_file, "w") as f:
         json.dump(pcm_defaults, f)
 
-    new_system = update_system(
-        config=simple_config,
-        parser=None,
-        system=system,
-        pcm_defaults_fpath=str(temp_file)
+    new_system = add_pcm_defaults(
+        config=simple_config, parser=None, system=system, pcm_defaults_fpath=str(temp_file)
     )
 
     updated_gen = new_system.get_component(ReEDSGenerator, "specific_gen")
@@ -347,18 +336,15 @@ def test_pcm_defaults_hierarchy(tmp_path, simple_config):
             "forced_outage_rate": 0.03,
             "heat_rate": 8000.0,
             "vom_cost": 5.0,
-        }
+        },
     }
     temp_file = tmp_path / "pcm_data.json"
 
     with open(temp_file, "w") as f:
         json.dump(pcm_defaults, f)
 
-    new_system = update_system(
-        config=simple_config,
-        parser=None,
-        system=system,
-        pcm_defaults_fpath=str(temp_file)
+    new_system = add_pcm_defaults(
+        config=simple_config, parser=None, system=system, pcm_defaults_fpath=str(temp_file)
     )
 
     updated_gen = new_system.get_component(ReEDSGenerator, "test_gen")
@@ -373,12 +359,7 @@ def test_pcm_defaults_no_file(simple_config, system_with_generators):
     """Test PCM defaults when no file is provided."""
     system = system_with_generators
 
-    new_system = update_system(
-        config=simple_config,
-        parser=None,
-        system=system,
-        pcm_defaults_fpath=None
-    )
+    new_system = add_pcm_defaults(config=simple_config, parser=None, system=system, pcm_defaults_fpath=None)
 
     assert new_system is system
 
@@ -389,11 +370,8 @@ def test_pcm_defaults_invalid_file(simple_config, system_with_generators):
 
     # Test that the plugin handles invalid file gracefully
     try:
-        new_system = update_system(
-            config=simple_config,
-            parser=None,
-            system=system,
-            pcm_defaults_fpath="nonexistent_file.json"
+        new_system = add_pcm_defaults(
+            config=simple_config, parser=None, system=system, pcm_defaults_fpath="nonexistent_file.json"
         )
         # If no exception, check that system is returned unchanged
         assert new_system is system
@@ -412,11 +390,8 @@ def test_pcm_defaults_empty_system(tmp_path, simple_config):
     with open(temp_file, "w") as f:
         json.dump(pcm_defaults, f)
 
-    new_system = update_system(
-        config=simple_config,
-        parser=None,
-        system=system,
-        pcm_defaults_fpath=str(temp_file)
+    new_system = add_pcm_defaults(
+        config=simple_config, parser=None, system=system, pcm_defaults_fpath=str(temp_file)
     )
 
     assert new_system is system
@@ -433,11 +408,8 @@ def test_pcm_defaults_malformed_json(tmp_path, simple_config, system_with_genera
         f.write('{"thermal": {"forced_outage_rate": 0.05,}')
 
     try:
-        new_system = update_system(
-            config=simple_config,
-            parser=None,
-            system=system,
-            pcm_defaults_fpath=str(temp_file)
+        new_system = add_pcm_defaults(
+            config=simple_config, parser=None, system=system, pcm_defaults_fpath=str(temp_file)
         )
         assert new_system is system
     except (json.JSONDecodeError, ValueError, Exception):
@@ -476,11 +448,8 @@ def test_pcm_defaults_partial_application(tmp_path, simple_config):
     with open(temp_file, "w") as f:
         json.dump(pcm_defaults, f)
 
-    new_system = update_system(
-        config=simple_config,
-        parser=None,
-        system=system,
-        pcm_defaults_fpath=str(temp_file)
+    new_system = add_pcm_defaults(
+        config=simple_config, parser=None, system=system, pcm_defaults_fpath=str(temp_file)
     )
 
     updated_gen = new_system.get_component(ReEDSGenerator, "test_gen")
@@ -521,11 +490,8 @@ def test_pcm_defaults_no_matching_category(tmp_path, simple_config):
     with open(temp_file, "w") as f:
         json.dump(pcm_defaults, f)
 
-    new_system = update_system(
-        config=simple_config,
-        parser=None,
-        system=system,
-        pcm_defaults_fpath=str(temp_file)
+    new_system = add_pcm_defaults(
+        config=simple_config, parser=None, system=system, pcm_defaults_fpath=str(temp_file)
     )
 
     updated_gen = new_system.get_component(ReEDSGenerator, "test_gen")

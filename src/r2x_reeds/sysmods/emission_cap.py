@@ -7,14 +7,15 @@ import polars as pl
 from infrasys import System
 from loguru import logger
 
+from r2x_core import PluginManager
 from r2x_reeds.config import ReEDSConfig
 from r2x_reeds.models.components import ReEDSEmission, ReEDSGenerator
 from r2x_reeds.models.enums import EmissionType
 from r2x_reeds.parser import ReEDSParser
 
 
-# @PluginManager.register_system_update("emission_cap")
-def update_system(
+@PluginManager.register_system_modifier("add_emission_cap")
+def add_emission_cap(
     config: ReEDSConfig,
     system: System,
     parser: ReEDSParser | None = None,
