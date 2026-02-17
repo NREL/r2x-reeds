@@ -736,8 +736,8 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         return Ok((interface_count, creation_errors))
 
     def _build_transmission_lines(
-        self, system: System, trancap: pl.DataFrame
-    ) -> Result[tuple[int, list[str]], str]:
+            self, system: System, trancap: pl.DataFrame
+        ) -> Result[tuple[int, list[str]], str]:
         """Instantiate transmission lines using the raw transmission capacity table."""
         if self._ctx is None:
             return Err("Parser context is missing")
@@ -760,9 +760,14 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if line_kwargs_result.is_err():
             return Err(str(line_kwargs_result.err()))
 
+        unique_lines = {}
+        for identifier, kwargs in line_kwargs_result.ok() or []:
+            if identifier not in unique_lines:
+                unique_lines[identifier] = kwargs
+
         creation_errors: list[str] = []
         line_count = 0
-        for identifier, kwargs in line_kwargs_result.ok() or []:
+        for identifier, kwargs in unique_lines.items():
             try:
                 line = self.create_component(ReEDSTransmissionLine, **kwargs)
             except ComponentCreationError as exc:
