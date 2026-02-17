@@ -257,7 +257,10 @@ def _prepare_generator_dataset(
     def _transform_optional(name: str, frame: pl.LazyFrame) -> pl.LazyFrame:
         """Normalize optional data frames before joining."""
         if name == "storage_duration_out":
-            return frame.select(
+            # Ensure year is cast to Int64 for join compatibility
+            return frame.with_columns(
+                pl.col("year").cast(pl.Int64)
+            ).select(
                 pl.col("technology"),
                 pl.col("vintage"),
                 pl.col("region"),
@@ -294,6 +297,8 @@ def _prepare_generator_dataset(
             continue
 
         try:
+            if name == "storage_duration_out" and "year" in df.collect_schema().names():
+                df = df.with_columns(pl.col("year").cast(pl.Int64))
             transformed = _transform_optional(name, next_df)
             df_cols = set(df.collect_schema().names())
             transformed_cols = set(transformed.collect_schema().names())
