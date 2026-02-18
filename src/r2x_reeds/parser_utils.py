@@ -378,6 +378,13 @@ def _prepare_generator_dataset(
     if df_out.is_empty():
         return Err(ValidationError("All generators were excluded"))
 
+    df_out = df_out.with_columns(
+        pl.when(pl.col("capacity") < 1e-8)
+        .then(0.0)
+        .otherwise(pl.col("capacity"))
+        .alias("capacity")
+    )
+
     return Ok(df_out)
 
 
