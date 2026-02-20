@@ -312,6 +312,23 @@ def test_lookup_region_missing_field_errors(context_with_regions):
     assert result.is_err()
 
 
+def test_build_transmission_line_name_is_symmetric(dummy_context):
+    from r2x_reeds.getters import build_transmission_line_name
+
+    forward = build_transmission_line_name(
+        {"from_region": "a", "to_region": "b", "trtype": "ac"},
+        context=dummy_context,
+    )
+    reverse = build_transmission_line_name(
+        {"from_region": "b", "to_region": "a", "trtype": "ac"},
+        context=dummy_context,
+    )
+
+    assert forward.is_ok() and reverse.is_ok()
+    assert forward.ok() == "a_b_ac"
+    assert reverse.ok() == "a_b_ac"
+
+
 def test_transmission_interface_and_line_names(dummy_context):
     from r2x_reeds.getters import build_transmission_interface_name, build_transmission_line_name
 
