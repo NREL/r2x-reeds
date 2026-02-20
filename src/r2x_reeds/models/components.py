@@ -186,7 +186,7 @@ class ReEDSVariableGenerator(ReEDSGenerator):
 class ReEDSStorage(ReEDSGenerator):
     """Storage technologies with energy/power characteristics."""
 
-    storage_duration: Annotated[PositiveFloat, Unit("hours"), Field(description="Storage duration")] = None
+    storage_duration: Annotated[PositiveFloat, Unit("hours"), Field(description="Storage duration")]
     round_trip_efficiency: Annotated[UnitFloat, Field(description="Round-trip efficiency")]
     energy_capacity: Annotated[PositiveFloat | None, Unit("MWh"), Field(description="Energy capacity")] = None
     max_charge_rate: Annotated[PositiveFloat | None, Unit("MW"), Field(description="Max charge")] = None
