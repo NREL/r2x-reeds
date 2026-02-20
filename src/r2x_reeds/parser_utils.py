@@ -320,6 +320,19 @@ def _prepare_generator_dataset(
                         .otherwise(pl.col("storage_duration"))
                         .alias("storage_duration")
                     ).drop("storage_duration_out_value")
+                    storage_mask = pl.col("technology").map_elements(
+                        lambda tech, _tc=technology_categories: tech_matches_category(str(tech), "storage", _tc),
+                        return_dtype=pl.Boolean,
+                    )
+                    df = df.filter(
+                        ~(
+                            storage_mask
+                            & (
+                                pl.col("storage_duration").is_null()
+                                | pl.col("storage_duration").is_nan()
+                            )
+                        )
+                    )
         except Exception as e:
             return Err(ValidationError(f"Failed to join {name} data: {e}"))
 
