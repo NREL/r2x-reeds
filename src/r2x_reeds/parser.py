@@ -736,8 +736,8 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         return Ok((interface_count, creation_errors))
 
     def _build_transmission_lines(
-            self, system: System, trancap: pl.DataFrame
-        ) -> Result[tuple[int, list[str]], str]:
+        self, system: System, trancap: pl.DataFrame
+    ) -> Result[tuple[int, list[str]], str]:
         """Instantiate transmission lines using the raw transmission capacity table."""
         if self._ctx is None:
             return Err("Parser context is missing")
@@ -764,6 +764,12 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         for identifier, kwargs in line_kwargs_result.ok() or []:
             if identifier not in unique_lines:
                 unique_lines[identifier] = kwargs
+            else:
+                logger.warning(
+                    "Duplicate transmission line identifier '{}' detected; "
+                    "keeping the first occurrence and discarding subsequent entries.",
+                    identifier,
+                )
 
         creation_errors: list[str] = []
         line_count = 0
