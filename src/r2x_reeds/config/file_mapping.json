@@ -518,7 +518,7 @@
         "r": "region",
         "t": "year",
         "v": "vintage",
-        "value": "vom_price"
+        "value": "vom_cost"
       },
       "filter_by": {
         "year": "{solve_year}"
