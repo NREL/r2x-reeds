@@ -350,7 +350,7 @@ def build_transmission_interface_name(row: Any, *, context: PluginContext) -> Re
 
 @_reeds_getter
 def build_transmission_line_name(row: Any, *, context: PluginContext) -> Result[str, Exception]:
-    """Build a line name from from/to regions and line type."""
+    """Build a symmetric line name from sorted from/to regions and line type."""
 
     try:
         from_region = get_row_field(row, "from_region")
@@ -360,7 +360,8 @@ def build_transmission_line_name(row: Any, *, context: PluginContext) -> Result[
         if not from_region or not to_region or not line_type:
             return Err(ValueError("Transmission row missing identifiers for line name"))
 
-        return Ok(f"{from_region}_{to_region}_{line_type}")
+        regions = sorted([str(from_region), str(to_region)])
+        return Ok(f"{regions[0]}_{regions[1]}_{line_type}")
     except Exception as e:
         return Err(e)
 

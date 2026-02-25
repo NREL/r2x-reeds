@@ -257,7 +257,10 @@ def _prepare_generator_dataset(
     def _transform_optional(name: str, frame: pl.LazyFrame) -> pl.LazyFrame:
         """Normalize optional data frames before joining."""
         if name == "storage_duration_out":
-            return frame.select(
+            # Ensure year is cast to Int64 for join compatibility
+            return frame.with_columns(
+                pl.col("year").cast(pl.Int64)
+            ).select(
                 pl.col("technology"),
                 pl.col("vintage"),
                 pl.col("region"),
@@ -294,6 +297,8 @@ def _prepare_generator_dataset(
             continue
 
         try:
+            if name == "storage_duration_out" and "year" in df.collect_schema().names():
+                df = df.with_columns(pl.col("year").cast(pl.Int64))
             transformed = _transform_optional(name, next_df)
             df_cols = set(df.collect_schema().names())
             transformed_cols = set(transformed.collect_schema().names())
@@ -315,6 +320,19 @@ def _prepare_generator_dataset(
                         .otherwise(pl.col("storage_duration"))
                         .alias("storage_duration")
                     ).drop("storage_duration_out_value")
+                    storage_mask = pl.col("technology").map_elements(
+                        lambda tech, _tc=technology_categories: tech_matches_category(str(tech), "storage", _tc),
+                        return_dtype=pl.Boolean,
+                    )
+                    df = df.filter(
+                        ~(
+                            storage_mask
+                            & (
+                                pl.col("storage_duration").is_null()
+                                | pl.col("storage_duration").is_nan()
+                            )
+                        )
+                    )
         except Exception as e:
             return Err(ValidationError(f"Failed to join {name} data: {e}"))
 
@@ -372,6 +390,13 @@ def _prepare_generator_dataset(
 
     if df_out.is_empty():
         return Err(ValidationError("All generators were excluded"))
+
+    df_out = df_out.with_columns(
+        pl.when(pl.col("capacity") < 1e-8)
+        .then(0.0)
+        .otherwise(pl.col("capacity"))
+        .alias("capacity")
+    )
 
     return Ok(df_out)
 

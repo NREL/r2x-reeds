@@ -760,9 +760,20 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if line_kwargs_result.is_err():
             return Err(str(line_kwargs_result.err()))
 
+        unique_lines = {}
+        for identifier, kwargs in line_kwargs_result.ok() or []:
+            if identifier not in unique_lines:
+                unique_lines[identifier] = kwargs
+            else:
+                logger.warning(
+                    "Duplicate transmission line identifier '{}' detected; "
+                    "keeping the first occurrence and discarding subsequent entries.",
+                    identifier,
+                )
+
         creation_errors: list[str] = []
         line_count = 0
-        for identifier, kwargs in line_kwargs_result.ok() or []:
+        for identifier, kwargs in unique_lines.items():
             try:
                 line = self.create_component(ReEDSTransmissionLine, **kwargs)
             except ComponentCreationError as exc:
