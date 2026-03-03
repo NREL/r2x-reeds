@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.6](https://github.com/NatLabRockies/r2x-reeds/compare/v0.3.5...v0.3.6) (2026-03-03)
+
+
+### 🐛 Bug Fixes
+
+* filter duplicated line names and update capacity field handling (approach to be changed) ([#46](https://github.com/NatLabRockies/r2x-reeds/issues/46)) ([e768205](https://github.com/NatLabRockies/r2x-reeds/commit/e768205f5d73fced70e3b97d166920c41053c7b9))
+
+
+### 📦 Build
+
+* **deps:** bump actions/download-artifact from 7 to 8 ([#48](https://github.com/NatLabRockies/r2x-reeds/issues/48)) ([824a4bd](https://github.com/NatLabRockies/r2x-reeds/commit/824a4bd191f3253b1fc91a78f11da26c10304cc3))
+* **deps:** bump actions/upload-artifact from 6 to 7 ([#49](https://github.com/NatLabRockies/r2x-reeds/issues/49)) ([f84f280](https://github.com/NatLabRockies/r2x-reeds/commit/f84f280430a94a88d088102393939bf982146442))
+
 ## [0.3.5](https://github.com/NatLabRockies/r2x-reeds/compare/v0.3.4...v0.3.5) (2026-02-04)
 
 
