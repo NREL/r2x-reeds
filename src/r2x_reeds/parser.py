@@ -639,6 +639,18 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if self._ctx is None:
             return Err("Parser context is missing")
 
+        tranloss_data = self.read_data_file("transmission_losses")
+        if tranloss_data is not None:
+            tranloss = tranloss_data.collect()
+            if not tranloss.is_empty():
+                tranloss = tranloss.rename({"r": "from_region", "value": "losses"})
+                trancap = trancap.join(
+                    tranloss.select(["from_region", "to_region", "trtype", "losses"]),
+                    on=["from_region", "to_region", "trtype"],
+                    how="left",
+                )
+                logger.trace("Joined transmission losses into trancap, columns: {}", trancap.columns)
+
         interfaces_result = self._build_transmission_interfaces(system, trancap)
         if interfaces_result.is_err():
             return Err(str(interfaces_result.err()))
