@@ -643,13 +643,28 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if tranloss_data is not None:
             tranloss = tranloss_data.collect()
             if not tranloss.is_empty():
-                tranloss = tranloss.rename({"r": "from_region", "value": "losses"})
-                trancap = trancap.join(
-                    tranloss.select(["from_region", "to_region", "trtype", "losses"]),
-                    on=["from_region", "to_region", "trtype"],
-                    how="left",
-                )
-                logger.trace("Joined transmission losses into trancap, columns: {}", trancap.columns)
+                rename_map = {}
+                if "r" in tranloss.columns and "from_region" not in tranloss.columns:
+                    rename_map["r"] = "from_region"
+                if "value" in tranloss.columns and "losses" not in tranloss.columns:
+                    rename_map["value"] = "losses"
+                if rename_map:
+                    tranloss = tranloss.rename(rename_map)
+
+                required_loss_cols = {"from_region", "to_region", "trtype", "losses"}
+                missing = required_loss_cols - set(tranloss.columns)
+                if missing:
+                    logger.warning(
+                        "Transmission losses data missing expected columns {}; skipping loss join",
+                        missing,
+                    )
+                else:
+                    trancap = trancap.join(
+                        tranloss.select(["from_region", "to_region", "trtype", "losses"]),
+                        on=["from_region", "to_region", "trtype"],
+                        how="left",
+                    )
+                    logger.trace("Joined transmission losses into trancap, columns: {}", trancap.columns)
 
         interfaces_result = self._build_transmission_interfaces(system, trancap)
         if interfaces_result.is_err():
