@@ -1574,7 +1574,27 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         generator_data = generator_data_result.ok()
         if generator_data is None:
             return Err("Generator data result was unexpectedly None")
-        self._variable_generator_df, self._non_variable_generator_df = generator_data
+
+        variable_df, non_variable_df = generator_data
+        ramprate_data = self.read_data_file("ramprate")
+        if ramprate_data is not None:
+            ramprate_df = ramprate_data.collect()
+            if not ramprate_df.is_empty():
+                ramprate_df = ramprate_df.filter(pl.col("ramp_rate").is_not_null())
+                logger.trace(
+                    "Joining ramp rate data ({} techs) into generator datasets",
+                    ramprate_df.height,
+                )
+                variable_df = variable_df.join(ramprate_df, on="technology", how="left")
+                non_variable_df = non_variable_df.join(ramprate_df, on="technology", how="left")
+            else:
+                logger.debug("Ramp rate data is empty, skipping join")
+        else:
+            logger.debug("No ramp rate data found, skipping join")
+
+        self._variable_generator_df = variable_df
+        self._non_variable_generator_df = non_variable_df
+
         logger.trace(
             "Prepared generator datasets - variable rows: {}, non-variable rows: {}",
             self._variable_generator_df.height,
