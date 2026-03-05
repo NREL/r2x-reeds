@@ -245,3 +245,105 @@ def test_builder_methods_return_result(initialized_parser: ReEDSParser, built_sy
     """Test builder methods return Result types."""
     for _, result in _builder_calls(initialized_parser, built_system):
         assert hasattr(result, "is_ok") and hasattr(result, "is_err")
+
+
+@pytest.fixture
+def fresh_parser(reeds_config: ReEDSConfig, data_store: DataStore) -> ReEDSParser:
+    """Fresh function-scoped parser with on_prepare already called."""
+    from typing import cast
+
+    from r2x_core import PluginContext
+    from r2x_reeds import ReEDSParser
+
+    ctx = PluginContext(config=reeds_config, store=data_store)
+    p = cast(ReEDSParser, ReEDSParser.from_context(ctx))
+    assert p.on_prepare().is_ok()
+    return p
+
+
+@pytest.mark.unit
+def test_build_transmission_losses_attached_to_lines(
+    fresh_parser: ReEDSParser,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify that transmission losses are attached to ReEDSTransmissionLine components."""
+    from r2x_core import System
+    from r2x_reeds.models.components import ReEDSTransmissionLine
+
+    parser = fresh_parser
+    system = System(name="transmission-losses-test")
+
+    parser.ctx.system = system
+    assert parser._build_regions(system).is_ok(), "_build_regions failed"
+
+    existing_regions = list(parser._region_cache.keys())
+    assert len(existing_regions) >= 2, (
+        f"Need at least 2 regions after _build_regions, found: {existing_regions}"
+    )
+    r1, r2 = existing_regions[0], existing_regions[1]
+
+    original_read = parser.read_data_file
+
+    def fake_read(name: str):
+        if name == "transmission_losses":
+            return pl.DataFrame(
+                {
+                    "from_region": [r1],
+                    "to_region": [r2],
+                    "trtype": ["ac"],
+                    "losses": [0.02],
+                }
+            ).lazy()
+        return original_read(name)
+
+    monkeypatch.setattr(parser, "read_data_file", fake_read)
+
+    result = parser._build_transmission(system)
+    assert result.is_ok(), f"_build_transmission failed: {result}"
+
+    lines = list(system.get_components(ReEDSTransmissionLine))
+    assert len(lines) > 0, "Expected at least one ReEDSTransmissionLine to be created"
+
+    lines_with_losses = [
+        ln for ln in lines if getattr(ln, "losses", None) == pytest.approx(0.02)
+    ]
+    assert len(lines_with_losses) > 0, (
+        f"Expected at least one line with losses=0.02; "
+        f"actual losses values: {[getattr(ln, 'losses', None) for ln in lines]}"
+    )
+
+
+@pytest.mark.unit
+def test_build_transmission_missing_losses_data(
+    fresh_parser: ReEDSParser,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify _build_transmission succeeds and creates lines when losses data is absent."""
+    from r2x_core import System
+    from r2x_reeds.models.components import ReEDSTransmissionLine
+
+    parser = fresh_parser
+    system = System(name="transmission-no-losses-test")
+
+    parser.ctx.system = system
+    assert parser._build_regions(system).is_ok(), "_build_regions failed"
+
+    original_read = parser.read_data_file
+
+    def fake_read(name: str):
+        if name == "transmission_losses":
+            return None
+        return original_read(name)
+
+    monkeypatch.setattr(parser, "read_data_file", fake_read)
+
+    result = parser._build_transmission(system)
+    assert result.is_ok(), f"_build_transmission should succeed without losses data: {result}"
+
+    lines = list(system.get_components(ReEDSTransmissionLine))
+    assert len(lines) > 0, "Lines should still be created even without losses data"
+    for line in lines:
+        if hasattr(line, "losses"):
+            assert line.losses is None or line.losses == pytest.approx(0.0), (
+                f"Lines without losses data should have None or 0.0, got {line.losses}"
+            )
