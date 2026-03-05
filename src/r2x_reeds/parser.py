@@ -639,6 +639,33 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if self._ctx is None:
             return Err("Parser context is missing")
 
+        tranloss_data = self.read_data_file("transmission_losses")
+        if tranloss_data is not None:
+            tranloss = tranloss_data.collect()
+            if not tranloss.is_empty():
+                rename_map = {}
+                if "r" in tranloss.columns and "from_region" not in tranloss.columns:
+                    rename_map["r"] = "from_region"
+                if "value" in tranloss.columns and "losses" not in tranloss.columns:
+                    rename_map["value"] = "losses"
+                if rename_map:
+                    tranloss = tranloss.rename(rename_map)
+
+                required_loss_cols = {"from_region", "to_region", "trtype", "losses"}
+                missing = required_loss_cols - set(tranloss.columns)
+                if missing:
+                    logger.warning(
+                        "Transmission losses data missing expected columns {}; skipping loss join",
+                        missing,
+                    )
+                else:
+                    trancap = trancap.join(
+                        tranloss.select(["from_region", "to_region", "trtype", "losses"]),
+                        on=["from_region", "to_region", "trtype"],
+                        how="left",
+                    )
+                    logger.trace("Joined transmission losses into trancap, columns: {}", trancap.columns)
+
         interfaces_result = self._build_transmission_interfaces(system, trancap)
         if interfaces_result.is_err():
             return Err(str(interfaces_result.err()))
@@ -1562,7 +1589,27 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         generator_data = generator_data_result.ok()
         if generator_data is None:
             return Err("Generator data result was unexpectedly None")
-        self._variable_generator_df, self._non_variable_generator_df = generator_data
+
+        variable_df, non_variable_df = generator_data
+        ramprate_data = self.read_data_file("ramprate")
+        if ramprate_data is not None:
+            ramprate_df = ramprate_data.collect()
+            if not ramprate_df.is_empty():
+                ramprate_df = ramprate_df.filter(pl.col("ramp_rate").is_not_null())
+                logger.trace(
+                    "Joining ramp rate data ({} techs) into generator datasets",
+                    ramprate_df.height,
+                )
+                variable_df = variable_df.join(ramprate_df, on="technology", how="left")
+                non_variable_df = non_variable_df.join(ramprate_df, on="technology", how="left")
+            else:
+                logger.debug("Ramp rate data is empty, skipping join")
+        else:
+            logger.debug("No ramp rate data found, skipping join")
+
+        self._variable_generator_df = variable_df
+        self._non_variable_generator_df = non_variable_df
+
         logger.trace(
             "Prepared generator datasets - variable rows: {}, non-variable rows: {}",
             self._variable_generator_df.height,

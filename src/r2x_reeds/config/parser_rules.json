@@ -362,14 +362,15 @@
       "category": null
     }
   },
-  {
+    {
     "source_type": "data_row",
     "target_type": "ReEDSTransmissionLine",
     "version": 1,
     "name": "transmission_line",
     "field_map": {
       "category": "trtype",
-      "line_type": "trtype"
+      "line_type": "trtype",
+      "losses": "losses"
     },
     "getters": {
       "name": "build_transmission_line_name",
@@ -378,7 +379,8 @@
     },
     "defaults": {
       "category": null,
-      "line_type": null
+      "line_type": null,
+      "losses": null
     }
   }
 ]
