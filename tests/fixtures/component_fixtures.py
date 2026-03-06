@@ -114,6 +114,8 @@ def consuming_technology(sample_region):
         technology="electrolyzer",
         capacity=150.0,
         capital_cost=788000.0,
+        heat_rate=10.1,
+        fuel_price=13.2,
         fom_cost=27500.0,
         vom_cost=0.0,
         electricity_efficiency=51.45,
