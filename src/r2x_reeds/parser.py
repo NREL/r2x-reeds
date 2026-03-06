@@ -666,6 +666,24 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                     )
                     logger.trace("Joined transmission losses into trancap, columns: {}", trancap.columns)
 
+        # Join reverse capacity from the same trancap table
+        # reverse row: swap from_region/to_region and use its capacity as reverse_capacity
+        reverse_df = (
+            trancap
+            .rename({"from_region": "_to", "to_region": "_from", "capacity": "reverse_capacity"})
+            .rename({"_to": "to_region", "_from": "from_region"})
+            .select(["from_region", "to_region", "trtype", "reverse_capacity"])
+        )
+        trancap = trancap.join(
+            reverse_df,
+            on=["from_region", "to_region", "trtype"],
+            how="left",
+        ).with_columns(
+            # If no reverse row exists, fall back to symmetric (same capacity both ways)
+            pl.col("reverse_capacity").fill_null(pl.col("capacity"))
+        )
+        logger.trace("Joined reverse capacity into trancap, columns: {}", trancap.columns)
+
         interfaces_result = self._build_transmission_interfaces(system, trancap)
         if interfaces_result.is_err():
             return Err(str(interfaces_result.err()))

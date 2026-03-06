@@ -391,15 +391,25 @@ def lookup_transmission_interface(row: Any, *, context: PluginContext) -> Result
 
 @_reeds_getter
 def build_transmission_flow(row: Any, *, context: PluginContext) -> Result[FromTo_ToFrom, Exception]:
-    """Build symmetric FromTo_ToFrom object from the 'value' field."""
+    """Build asymmetric FromTo_ToFrom from forward capacity and reverse capacity.
 
+    Expects:
+    - 'capacity'         : forward direction rating (MW) → to_from (positive)
+    - 'reverse_capacity' : reverse direction rating (MW) → from_to (positive)
+
+    Falls back to symmetric if 'reverse_capacity' is absent.
+    """
     try:
-        value = get_row_field(row, "capacity")
-        if value is None:
-            value = get_row_field(row, "value")
-        if value is None:
+        forward = get_row_field(row, "capacity")
+        if forward is None:
+            forward = get_row_field(row, "value")
+        if forward is None:
             return Err(ValueError("Transmission row missing 'capacity' field"))
 
-        return Ok(FromTo_ToFrom(from_to=float(value), to_from=float(value)))
+        reverse = get_row_field(row, "reverse_capacity")
+        if reverse is None:
+            reverse = forward
+
+        return Ok(FromTo_ToFrom(from_to=abs(float(reverse)), to_from=abs(float(forward))))
     except Exception as e:
         return Err(e)

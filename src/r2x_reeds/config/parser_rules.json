@@ -384,7 +384,8 @@
     "defaults": {
       "category": null,
       "line_type": null,
-      "losses": null
+      "losses": null,
+      "reverse_capacity": null
     }
   }
 ]
