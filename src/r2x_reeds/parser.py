@@ -1627,23 +1627,25 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         else:
             logger.debug("No ramp rate data found, skipping join")
 
-        # Ensure heat_rate column exists and fill nulls for thermal generators
-        # using the configured default_heat_rate from defaults.json
+        # Fill null heat_rate values using the mean of the same technology + vintage group.
+        # Only use the global default_heat_rate for groups where every row is null.
         default_heat_rate = self._defaults.get("default_values", {}).get("default_heat_rate")
         if default_heat_rate is not None:
             if "heat_rate" not in non_variable_df.columns:
-                non_variable_df = non_variable_df.with_columns(
-                    pl.lit(None).cast(pl.Float64).alias("heat_rate")
-                )
+                non_variable_df = non_variable_df.with_columns(pl.lit(None, dtype=pl.Float64).alias("heat_rate"))
+
             null_count = non_variable_df["heat_rate"].null_count()
             if null_count > 0:
-                logger.warning(
-                    "Filling {} null heat_rate value(s) in non-variable generators with default_heat_rate={}",
-                    null_count,
-                    default_heat_rate,
-                )
+                group_cols = [c for c in ("technology", "vintage") if c in non_variable_df.columns]
+                group_fill = pl.col("heat_rate").mean().over(group_cols) if group_cols else pl.lit(default_heat_rate, dtype=pl.Float64)
                 non_variable_df = non_variable_df.with_columns(
-                    pl.col("heat_rate").fill_null(default_heat_rate)
+                    pl.col("heat_rate").fill_null(group_fill).fill_null(default_heat_rate)
+                )
+                logger.debug(
+                    "Filled {} null heat_rate(s): group mean over [{}], default={}",
+                    null_count,
+                    ", ".join(group_cols),
+                    default_heat_rate,
                 )
 
         self._variable_generator_df = variable_df
