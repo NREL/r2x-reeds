@@ -1627,6 +1627,25 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         else:
             logger.debug("No ramp rate data found, skipping join")
 
+        # Ensure heat_rate column exists and fill nulls for thermal generators
+        # using the configured default_heat_rate from defaults.json
+        default_heat_rate = self._defaults.get("default_values", {}).get("default_heat_rate")
+        if default_heat_rate is not None:
+            if "heat_rate" not in non_variable_df.columns:
+                non_variable_df = non_variable_df.with_columns(
+                    pl.lit(None).cast(pl.Float64).alias("heat_rate")
+                )
+            null_count = non_variable_df["heat_rate"].null_count()
+            if null_count > 0:
+                logger.warning(
+                    "Filling {} null heat_rate value(s) in non-variable generators with default_heat_rate={}",
+                    null_count,
+                    default_heat_rate,
+                )
+                non_variable_df = non_variable_df.with_columns(
+                    pl.col("heat_rate").fill_null(default_heat_rate)
+                )
+
         self._variable_generator_df = variable_df
         self._non_variable_generator_df = non_variable_df
 
