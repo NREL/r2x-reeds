@@ -1208,15 +1208,17 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                 logger.debug("No matching generators for renewable profile {}|{}", tech, region_name)
                 continue
 
-            data = self._truncate_and_cast_time_series(renewable_profiles[col_name].to_numpy())
-            ts = SingleTimeSeries.from_array(
-                data=data,
-                name="max_active_power",
-                initial_timestamp=self.initial_timestamp,
-                resolution=timedelta(hours=1),
-            )
+            cf_data = self._truncate_and_cast_time_series(renewable_profiles[col_name].to_numpy())
 
+            # Scale profiles by rated capaciy
             for generator in matching_generators:
+                data = cf_data * generator.capacity
+                ts = SingleTimeSeries.from_array(
+                    data=data,
+                    name="max_active_power",
+                    initial_timestamp=self.initial_timestamp,
+                    resolution=timedelta(hours=1),
+                )
                 system.add_time_series(ts, generator)
                 profile_count += 1
 
