@@ -215,6 +215,8 @@ class ReEDSConsumingTechnology(HasUnits, ReEDSComponent):
     region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
     technology: Annotated[str, Field(description="Technology type")]
     capacity: Annotated[PositiveFloat, Unit("MW"), Field(description="Consumption capacity")]
+    heat_rate: Annotated[PositiveFloat | None, Unit("MMBtu/MWh"), Field(description="Heat rate")] = None
+    fuel_price: Annotated[PositiveFloat | None, Unit("$/MMBtu"), Field(description="Fuel price")] = None
     capital_cost: Annotated[PositiveFloat | None, Unit("$/kW"), Field(description="Capital cost")] = None
     fom_cost: Annotated[PositiveFloat | None, Unit("$/kW/year"), Field(description="Fixed O&M")] = None
     vom_cost: Annotated[PositiveFloat | None, Unit("$/MWh"), Field(description="Variable O&M")] = None

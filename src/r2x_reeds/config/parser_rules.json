@@ -233,6 +233,8 @@
       "category": "category",
       "forced_outage_rate": "forced_outage_rate",
       "planned_outage_rate": "planned_outage_rate",
+      "fuel_price": "fuel_price",
+      "heat_rate": "heat_rate",
       "max_age": "max_age",
       "vom_cost": "vom_cost",
       "fom_cost": "fom_cost",
@@ -251,6 +253,8 @@
       "planned_outage_rate": null,
       "max_age": null,
       "vom_cost": null,
+      "fuel_price": null,
+      "heat_rate": null,
       "fom_cost": null,
       "capital_cost": null,
       "vintage": null,
@@ -380,7 +384,8 @@
     "defaults": {
       "category": null,
       "line_type": null,
-      "losses": null
+      "losses": null,
+      "reverse_capacity": null
     }
   }
 ]
