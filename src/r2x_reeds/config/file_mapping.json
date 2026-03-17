@@ -108,40 +108,19 @@
     }
   },
   {
-    "name": "existing_transmission_capacity_ac",
-    "fpath": "inputs_case/transmission_capacity_init_AC_r.csv",
+    "name": "existing_transmission_capacity",
+    "fpath": "inputs_case/trancap_init_energy.csv",
     "info": {
-      "description": "Initial AC transmission capacity between regions",
+      "description": "Initial transmission capacity between regions (AC and DC)",
       "is_input": true,
       "is_optional": false,
       "units": "MW"
     },
     "proc_spec": {
       "column_mapping": {
-        "MW_f0": "forward_capacity",
-        "MW_f1": "forward_contingency_capacity",
-        "MW_r0": "reverse_capacity",
-        "MW_r1": "reverse_contingency_capacity",
-        "interface": "interface_name",
-        "r": "from_region",
-        "rr": "to_region"
-      }
-    }
-  },
-  {
-    "name": "existing_transmission_capacity_dc",
-    "fpath": "inputs_case/transmission_capacity_init_nonAC.csv",
-    "info": {
-      "description": "Initial DC transmission capacity between regions",
-      "is_input": true,
-      "is_optional": true,
-      "units": "MW"
-    },
-    "proc_spec": {
-      "column_mapping": {
-        "MW": "capacity",
-        "r": "from_region",
-        "rr": "to_region"
+        "*r": "from_region",
+        "rr": "to_region",
+        "mw": "capacity"
       }
     }
   },
