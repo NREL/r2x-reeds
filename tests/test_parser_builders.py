@@ -304,9 +304,7 @@ def test_build_transmission_losses_attached_to_lines(
     lines = list(system.get_components(ReEDSTransmissionLine))
     assert len(lines) > 0, "Expected at least one ReEDSTransmissionLine to be created"
 
-    lines_with_losses = [
-        ln for ln in lines if getattr(ln, "losses", None) == pytest.approx(0.02)
-    ]
+    lines_with_losses = [ln for ln in lines if getattr(ln, "losses", None) == pytest.approx(0.02)]
     assert len(lines_with_losses) > 0, (
         f"Expected at least one line with losses=0.02; "
         f"actual losses values: {[getattr(ln, 'losses', None) for ln in lines]}"

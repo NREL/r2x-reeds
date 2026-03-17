@@ -51,7 +51,7 @@ def caplog(caplog):
 
 
 @pytest.fixture(scope="function")
-def empty_file(tmp_path) -> Path: # pyright: ignore[reportInvalidTypeForm]
+def empty_file(tmp_path) -> Path:  # pyright: ignore[reportInvalidTypeForm]
     empty_fpath = tmp_path / "test.csv"
     empty_fpath.write_text("")
     yield empty_fpath
