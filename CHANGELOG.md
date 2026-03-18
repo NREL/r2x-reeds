@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/NatLabRockies/r2x-reeds/compare/v0.3.6...v0.4.0) (2026-03-18)
+
+
+### 🚀 Features
+
+* migrate transmission capacity init to trancap_init_energy.csv ([#53](https://github.com/NatLabRockies/r2x-reeds/issues/53)) ([17d2251](https://github.com/NatLabRockies/r2x-reeds/commit/17d22515efbf45752931065c6ef539abbb9bc7ac))
+
+
+### 🐛 Bug Fixes
+
+* add missing properties for consuming technology ([#52](https://github.com/NatLabRockies/r2x-reeds/issues/52)) ([a285ec3](https://github.com/NatLabRockies/r2x-reeds/commit/a285ec377212ae5542d68ead9ced65c20fd39fab))
+* include line losses to parsing workflow ([#50](https://github.com/NatLabRockies/r2x-reeds/issues/50)) ([bff3f6e](https://github.com/NatLabRockies/r2x-reeds/commit/bff3f6e8fcdf262a6b2f4a9299a5020ffb0ad5ea))
+
 ## [0.3.6](https://github.com/NatLabRockies/r2x-reeds/compare/v0.3.5...v0.3.6) (2026-03-03)
 
 
