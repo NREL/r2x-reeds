@@ -669,8 +669,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         # Join reverse capacity from the same trancap table
         # reverse row: swap from_region/to_region and use its capacity as reverse_capacity
         reverse_df = (
-            trancap
-            .rename({"from_region": "_to", "to_region": "_from", "capacity": "reverse_capacity"})
+            trancap.rename({"from_region": "_to", "to_region": "_from", "capacity": "reverse_capacity"})
             .rename({"_to": "to_region", "_from": "from_region"})
             .select(["from_region", "to_region", "trtype", "reverse_capacity"])
         )
@@ -1632,12 +1631,18 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         default_heat_rate = self._defaults.get("default_values", {}).get("default_heat_rate")
         if default_heat_rate is not None:
             if "heat_rate" not in non_variable_df.columns:
-                non_variable_df = non_variable_df.with_columns(pl.lit(None, dtype=pl.Float64).alias("heat_rate"))
+                non_variable_df = non_variable_df.with_columns(
+                    pl.lit(None, dtype=pl.Float64).alias("heat_rate")
+                )
 
             null_count = non_variable_df["heat_rate"].null_count()
             if null_count > 0:
                 group_cols = [c for c in ("technology", "vintage") if c in non_variable_df.columns]
-                group_fill = pl.col("heat_rate").mean().over(group_cols) if group_cols else pl.lit(default_heat_rate, dtype=pl.Float64)
+                group_fill = (
+                    pl.col("heat_rate").mean().over(group_cols)
+                    if group_cols
+                    else pl.lit(default_heat_rate, dtype=pl.Float64)
+                )
                 non_variable_df = non_variable_df.with_columns(
                     pl.col("heat_rate").fill_null(group_fill).fill_null(default_heat_rate)
                 )
