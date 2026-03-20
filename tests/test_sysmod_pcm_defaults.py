@@ -66,6 +66,22 @@ def test_pcm_defaults_scope_file(tmp_path: Path) -> None:
     assert generator.fuel_price == pytest.approx(4.5)
 
 
+def test_pcm_defaults_scope_file_list_format(tmp_path: Path) -> None:
+    """Defaults loaded from a JSON list (name-keyed objects) are parsed correctly."""
+    system, generator = _build_generator()
+    defaults = [
+        {"name": "GEN1", "heat_rate": 8.5, "vom_cost": 3.0},
+        {"name": "other", "heat_rate": 10.0},
+    ]
+    json_path = tmp_path / "pcm_defaults.json"
+    json_path.write_text(json.dumps(defaults))
+
+    _run_pcm_defaults(system, pcm_defaults_fpath=str(json_path))
+
+    assert generator.heat_rate == pytest.approx(8.5)
+    assert generator.vom_cost == pytest.approx(3.0)
+
+
 def test_pcm_defaults_scope_no_inputs(caplog) -> None:
     """Without dict or file path the plugin exits early with a warning."""
     system, _ = _build_generator()
