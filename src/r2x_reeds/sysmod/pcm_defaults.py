@@ -86,8 +86,14 @@ def add_pcm_defaults(
     # Fields that need to be multiplied by generator capacity
     needs_multiplication = {"start_cost_per_MW", "ramp_limits"}
 
+    # Field name remapping (pcm_defaults key → component attribute name)
+    field_name_mapping = {"start_cost_per_MW": "startup_cost"}
+
+    # Fields expected to be in 0-1 range (may arrive as 0-100 percentages)
+    needs_percent_to_fraction = {"forced_outage_rate", "maintenance_rate"}
+
     # Fields that should be processed first (for dependency ordering)
-    fields_weight = {"capacity": 1}  # Updated from active_power_limits
+    fields_weight = {"capacity": 1}
 
     # NOTE: Matching names provides the order that we do the mapping for. First
     # we try to find the name of the generator, if not we rely on reeds category
@@ -127,8 +133,10 @@ def add_pcm_defaults(
                     logger.warning("Cannot multiply {} for {} - no capacity defined", field, component.name)
                     continue
 
-            if field == "start_cost_per_MW":
-                field = "startup_cost"
+            if field in needs_percent_to_fraction and isinstance(value, (int, float)) and value > 1:
+                value = value / 100
+
+            field = field_name_mapping.get(field, field)
 
             try:
                 setattr(component, field, value)
