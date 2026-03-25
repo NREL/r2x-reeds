@@ -1175,7 +1175,11 @@ class ReEDSParser(Plugin[ReEDSConfig]):
 
                 if region_name in loadsite_increments:
                     increment = self._truncate_and_cast_time_series(loadsite_increments[region_name])
-                    base_data = base_data + increment[: len(base_data)]
+                    # base_data = base_data + increment[: len(base_data)]
+                    min_len = min(len(base_data), len(increment))
+                    if min_len > 0:
+                        base_data = base_data.copy()
+                        base_data[:min_len] = base_data[:min_len] + increment[:min_len]
                     logger.debug("Added loadsite increment to region {} load profile", region_name)
 
                 ts = SingleTimeSeries.from_array(

@@ -127,14 +127,20 @@ def loadsite_run_path(tmp_path_factory, reeds_run_path):
             if yearhour and period:
                 rows.append({"yearhour": yearhour, "h": period})
 
+    # Deduplicate by yearhour and sort by yearhour for deterministic behavior
+    dedup_by_yearhour = {}
+    for r in rows:
+        yh = r["yearhour"]
+        if yh not in dedup_by_yearhour:
+            dedup_by_yearhour[yh] = r
+    rows = sorted(dedup_by_yearhour.values(), key=lambda r: r["yearhour"])
     hmap_myr_path = run_path / "inputs_case" / "rep" / "hmap_myr.csv"
     with open(hmap_myr_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=["yearhour", "h"])
         writer.writeheader()
         writer.writerows(rows)
-
-    # Unique period keys for loadsite_op columns
-    unique_periods = list({r["h"] for r in rows})
+    # Unique period keys for loadsite_op columns (sorted for determinism)
+    unique_periods = sorted({r["h"] for r in rows})
 
     loadsite_path = run_path / "outputs" / "loadsite_op.csv"
     with open(loadsite_path, "w", newline="") as f:

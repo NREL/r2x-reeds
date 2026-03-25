@@ -66,10 +66,10 @@ def create_hmap_myr(folder: Path, upgrader_context: dict[str, Any] | None = None
     It also skips silently when hmap_allyrs.csv is absent (legacy runs that lack
     loadsite data do not need this file).
 
-    Column resolution
-    -----------------
-    - ``h``       : used when present and non-empty (populated in newer ReEDS runs)
-    - ``actual_h``: used as fallback when ``h`` is empty (older test fixtures)
+    Column resolution (per-row)
+    ---------------------------
+    - ``h``       : used when non-empty for that row (populated in newer ReEDS runs)
+    - ``actual_h``: used as fallback when ``h`` is empty for that row (older fixtures)
     """
     import csv
 
@@ -86,11 +86,14 @@ def create_hmap_myr(folder: Path, upgrader_context: dict[str, Any] | None = None
 
     with open(source, newline="") as fh:
         reader = csv.DictReader(fh)
-        # Normalise header: strip leading * and whitespace
         raw_fieldnames = reader.fieldnames or []
         norm = {f: f.lstrip("*").strip() for f in raw_fieldnames}
         rows = [
-            {norm[k]: v for k, v in row.items()}
+            {
+                norm.get(k, k): (v if v is not None else "")
+                for k, v in row.items()
+                if k is not None
+            }
             for row in reader
         ]
 
@@ -98,46 +101,46 @@ def create_hmap_myr(folder: Path, upgrader_context: dict[str, Any] | None = None
         logger.warning("hmap_allyrs.csv at {} is empty; skipping hmap_myr creation", source)
         return folder
 
-    # Determine which column carries the representative period key
-    sample = rows[0]
-    if "yearhour" not in sample:
+    if "yearhour" not in rows[0]:
         logger.warning(
             "hmap_allyrs.csv missing 'yearhour' column; cannot create hmap_myr.csv"
         )
         return folder
 
-    if "h" in sample and sample["h"].strip():
-        h_col = "h"
-    elif "actual_h" in sample and sample.get("actual_h", "").strip():
-        h_col = "actual_h"
-    else:
-        # Scan a few rows to find a non-empty h column
-        h_col = None
-        for r in rows[:50]:
-            if r.get("h", "").strip():
-                h_col = "h"
-                break
-            if r.get("actual_h", "").strip():
-                h_col = "actual_h"
-                break
-        if h_col is None:
-            logger.warning(
-                "Neither 'h' nor 'actual_h' column has non-empty values in {}; "
-                "skipping hmap_myr creation",
-                source,
-            )
-            return folder
+    def _to_int(s: str) -> int | None:
+        try:
+            return int(s)
+        except (ValueError, TypeError):
+            return None
 
-    # Deduplicate by yearhour, keeping first occurrence
-    seen: set[str] = set()
-    out_rows: list[dict[str, str]] = []
+    # Derive the period key per-row: prefer h if non-empty, fall back to actual_h.
+    # Deduplicate by yearhour, preferring a non-empty period over an empty one.
+    out_map: dict[str, str] = {}  # yearhour -> best period found so far
     for r in rows:
-        yh = r["yearhour"]
-        if yh not in seen:
-            seen.add(yh)
-            out_rows.append({"yearhour": yh, "h": r[h_col]})
+        yh = r.get("yearhour", "").strip()
+        if not yh or _to_int(yh) is None:
+            logger.debug("Skipping non-integer yearhour value {!r} in hmap_myr derivation", yh)
+            continue
+        period = r.get("h", "").strip() or r.get("actual_h", "").strip()
+        if yh not in out_map or (not out_map[yh] and period):
+            out_map[yh] = period
 
-    out_rows.sort(key=lambda r: int(r["yearhour"]))
+    if not out_map:
+        logger.warning("No valid rows found in {}; skipping hmap_myr creation", source)
+        return folder
+
+    if not any(out_map.values()):
+        logger.warning(
+            "Neither 'h' nor 'actual_h' column has non-empty values in {}; "
+            "skipping hmap_myr creation",
+            source,
+        )
+        return folder
+
+    out_rows: list[dict[str, str]] = sorted(
+        ({"yearhour": yh, "h": period} for yh, period in out_map.items()),
+        key=lambda r: _to_int(r["yearhour"]) or 0,
+    )
 
     target.parent.mkdir(parents=True, exist_ok=True)
     with open(target, "w", newline="") as fh:
