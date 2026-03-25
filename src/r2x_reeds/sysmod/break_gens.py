@@ -159,20 +159,20 @@ def _create_split_generator(
         The newly created split generator component.
     """
     logger.trace("Creating split generator {} with capacity {}", name, new_capacity)
-    component = type(original)(
-        name=name,
-        region=original.region,
-        technology=original.technology,
-        capacity=new_capacity,
-        category=original.category,
-        heat_rate=original.heat_rate,
-        forced_outage_rate=original.forced_outage_rate,
-        planned_outage_rate=original.planned_outage_rate,
-        fuel_type=original.fuel_type,
-        fuel_price=original.fuel_price,
-        vom_cost=original.vom_cost,
-        vintage=original.vintage,
-    )
+
+    model_fields = type(original).model_fields
+
+
+    component_values = {
+        field_name: getattr(original, field_name)
+        for field_name in model_fields
+        if field_name != "uuid"
+    }
+    
+    component_values["name"] = name
+    component_values["capacity"] = new_capacity
+    component = type(original)(**component_values)
+
     logger.trace("Created new generator {} with capacity {}", component.label, new_capacity)
     system.add_component(component)
 
