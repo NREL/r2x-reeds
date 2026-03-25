@@ -53,6 +53,7 @@ from .parser_utils import (
     _collect_component_kwargs_from_rule,
     _resolve_generator_rule_from_row,
     calculate_reserve_requirement,
+    expand_loadsite_hourly,
     get_generator_class,
     get_rule_for_target,
     get_rules_by_target,
@@ -1134,13 +1135,51 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             load_profiles.height,
             load_profiles.width,
         )
+
+        #  Load cost-optimally sited load (loadsite_op) and expand to 8760 (in case it exists)
+        loadsite_increments: dict[str, np.ndarray] = {}
+        try:
+            loadsite_raw = self.read_data_file("loadsite_op")
+            hour_map_myr_raw = self.read_data_file("hour_map_myr")
+            if loadsite_raw is not None and hour_map_myr_raw is not None:
+                loadsite_df = loadsite_raw.collect()
+                # Guard against multi-year leakage: keep only the primary solve year
+                if "year" in loadsite_df.columns:
+                    loadsite_df = loadsite_df.filter(
+                        pl.col("year") == self.config.primary_solve_year
+                    )
+                if not loadsite_df.is_empty():
+                    expand_result = expand_loadsite_hourly(loadsite_df, hour_map_myr_raw.collect())
+                    if expand_result.is_ok():
+                        expanded = expand_result.ok()
+                        if expanded is not None:
+                            for region in expanded["region"].unique().to_list():
+                                loadsite_increments[region] = (
+                                    expanded.filter(pl.col("region") == region)
+                                    .sort("sequential_hour")["value"]
+                                    .to_numpy()
+                                )
+                            logger.info(
+                                "Loaded loadsite increments for {} regions", len(loadsite_increments)
+                            )
+                    else:
+                        logger.warning("Failed to expand loadsite data: {}", expand_result.err())
+        except Exception as exc:
+            logger.debug("Loadsite data not available, skipping: {}", exc)
+
         attached_count = 0
         for demand in system.get_components(ReEDSDemand):
             region_name = demand.name.replace("_load", "")
             if region_name in load_profiles.columns:
-                data = self._truncate_and_cast_time_series(load_profiles[region_name].to_numpy())
+                base_data = self._truncate_and_cast_time_series(load_profiles[region_name].to_numpy())
+
+                if region_name in loadsite_increments:
+                    increment = self._truncate_and_cast_time_series(loadsite_increments[region_name])
+                    base_data = base_data + increment[: len(base_data)]
+                    logger.debug("Added loadsite increment to region {} load profile", region_name)
+
                 ts = SingleTimeSeries.from_array(
-                    data=data,
+                    data=base_data,
                     name="max_active_power",
                     initial_timestamp=self.initial_timestamp,
                     resolution=timedelta(hours=1),

@@ -830,3 +830,56 @@ def calculate_hydro_budgets_for_generator(
         results.append(HydroBudgetResult(year=year, budget_array=budget_array))
 
     return results
+
+
+def expand_loadsite_hourly(
+    loadsite_data: pl.DataFrame,
+    hour_map_myr: pl.DataFrame,
+) -> Result[pl.DataFrame, ValidationError]:
+    """Expand loadsite representative-period data to 8760-hour profiles per region.
+
+    Parameters
+    ----------
+    loadsite_data : pl.DataFrame
+        Loadsite data pre-filtered to a single solve year.
+        Must have columns: region, hour_period, value
+    hour_map_myr : pl.DataFrame
+        Mapping from sequential year-hours to representative period keys.
+        Must have columns: sequential_hour, hour_period
+
+    Returns
+    -------
+    Result[pl.DataFrame, ValidationError]
+        Ok(DataFrame) with columns: sequential_hour, region, value —
+        8760 rows per region sorted by sequential_hour, or Err on failure.
+    """
+    try:
+        if loadsite_data.is_empty():
+            return Err(ValidationError("Loadsite data is empty after year filtering"))
+
+        # Coerce nulls (from 'Eps' replacement) to 0.0 and ensure float
+        loadsite_data = loadsite_data.with_columns(
+            pl.col("value").fill_null(0.0).cast(pl.Float64).round(5)
+        )
+
+        # Build a complete 8760xn_regions template via cross join,
+        # then left-join loadsite values so missing hours default to 0.
+        regions_df = pl.DataFrame({"region": loadsite_data["region"].unique().sort()})
+        hour_region = hour_map_myr.select("sequential_hour", "hour_period").join(
+            regions_df, how="cross"
+        )
+        expanded = (
+            hour_region
+            .join(
+                loadsite_data.select("region", "hour_period", "value"),
+                on=["region", "hour_period"],
+                how="left",
+            )
+            .with_columns(pl.col("value").fill_null(0.0))
+            .sort(["region", "sequential_hour"])
+            .select("sequential_hour", "region", "value")
+        )
+        return Ok(expanded)
+
+    except Exception as exc:
+        return Err(ValidationError(f"Failed to expand loadsite data to 8760: {exc}"))

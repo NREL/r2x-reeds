@@ -17,18 +17,15 @@ def move_hmap_file(folder: Path, upgrader_context: dict[str, Any] | None = None)
     old_location = folder / "inputs_case/hmap_allyrs.csv"
     new_location = folder / "inputs_case/rep/hmap_allyrs.csv"
 
-    # Check if the file has already been moved to the new location
     if new_location.exists():
         logger.debug("File {} already exists at target location, skipping move", new_location.name)
         return folder
 
-    # Check if the file exists at the old location
     if not old_location.exists():
         raise FileNotFoundError(
             f"File {old_location} does not exist and target {new_location} does not exist either."
         )
 
-    # Move the file to its new location
     old_location.rename(new_location)
     logger.debug("Moved {} to {}", old_location.name, new_location)
     return folder
@@ -58,7 +55,99 @@ def move_transmission_cost(folder: Path, upgrader_context: dict[str, Any] | None
     return folder
 
 
-# Create UpgradeStep instances for each upgrade function
+def create_hmap_myr(folder: Path, upgrader_context: dict[str, Any] | None = None) -> Path:
+    """Derive inputs_case/rep/hmap_myr.csv from hmap_allyrs.csv if not already present.
+
+    hmap_myr.csv maps sequential year-hours (1-8760) to representative period keys.
+    It is required by the loadsite_op.csv expand logic to convert representative-period
+    demand data to full 8760-hour profiles.
+
+    The step is idempotent: it skips silently when the target file already exists.
+    It also skips silently when hmap_allyrs.csv is absent (legacy runs that lack
+    loadsite data do not need this file).
+
+    Column resolution
+    -----------------
+    - ``h``       : used when present and non-empty (populated in newer ReEDS runs)
+    - ``actual_h``: used as fallback when ``h`` is empty (older test fixtures)
+    """
+    import csv
+
+    target = folder / "inputs_case/rep/hmap_myr.csv"
+    source = folder / "inputs_case/rep/hmap_allyrs.csv"
+
+    if target.exists():
+        logger.debug("hmap_myr.csv already exists at {}, skipping", target)
+        return folder
+
+    if not source.exists():
+        logger.debug("hmap_allyrs.csv not found at {}; skipping hmap_myr creation", source)
+        return folder
+
+    with open(source, newline="") as fh:
+        reader = csv.DictReader(fh)
+        # Normalise header: strip leading * and whitespace
+        raw_fieldnames = reader.fieldnames or []
+        norm = {f: f.lstrip("*").strip() for f in raw_fieldnames}
+        rows = [
+            {norm[k]: v for k, v in row.items()}
+            for row in reader
+        ]
+
+    if not rows:
+        logger.warning("hmap_allyrs.csv at {} is empty; skipping hmap_myr creation", source)
+        return folder
+
+    # Determine which column carries the representative period key
+    sample = rows[0]
+    if "yearhour" not in sample:
+        logger.warning(
+            "hmap_allyrs.csv missing 'yearhour' column; cannot create hmap_myr.csv"
+        )
+        return folder
+
+    if "h" in sample and sample["h"].strip():
+        h_col = "h"
+    elif "actual_h" in sample and sample.get("actual_h", "").strip():
+        h_col = "actual_h"
+    else:
+        # Scan a few rows to find a non-empty h column
+        h_col = None
+        for r in rows[:50]:
+            if r.get("h", "").strip():
+                h_col = "h"
+                break
+            if r.get("actual_h", "").strip():
+                h_col = "actual_h"
+                break
+        if h_col is None:
+            logger.warning(
+                "Neither 'h' nor 'actual_h' column has non-empty values in {}; "
+                "skipping hmap_myr creation",
+                source,
+            )
+            return folder
+
+    # Deduplicate by yearhour, keeping first occurrence
+    seen: set[str] = set()
+    out_rows: list[dict[str, str]] = []
+    for r in rows:
+        yh = r["yearhour"]
+        if yh not in seen:
+            seen.add(yh)
+            out_rows.append({"yearhour": yh, "h": r[h_col]})
+
+    out_rows.sort(key=lambda r: int(r["yearhour"]))
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with open(target, "w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=["yearhour", "h"])
+        writer.writeheader()
+        writer.writerows(out_rows)
+
+    logger.debug("Created hmap_myr.csv at {} ({} rows)", target, len(out_rows))
+    return folder
+
 UPGRADE_STEPS = [
     UpgradeStep(
         name="move_hmap_file",
@@ -73,5 +162,12 @@ UPGRADE_STEPS = [
         target_version="2026.01.22",
         upgrade_type=UpgradeType.FILE,
         priority=30,
+    ),
+    UpgradeStep(
+        name="create_hmap_myr",
+        func=create_hmap_myr,
+        target_version="2026.03.24",
+        upgrade_type=UpgradeType.FILE,
+        priority=40,
     ),
 ]
