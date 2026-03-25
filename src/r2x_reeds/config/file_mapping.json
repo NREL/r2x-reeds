@@ -233,6 +233,33 @@
     }
   },
   {
+    "name": "loadsite_op",
+    "fpath": "outputs/loadsite_op.csv",
+    "info": {
+      "description": "Cost-optimally sited demand (data center load) by representative period, region, and model year",
+      "is_input": false,
+      "is_optional": true,
+      "units": "MW"
+    },
+    "reader": {
+      "kwargs": {
+        "null_values": ["Eps"]
+      },
+      "function": null
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "r": "region",
+        "allh": "hour_period",
+        "t": "year",
+        "Value": "value"
+      },
+      "filter_by": {
+        "year": "{solve_year}"
+      }
+    }
+  },
+  {
     "name": "heat_rate",
     "fpath": "outputs/heat_rate.csv",
     "info": {
@@ -460,6 +487,21 @@
         "*timestamp": "time_index",
         "h": "hour_period",
         "season": "season"
+      }
+    }
+  },
+  {
+    "name": "hour_map_myr",
+    "fpath": "inputs_case/rep/hmap_myr.csv",
+    "info": {
+      "description": "Mapping from sequential model-year hours (1-8760) to representative period keys",
+      "is_input": true,
+      "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "yearhour": "sequential_hour",
+        "h": "hour_period"
       }
     }
   },
