@@ -84,7 +84,7 @@ def add_pcm_defaults(
             return Err(str(exc))
 
     # Fields that need to be multiplied by generator capacity
-    needs_multiplication = {"startup_cost_per_MW", "ramp_limits"}
+    needs_multiplication = {"startup_cost", "ramp_limits"}
 
     # Fields that should be processed first (for dependency ordering)
     fields_weight = {"capacity": 1}  # Updated from active_power_limits
@@ -107,12 +107,14 @@ def add_pcm_defaults(
         msg = "Applying PCM defaults to {}"
         logger.debug(msg, component.name)
 
+        model_fields = type(component).model_fields
         if not config.pcm_defaults_override:
             fields_to_replace = [
-                key for key in pcm_values if _check_if_null(_get_component_attribute(component, key))
+                key for key in pcm_values
+                if key in model_fields and _check_if_null(_get_component_attribute(component, key))
             ]
         else:
-            fields_to_replace = [key for key in pcm_values if key in type(component).model_fields]
+            fields_to_replace = [key for key in pcm_values if key in model_fields]
 
         for field in sorted(fields_to_replace, key=lambda x: fields_weight.get(x, -999)):
             value = pcm_values[field]
@@ -126,9 +128,6 @@ def add_pcm_defaults(
                 else:
                     logger.warning("Cannot multiply {} for {} - no capacity defined", field, component.name)
                     continue
-
-            if field == "start_cost_per_MW":
-                field = "startup_cost"
 
             try:
                 setattr(component, field, value)
