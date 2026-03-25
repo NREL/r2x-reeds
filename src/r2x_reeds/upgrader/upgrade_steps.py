@@ -55,101 +55,37 @@ def move_transmission_cost(folder: Path, upgrader_context: dict[str, Any] | None
     return folder
 
 
-def create_hmap_myr(folder: Path, upgrader_context: dict[str, Any] | None = None) -> Path:
-    """Derive inputs_case/rep/hmap_myr.csv from hmap_allyrs.csv if not already present.
+def move_hmap_myr_file(folder: Path, upgrader_context: dict[str, Any] | None = None) -> Path:
+    """Move hmap_myr.csv from inputs_case/ to inputs_case/rep/ if present at the old location.
 
-    hmap_myr.csv maps sequential year-hours (1-8760) to representative period keys.
-    It is required by the loadsite_op.csv expand logic to convert representative-period
-    demand data to full 8760-hour profiles.
+    ReEDS runs prior to 2026-03-28 placed hmap_myr.csv directly under inputs_case/.
+    Newer runs expect it at inputs_case/rep/hmap_myr.csv.
+    This step is idempotent: it skips when the target already exists.
 
-    The step is idempotent: it skips silently when the target file already exists.
-    It also skips silently when hmap_allyrs.csv is absent (legacy runs that lack
-    loadsite data do not need this file).
-
-    Column resolution (per-row)
-    ---------------------------
-    - ``h``       : used when non-empty for that row (populated in newer ReEDS runs)
-    - ``actual_h``: used as fallback when ``h`` is empty for that row (older fixtures)
+    Notes
+    -----
+    hmap_myr.csv maps every sequential year-hour (1-8760) to its representative
+    period key and is an output of the ReEDS representative-period selection process.
+    It cannot be derived from hmap_allyrs.csv — that file only populates the ``h``
+    column for the representative hours themselves, leaving all other rows blank.
+    Runs that lack hmap_myr.csv entirely will silently skip loadsite demand expansion.
     """
-    import csv
+    old_location = folder / "inputs_case/hmap_myr.csv"
+    new_location = folder / "inputs_case/rep/hmap_myr.csv"
 
-    target = folder / "inputs_case/rep/hmap_myr.csv"
-    source = folder / "inputs_case/rep/hmap_allyrs.csv"
-
-    if target.exists():
-        logger.debug("hmap_myr.csv already exists at {}, skipping", target)
+    if new_location.exists():
+        logger.debug("hmap_myr.csv already at target location {}, skipping move", new_location)
         return folder
 
-    if not source.exists():
-        logger.debug("hmap_allyrs.csv not found at {}; skipping hmap_myr creation", source)
+    if not old_location.exists():
+        logger.debug("hmap_myr.csv not found at legacy location {}; skipping", old_location)
         return folder
 
-    with open(source, newline="") as fh:
-        reader = csv.DictReader(fh)
-        raw_fieldnames = reader.fieldnames or []
-        norm = {f: f.lstrip("*").strip() for f in raw_fieldnames}
-        rows = [
-            {
-                norm.get(k, k): (v if v is not None else "")
-                for k, v in row.items()
-                if k is not None
-            }
-            for row in reader
-        ]
-
-    if not rows:
-        logger.warning("hmap_allyrs.csv at {} is empty; skipping hmap_myr creation", source)
-        return folder
-
-    if "yearhour" not in rows[0]:
-        logger.warning(
-            "hmap_allyrs.csv missing 'yearhour' column; cannot create hmap_myr.csv"
-        )
-        return folder
-
-    def _to_int(s: str) -> int | None:
-        try:
-            return int(s)
-        except (ValueError, TypeError):
-            return None
-
-    # Derive the period key per-row: prefer h if non-empty, fall back to actual_h.
-    # Deduplicate by yearhour, preferring a non-empty period over an empty one.
-    out_map: dict[str, str] = {}  # yearhour -> best period found so far
-    for r in rows:
-        yh = r.get("yearhour", "").strip()
-        if not yh or _to_int(yh) is None:
-            logger.debug("Skipping non-integer yearhour value {!r} in hmap_myr derivation", yh)
-            continue
-        period = r.get("h", "").strip() or r.get("actual_h", "").strip()
-        if yh not in out_map or (not out_map[yh] and period):
-            out_map[yh] = period
-
-    if not out_map:
-        logger.warning("No valid rows found in {}; skipping hmap_myr creation", source)
-        return folder
-
-    if not any(out_map.values()):
-        logger.warning(
-            "Neither 'h' nor 'actual_h' column has non-empty values in {}; "
-            "skipping hmap_myr creation",
-            source,
-        )
-        return folder
-
-    out_rows: list[dict[str, str]] = sorted(
-        ({"yearhour": yh, "h": period} for yh, period in out_map.items()),
-        key=lambda r: _to_int(r["yearhour"]) or 0,
-    )
-
-    target.parent.mkdir(parents=True, exist_ok=True)
-    with open(target, "w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=["yearhour", "h"])
-        writer.writeheader()
-        writer.writerows(out_rows)
-
-    logger.debug("Created hmap_myr.csv at {} ({} rows)", target, len(out_rows))
+    new_location.parent.mkdir(parents=True, exist_ok=True)
+    old_location.rename(new_location)
+    logger.debug("Moved legacy hmap_myr.csv from {} to {}", old_location, new_location)
     return folder
+
 
 UPGRADE_STEPS = [
     UpgradeStep(
@@ -167,10 +103,10 @@ UPGRADE_STEPS = [
         priority=30,
     ),
     UpgradeStep(
-        name="create_hmap_myr",
-        func=create_hmap_myr,
+        name="move_hmap_myr_file",
+        func=move_hmap_myr_file,
         target_version="2026.03.24",
         upgrade_type=UpgradeType.FILE,
-        priority=40,
+        priority=35,
     ),
 ]
