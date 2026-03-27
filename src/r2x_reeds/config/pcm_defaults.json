@@ -1068,7 +1068,7 @@
   },
   {
     "name": "hydund",
-    "capacity_MW": null,
+    "capacity_MW": 50.0,
     "forced_outage_rate": null,
     "planned_outage_rate": null,
     "ramp_rate": 0.05,
