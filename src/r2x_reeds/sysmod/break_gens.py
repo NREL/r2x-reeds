@@ -168,7 +168,6 @@ def _create_split_generator(
         for field_name in model_fields
         if field_name != "uuid"
     }
-    
     component_values["name"] = name
     component_values["capacity"] = new_capacity
     component = type(original)(**component_values)
