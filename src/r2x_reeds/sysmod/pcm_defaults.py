@@ -74,11 +74,9 @@ def add_pcm_defaults(
             data_store = DataStore(path=pcm_path.parent)
             data_store.add_data([pcm_data_file])
 
-            pcm_defaults_raw = data_store.read_data(name="pcm_defaults")
-            if isinstance(pcm_defaults_raw, list):
-                pcm_defaults = {item["name"]: item for item in pcm_defaults_raw}
-            else:
-                pcm_defaults = pcm_defaults_raw
+            pcm_defaults = data_store.read_data(name="pcm_defaults")
+            if isinstance(pcm_defaults, list):
+                pcm_defaults = {item["name"]: item for item in pcm_defaults}
         except Exception as exc:
             logger.error("Failed to load PCM defaults: {}", exc)
             return Err(str(exc))
