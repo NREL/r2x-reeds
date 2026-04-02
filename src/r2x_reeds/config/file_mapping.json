@@ -215,8 +215,9 @@
       "kwargs": {
         "data_key": "data",
         "columns_key": "columns",
-        "datetime_key": "index_1",
+        "datetime_key": "index_datetime",
         "additional_keys": [
+          "index_year",
           "index_0"
         ]
       },
@@ -357,7 +358,7 @@
       "kwargs": {
         "data_key": "data",
         "columns_key": "columns",
-        "datetime_key": "index_0"
+        "datetime_key": "index_datetime"
       },
       "function": null
     },
