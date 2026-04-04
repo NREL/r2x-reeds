@@ -119,12 +119,12 @@ def _break_system_generators(
 
         for _ in range(no_splits):
             component_name = component.name + f"_{split_no:02}"
-            _create_split_generator(system, component, component_name, capacity)
+            _create_split_generator(system, component, new_name=component_name, new_capacity=capacity)
             split_no += 1
 
         if remainder > capacity_threshold:
             component_name = component.name + f"_{split_no:02}"
-            _create_split_generator(system, component, component_name, remainder)
+            _create_split_generator(system, component, new_name=component_name, new_capacity=remainder)
         else:
             capacity_dropped += remainder
             logger.debug(f"Dropped {remainder} capacity for {component.name}")
@@ -138,7 +138,7 @@ def _break_system_generators(
 
 
 def _create_split_generator(
-    system: System, original: ReEDSGenerator, name: str, new_capacity: float
+    system: System, original: ReEDSGenerator, new_name: str, new_capacity: float
 ) -> ReEDSGenerator:
     """Create a new split generator component.
 
@@ -148,7 +148,7 @@ def _create_split_generator(
         System to add the new generator to.
     original : ReEDSGenerator
         Original generator component to split.
-    name : str
+    new_name : str
         Name for the new split generator.
     new_capacity : float
         Capacity of the new generator (MW).
@@ -158,21 +158,19 @@ def _create_split_generator(
     ReEDSGenerator
         The newly created split generator component.
     """
-    logger.trace("Creating split generator {} with capacity {}", name, new_capacity)
-    component = type(original)(
-        name=name,
-        region=original.region,
-        technology=original.technology,
-        capacity=new_capacity,
-        category=original.category,
-        heat_rate=original.heat_rate,
-        forced_outage_rate=original.forced_outage_rate,
-        planned_outage_rate=original.planned_outage_rate,
-        fuel_type=original.fuel_type,
-        fuel_price=original.fuel_price,
-        vom_cost=original.vom_cost,
-        vintage=original.vintage,
-    )
+    logger.trace("Creating split generator {} with capacity {}", new_name, new_capacity)
+
+    model_fields = type(original).model_fields
+
+    component_values = {
+        field_name: getattr(original, field_name)
+        for field_name in model_fields
+        if field_name not in {"uuid", "name"}
+    }
+    component_values["name"] = new_name
+    component_values["capacity"] = new_capacity
+    component = type(original)(**component_values)
+
     logger.trace("Created new generator {} with capacity {}", component.label, new_capacity)
     system.add_component(component)
 

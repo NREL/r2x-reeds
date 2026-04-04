@@ -343,7 +343,7 @@ def _prepare_generator_dataset(
         """Return category names for a technology, logging misses."""
         result = get_technology_categories(tech, technology_categories)
         if result.is_err():
-            logger.debug("Technology %s has no category match: %s", tech, result.err())
+            logger.debug("Technology {} has no category match: {}", tech, result.err())
             return []
         categories = result.ok()
         return categories if categories is not None else []
