@@ -197,20 +197,20 @@ def loadsite_base_profiles(loadsite_run_path):
     ).collect()
 
 
-def test_loadsite_increment_applied_to_p4(loadsite_system, loadsite_base_profiles) -> None:
-    """p4 load must exceed the base profile by exactly 500 MW at every hour."""
+def test_loadsite_not_applied_during_parse_p4(loadsite_system, loadsite_base_profiles) -> None:
+    """p4 load remains equal to the base profile until optimal siting sysmod is applied."""
     p4 = loadsite_system.get_component(ReEDSDemand, "p4_load")
     actual = loadsite_system.get_time_series(p4).data
     base = loadsite_base_profiles["p4"].to_numpy()[:8760]
-    np.testing.assert_allclose(actual - base, 500.0, atol=1e-3)
+    np.testing.assert_allclose(actual, base, rtol=1e-5)
 
 
-def test_loadsite_increment_applied_to_p5(loadsite_system, loadsite_base_profiles) -> None:
-    """p5 load must exceed the base profile by exactly 300 MW at every hour."""
+def test_loadsite_not_applied_during_parse_p5(loadsite_system, loadsite_base_profiles) -> None:
+    """p5 load remains equal to the base profile until optimal siting sysmod is applied."""
     p5 = loadsite_system.get_component(ReEDSDemand, "p5_load")
     actual = loadsite_system.get_time_series(p5).data
     base = loadsite_base_profiles["p5"].to_numpy()[:8760]
-    np.testing.assert_allclose(actual - base, 300.0, atol=1e-3)
+    np.testing.assert_allclose(actual, base, rtol=1e-5)
 
 
 def test_loadsite_not_applied_to_p1(loadsite_system, loadsite_base_profiles) -> None:
@@ -221,15 +221,9 @@ def test_loadsite_not_applied_to_p1(loadsite_system, loadsite_base_profiles) -> 
     np.testing.assert_allclose(actual, base, rtol=1e-5)
 
 
-def test_loadsite_year_filtering(loadsite_system, loadsite_base_profiles) -> None:
-    """Year=2040 rows (value=999) must not reach the 2032 system.
-
-    If year filtering failed, p4 would show +999 instead of +500.
-    """
+def test_loadsite_data_does_not_change_parser_output(loadsite_system, loadsite_base_profiles) -> None:
+    """Presence of loadsite rows does not affect parser-only load profiles."""
     p4 = loadsite_system.get_component(ReEDSDemand, "p4_load")
     actual = loadsite_system.get_time_series(p4).data
     base = loadsite_base_profiles["p4"].to_numpy()[:8760]
-    diff = actual - base
-    # Increments must all be ≈500, never ≈999
-    assert np.all(diff < 600.0), "Year=2040 loadsite rows leaked into the 2032 system"
-    assert np.all(diff >= 0.0), "Loadsite increment produced negative values"
+    np.testing.assert_allclose(actual, base, rtol=1e-5)
