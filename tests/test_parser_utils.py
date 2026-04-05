@@ -1425,7 +1425,9 @@ def test_get_rule_for_target_named_miss_returns_first() -> None:
 
     class _R:
         name = "first"
-        def get_target_types(self): return ["X"]
+
+        def get_target_types(self):
+            return ["X"]
 
     result = get_rule_for_target({"X": [_R()]}, target_type="X", name="nonexistent")
     assert result.is_ok()
@@ -1490,9 +1492,7 @@ def test_expand_loadsite_hourly_exception_path() -> None:
     from r2x_reeds.parser_utils import expand_loadsite_hourly
 
     # hour_map_myr is missing 'sequential_hour' column → select() will raise
-    loadsite_data = pl.DataFrame(
-        {"region": ["p1"], "hour_period": ["y2012d001h001"], "value": [100.0]}
-    )
+    loadsite_data = pl.DataFrame({"region": ["p1"], "hour_period": ["y2012d001h001"], "value": [100.0]})
     bad_hour_map = pl.DataFrame({"wrong_col": [1, 2, 3], "hour_period": ["y2012d001h001"] * 3})
 
     result = expand_loadsite_hourly(loadsite_data, bad_hour_map)
