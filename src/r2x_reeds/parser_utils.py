@@ -853,36 +853,42 @@ def expand_loadsite_hourly(
         Ok(DataFrame) with columns: sequential_hour, region, value —
         8760 rows per region sorted by sequential_hour, or Err on failure.
     """
-    try:
-        if loadsite_data.is_empty():
-            return Err(ValidationError("Loadsite data is empty after year filtering"))
+    if loadsite_data.is_empty():
+        return Err(ValidationError("Loadsite data is empty after year filtering"))
 
-        # Coerce nulls (from 'Eps' replacement) to 0.0 and ensure float
-        loadsite_data = loadsite_data.with_columns(pl.col("value").fill_null(0.0).cast(pl.Float64).round(5))
+    required_loadsite_cols = {"region", "hour_period", "value"}
+    missing_loadsite_cols = required_loadsite_cols - set(loadsite_data.columns)
+    if missing_loadsite_cols:
+        return Err(ValidationError(f"Missing required loadsite columns: {sorted(missing_loadsite_cols)}"))
 
-        # Build a complete 8760xn_regions template via cross join,
-        # then left-join loadsite values so missing hours default to 0.
-        regions_df = pl.DataFrame({"region": loadsite_data["region"].unique().sort()})
-        hour_region = hour_map_myr.select("sequential_hour", "hour_period").join(regions_df, how="cross")
-        expanded = (
-            hour_region.join(
-                loadsite_data.select("region", "hour_period", "value"),
-                on=["region", "hour_period"],
-                how="left",
-            )
-            .with_columns(pl.col("value").fill_null(0.0))
-            .sort(["region", "sequential_hour"])
-            .select("sequential_hour", "region", "value")
+    required_hour_map_cols = {"sequential_hour", "hour_period"}
+    missing_hour_map_cols = required_hour_map_cols - set(hour_map_myr.columns)
+    if missing_hour_map_cols:
+        return Err(ValidationError(f"Missing required hour_map_myr columns: {sorted(missing_hour_map_cols)}"))
+
+    # Coerce nulls (from 'Eps' replacement) to 0.0 and ensure float
+    loadsite_data = loadsite_data.with_columns(pl.col("value").fill_null(0.0).cast(pl.Float64).round(5))
+
+    # Build a complete 8760xn_regions template via cross join,
+    # then left-join loadsite values so missing hours default to 0.
+    regions_df = pl.DataFrame({"region": loadsite_data["region"].unique().sort()})
+    hour_region = hour_map_myr.select("sequential_hour", "hour_period").join(regions_df, how="cross")
+    expanded = (
+        hour_region.join(
+            loadsite_data.select("region", "hour_period", "value"),
+            on=["region", "hour_period"],
+            how="left",
         )
-        expected_rows = hour_region.height
-        if expanded.height != expected_rows:
-            return Err(
-                ValidationError(
-                    "Expanded loadsite rows mismatch expected size: "
-                    f"expected={expected_rows}, got={expanded.height}"
-                )
+        .with_columns(pl.col("value").fill_null(0.0))
+        .sort(["region", "sequential_hour"])
+        .select("sequential_hour", "region", "value")
+    )
+    expected_rows = hour_region.height
+    if expanded.height != expected_rows:
+        return Err(
+            ValidationError(
+                "Expanded loadsite rows mismatch expected size: "
+                f"expected={expected_rows}, got={expanded.height}"
             )
-        return Ok(expanded)
-
-    except Exception as exc:
-        return Err(ValidationError(f"Failed to expand loadsite data to 8760: {exc}"))
+        )
+    return Ok(expanded)
