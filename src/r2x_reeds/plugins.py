@@ -12,6 +12,7 @@ from r2x_reeds.sysmod.ccs_credit import add_ccs_credit
 from r2x_reeds.sysmod.electrolyzer import add_electrolizer_load
 from r2x_reeds.sysmod.emission_cap import add_emission_cap
 from r2x_reeds.sysmod.imports import add_imports
+from r2x_reeds.sysmod.optimal_siting import add_optimal_siting
 from r2x_reeds.sysmod.pcm_defaults import add_pcm_defaults
 from r2x_reeds.upgrader.data_upgrader import ReEDSUpgrader, ReEDSVersionDetector
 
@@ -27,6 +28,7 @@ system_modifiers = {
     "add-ccs-credit": add_ccs_credit,
     "break-gens": break_generators,
     "add-imports": add_imports,
+    "add-optimal-siting": add_optimal_siting,
 }
 
 __all__ = [

@@ -858,19 +858,14 @@ def expand_loadsite_hourly(
             return Err(ValidationError("Loadsite data is empty after year filtering"))
 
         # Coerce nulls (from 'Eps' replacement) to 0.0 and ensure float
-        loadsite_data = loadsite_data.with_columns(
-            pl.col("value").fill_null(0.0).cast(pl.Float64).round(5)
-        )
+        loadsite_data = loadsite_data.with_columns(pl.col("value").fill_null(0.0).cast(pl.Float64).round(5))
 
         # Build a complete 8760xn_regions template via cross join,
         # then left-join loadsite values so missing hours default to 0.
         regions_df = pl.DataFrame({"region": loadsite_data["region"].unique().sort()})
-        hour_region = hour_map_myr.select("sequential_hour", "hour_period").join(
-            regions_df, how="cross"
-        )
+        hour_region = hour_map_myr.select("sequential_hour", "hour_period").join(regions_df, how="cross")
         expanded = (
-            hour_region
-            .join(
+            hour_region.join(
                 loadsite_data.select("region", "hour_period", "value"),
                 on=["region", "hour_period"],
                 how="left",
