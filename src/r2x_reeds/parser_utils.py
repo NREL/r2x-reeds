@@ -874,6 +874,14 @@ def expand_loadsite_hourly(
             .sort(["region", "sequential_hour"])
             .select("sequential_hour", "region", "value")
         )
+        expected_rows = hour_region.height
+        if expanded.height != expected_rows:
+            return Err(
+                ValidationError(
+                    "Expanded loadsite rows mismatch expected size: "
+                    f"expected={expected_rows}, got={expanded.height}"
+                )
+            )
         return Ok(expanded)
 
     except Exception as exc:
