@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.5.0](https://github.com/NatLabRockies/r2x-reeds/compare/v0.4.0...v0.5.0) (2026-04-06)
+
+
+### 🚀 Features
+
+* add optimal load siting capability to be included on load parser as an Upgrader feature ([#57](https://github.com/NatLabRockies/r2x-reeds/issues/57)) ([284d05a](https://github.com/NatLabRockies/r2x-reeds/commit/284d05ae85c6c2b7674a2cb80e3d2c11cb0b9920))
+
+
+### 🐛 Bug Fixes
+
+* allow double format for pcm default values ([#54](https://github.com/NatLabRockies/r2x-reeds/issues/54)) ([d7b65ce](https://github.com/NatLabRockies/r2x-reeds/commit/d7b65ce53672d769e3121fcfbbc7b7634f0707ff))
+* pcm defaults and split generators ([#58](https://github.com/NatLabRockies/r2x-reeds/issues/58)) ([45df350](https://github.com/NatLabRockies/r2x-reeds/commit/45df350d5897af9380c6d5600df81af39d243170))
+
+
+### 📦 Build
+
+* **deps:** bump codecov/codecov-action from 5 to 6 ([#59](https://github.com/NatLabRockies/r2x-reeds/issues/59)) ([b83b85b](https://github.com/NatLabRockies/r2x-reeds/commit/b83b85b924b6c7c8515da99b438d64ea1b5240fb))
+
 ## [0.4.0](https://github.com/NatLabRockies/r2x-reeds/compare/v0.3.6...v0.4.0) (2026-03-18)
 
 
