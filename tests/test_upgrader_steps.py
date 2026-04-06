@@ -125,3 +125,16 @@ def test_move_transmission_cost_skips_missing_files(tmp_path: Path) -> None:
     # Neither old files exist - should complete without error
     result = move_transmission_cost(tmp_path)
     assert result == tmp_path
+
+
+def _write_hmap_allyrs(rep_folder: Path, rows: list[dict]) -> None:
+    """Write a minimal hmap_allyrs.csv fixture for testing."""
+    import csv
+
+    path = rep_folder / "hmap_allyrs.csv"
+    fieldnames = ["*timestamp", "year", "yearhour", "h", "actual_h"]
+    with open(path, "w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)

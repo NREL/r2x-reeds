@@ -1134,13 +1134,15 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             load_profiles.height,
             load_profiles.width,
         )
+
         attached_count = 0
         for demand in system.get_components(ReEDSDemand):
             region_name = demand.name.replace("_load", "")
             if region_name in load_profiles.columns:
-                data = self._truncate_and_cast_time_series(load_profiles[region_name].to_numpy())
+                base_data = self._truncate_and_cast_time_series(load_profiles[region_name].to_numpy())
+
                 ts = SingleTimeSeries.from_array(
-                    data=data,
+                    data=base_data,
                     name="max_active_power",
                     initial_timestamp=self.initial_timestamp,
                     resolution=timedelta(hours=1),

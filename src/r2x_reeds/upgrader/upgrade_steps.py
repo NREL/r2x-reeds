@@ -17,18 +17,15 @@ def move_hmap_file(folder: Path, upgrader_context: dict[str, Any] | None = None)
     old_location = folder / "inputs_case/hmap_allyrs.csv"
     new_location = folder / "inputs_case/rep/hmap_allyrs.csv"
 
-    # Check if the file has already been moved to the new location
     if new_location.exists():
         logger.debug("File {} already exists at target location, skipping move", new_location.name)
         return folder
 
-    # Check if the file exists at the old location
     if not old_location.exists():
         raise FileNotFoundError(
             f"File {old_location} does not exist and target {new_location} does not exist either."
         )
 
-    # Move the file to its new location
     old_location.rename(new_location)
     logger.debug("Moved {} to {}", old_location.name, new_location)
     return folder
@@ -58,7 +55,38 @@ def move_transmission_cost(folder: Path, upgrader_context: dict[str, Any] | None
     return folder
 
 
-# Create UpgradeStep instances for each upgrade function
+def move_hmap_myr_file(folder: Path, upgrader_context: dict[str, Any] | None = None) -> Path:
+    """Move hmap_myr.csv from inputs_case/ to inputs_case/rep/ if present at the old location.
+
+    ReEDS runs prior to 2026-03-28 placed hmap_myr.csv directly under inputs_case/.
+    Newer runs expect it at inputs_case/rep/hmap_myr.csv.
+    This step is idempotent: it skips when the target already exists.
+
+    Notes
+    -----
+    hmap_myr.csv maps every sequential year-hour (1-8760) to its representative
+    period key and is an output of the ReEDS representative-period selection process.
+    It cannot be derived from hmap_allyrs.csv — that file only populates the ``h``
+    column for the representative hours themselves, leaving all other rows blank.
+    Runs that lack hmap_myr.csv entirely will silently skip loadsite demand expansion.
+    """
+    old_location = folder / "inputs_case/hmap_myr.csv"
+    new_location = folder / "inputs_case/rep/hmap_myr.csv"
+
+    if new_location.exists():
+        logger.debug("hmap_myr.csv already at target location {}, skipping move", new_location)
+        return folder
+
+    if not old_location.exists():
+        logger.debug("hmap_myr.csv not found at legacy location {}; skipping", old_location)
+        return folder
+
+    new_location.parent.mkdir(parents=True, exist_ok=True)
+    old_location.rename(new_location)
+    logger.debug("Moved legacy hmap_myr.csv from {} to {}", old_location, new_location)
+    return folder
+
+
 UPGRADE_STEPS = [
     UpgradeStep(
         name="move_hmap_file",
@@ -73,5 +101,12 @@ UPGRADE_STEPS = [
         target_version="2026.01.22",
         upgrade_type=UpgradeType.FILE,
         priority=30,
+    ),
+    UpgradeStep(
+        name="move_hmap_myr_file",
+        func=move_hmap_myr_file,
+        target_version="2026.03.24",
+        upgrade_type=UpgradeType.FILE,
+        priority=35,
     ),
 ]

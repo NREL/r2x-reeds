@@ -31,15 +31,13 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "License :: OSI Approved :: BSD License",
     "Natural Language :: English",
     "Operating System :: OS Independent",
     "Topic :: File Formats :: JSON",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Information Analysis",
     "Topic :: Scientific/Engineering :: Interface Engine/Protocol Translator",
-    "Topic :: Software Development :: Build Tools",
-    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Libraries :: Python Modules :: Build Tools",
     "Typing :: Typed",
 ]
 
@@ -53,6 +51,7 @@ add-electrolyzer-load = "r2x_reeds.sysmod.electrolyzer:add_electrolizer_load"
 add-ccs-credit = "r2x_reeds.sysmod.ccs_credit:add_ccs_credit"
 break-gens = "r2x_reeds.sysmod.break_gens:break_generators"
 add-imports = "r2x_reeds.sysmod.imports:add_imports"
+add-optimal-siting = "r2x_reeds.sysmod.optimal_siting:add_optimal_siting"
 
 [dependency-groups]
 dev = [

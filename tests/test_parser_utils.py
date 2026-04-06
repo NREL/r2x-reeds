@@ -1323,3 +1323,177 @@ def test_prepare_generator_inputs_custom_categories_no_match() -> None:
     assert variable_df.is_empty()
     # All techs are non-variable
     assert non_variable_df.shape[0] == 2
+
+
+def test_collect_component_kwargs_empty_identifier() -> None:
+    """Row where identifier getter returns Ok('') triggers 'Missing identifier' path."""
+    from unittest.mock import MagicMock
+
+    import polars as pl
+    from rust_ok import Ok
+
+    from r2x_reeds.parser_utils import _collect_component_kwargs_from_rule
+
+    data = pl.DataFrame({"region": ["p1"]})
+    ctx = MagicMock()
+
+    result = _collect_component_kwargs_from_rule(
+        data=data,
+        rule_provider=MagicMock(),
+        parser_context=ctx,
+        row_identifier_getter=lambda row: Ok(""),
+    )
+    assert result.is_err()
+    assert "Missing identifier value" in str(result.unwrap_err())
+
+
+def test_collect_component_kwargs_identifier_err() -> None:
+    """Row where identifier getter returns Err is recorded as a failure."""
+    from unittest.mock import MagicMock
+
+    import polars as pl
+    from rust_ok import Err
+
+    from r2x_reeds.parser_utils import _collect_component_kwargs_from_rule
+
+    data = pl.DataFrame({"region": ["p1"]})
+    ctx = MagicMock()
+
+    result = _collect_component_kwargs_from_rule(
+        data=data,
+        rule_provider=MagicMock(),
+        parser_context=ctx,
+        row_identifier_getter=lambda row: Err(ValueError("bad row")),
+    )
+    assert result.is_err()
+    assert "bad row" in str(result.unwrap_err())
+
+
+def test_collect_component_kwargs_rule_provider_returns_err() -> None:
+    """Callable rule_provider returning Err causes the row to be skipped with an error."""
+    from unittest.mock import MagicMock
+
+    import polars as pl
+    from rust_ok import Err, Ok
+
+    from r2x_core.exceptions import ValidationError
+    from r2x_reeds.parser_utils import _collect_component_kwargs_from_rule
+
+    data = pl.DataFrame({"region": ["p1"]})
+    ctx = MagicMock()
+
+    result = _collect_component_kwargs_from_rule(
+        data=data,
+        rule_provider=lambda row: Err(ValidationError("no rule")),
+        parser_context=ctx,
+        row_identifier_getter=lambda row: Ok("p1"),
+    )
+    assert result.is_err()
+    assert "no rule" in str(result.unwrap_err())
+
+
+def test_resolve_generator_rule_no_rule_for_class() -> None:
+    """Known class with no rules returns Err."""
+    from r2x_reeds.parser_utils import _resolve_generator_rule_from_row
+
+    result = _resolve_generator_rule_from_row(
+        row={"technology": "coal"},
+        technology_categories={"thermal": {"prefixes": ["coal"]}},
+        category_class_mapping={"thermal": "ReEDSThermalGenerator"},
+        rules_by_target={},  # no rules registered
+    )
+    assert result.is_err()
+    assert "ReEDSThermalGenerator" in str(result.unwrap_err())
+
+
+def test_prepare_generator_inputs_propagates_dataset_error() -> None:
+    """Returns Err when _prepare_generator_dataset fails."""
+    from r2x_reeds.parser_utils import prepare_generator_inputs
+
+    result = prepare_generator_inputs(
+        capacity_data=None,
+        optional_data={},
+        excluded_technologies=[],
+        technology_categories={},
+    )
+    assert result.is_err()
+
+
+def test_get_rule_for_target_named_miss_returns_first() -> None:
+    """When name doesn't match any rule, falls through and returns the first candidate."""
+    from r2x_reeds.parser_utils import get_rule_for_target
+
+    class _R:
+        name = "first"
+
+        def get_target_types(self):
+            return ["X"]
+
+    result = get_rule_for_target({"X": [_R()]}, target_type="X", name="nonexistent")
+    assert result.is_ok()
+    assert result.unwrap().name == "first"
+
+
+def test_calculate_reserve_requirement_exception_path() -> None:
+    """Passing non-array time_series raises internally and returns Err."""
+    import numpy as np
+
+    from r2x_reeds.parser_utils import calculate_reserve_requirement
+
+    # time_series value is a string — will cause a TypeError inside
+    bad_generators = [{"capacity": 1.0, "time_series": "not_an_array"}]
+    hours = np.arange(8)
+    result = calculate_reserve_requirement(bad_generators, [], [], hours, 0.1, 0.0, 0.0)
+    assert result.is_err()
+
+
+def test_filter_generators_by_transmission_region_category_filter_no_tech_categories() -> None:
+    """category_filter set but tech_categories=None → generator is excluded."""
+    from unittest.mock import MagicMock
+
+    from r2x_reeds.parser_utils import filter_generators_by_transmission_region
+
+    gen = MagicMock()
+    gen.region.transmission_region = "CAISO"
+    gen.technology = "wind-ons"
+
+    result = filter_generators_by_transmission_region(
+        [gen],
+        region_name="CAISO",
+        category_filter="wind",
+        tech_categories=None,
+    )
+    assert result == []
+
+
+def test_filter_generators_by_transmission_region_category_filter_no_match() -> None:
+    """Generator whose technology doesn't match the category filter is excluded."""
+    from unittest.mock import MagicMock
+
+    from r2x_reeds.parser_utils import filter_generators_by_transmission_region
+
+    gen = MagicMock()
+    gen.region.transmission_region = "CAISO"
+    gen.technology = "coal"
+
+    result = filter_generators_by_transmission_region(
+        [gen],
+        region_name="CAISO",
+        category_filter="wind",
+        tech_categories={"wind": {"prefixes": ["wind"]}},
+    )
+    assert result == []
+
+
+def test_expand_loadsite_hourly_exception_path() -> None:
+    """Passing a DataFrame with wrong column names triggers the except branch."""
+    import polars as pl
+
+    from r2x_reeds.parser_utils import expand_loadsite_hourly
+
+    # hour_map_myr is missing 'sequential_hour' column → select() will raise
+    loadsite_data = pl.DataFrame({"region": ["p1"], "hour_period": ["y2012d001h001"], "value": [100.0]})
+    bad_hour_map = pl.DataFrame({"wrong_col": [1, 2, 3], "hour_period": ["y2012d001h001"] * 3})
+
+    result = expand_loadsite_hourly(loadsite_data, bad_hour_map)
+    assert result.is_err()

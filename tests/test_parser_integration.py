@@ -3,6 +3,9 @@
 These tests verify that the parser can build a example_system using real data files.
 """
 
+import csv
+import shutil
+
 import numpy as np
 import pytest
 from infrasys import Component
@@ -101,3 +104,126 @@ def test_load_time_series_values(
         expected_profile,
         rtol=1e-5,
     )
+
+
+@pytest.fixture(scope="session")
+def loadsite_run_path(tmp_path_factory, reeds_run_path):
+    """Copy test_Pacific run and inject hmap_myr.csv + loadsite_op.csv."""
+    tmp = tmp_path_factory.mktemp("reeds_loadsite")
+    run_path = tmp / "test_Pacific"
+    shutil.copytree(reeds_run_path, run_path)
+
+    # Derive hmap_myr.csv from hmap_allyrs.csv (same logic as the upgrader step)
+    hmap_allyrs_path = run_path / "inputs_case" / "rep" / "hmap_allyrs.csv"
+    rows = []
+    with open(hmap_allyrs_path, newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            normalized = {k.lstrip("*"): v for k, v in row.items()}
+            yearhour = normalized.get("yearhour", "").strip()
+            h = normalized.get("h", "").strip()
+            actual_h = normalized.get("actual_h", "").strip()
+            period = h if h else actual_h
+            if yearhour and period:
+                rows.append({"yearhour": yearhour, "h": period})
+
+    # Deduplicate by yearhour and sort by yearhour for deterministic behavior
+    dedup_by_yearhour = {}
+    for r in rows:
+        yh = r["yearhour"]
+        if yh not in dedup_by_yearhour:
+            dedup_by_yearhour[yh] = r
+    rows = sorted(dedup_by_yearhour.values(), key=lambda r: r["yearhour"])
+    hmap_myr_path = run_path / "inputs_case" / "rep" / "hmap_myr.csv"
+    with open(hmap_myr_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["yearhour", "h"])
+        writer.writeheader()
+        writer.writerows(rows)
+    # Unique period keys for loadsite_op columns (sorted for determinism)
+    unique_periods = sorted({r["h"] for r in rows})
+
+    loadsite_path = run_path / "outputs" / "loadsite_op.csv"
+    with open(loadsite_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["r", "allh", "t", "Value"])
+        writer.writeheader()
+        for period in unique_periods:
+            writer.writerow({"r": "p4", "allh": period, "t": 2032, "Value": 500.0})
+            writer.writerow({"r": "p5", "allh": period, "t": 2032, "Value": 300.0})
+            # Year=2040 row, must be filtered out by the parser
+            writer.writerow({"r": "p4", "allh": period, "t": 2040, "Value": 999.0})
+
+    return run_path
+
+
+@pytest.fixture(scope="session")
+def loadsite_system(loadsite_run_path):
+    """Build a system with loadsite_op + hmap_myr data included."""
+    from typing import cast
+
+    from r2x_core import DataStore, PluginContext
+    from r2x_reeds import ReEDSConfig, ReEDSParser
+
+    config = ReEDSConfig(
+        solve_year=2032,
+        weather_year=2012,
+        case_name="test",
+        scenario="base",
+    )
+    store = DataStore.from_plugin_config(config, path=loadsite_run_path)
+    ctx = PluginContext(config=config, store=store)
+    parser = cast(ReEDSParser, ReEDSParser.from_context(ctx))
+    ctx = parser.run(ctx=ctx)
+    if ctx.system is None:
+        raise RuntimeError("loadsite system build returned None")
+    return ctx.system
+
+
+@pytest.fixture(scope="session")
+def loadsite_base_profiles(loadsite_run_path):
+    """Raw load_profiles DataFrame from the loadsite run (before increment)."""
+    from r2x_core import DataStore
+    from r2x_reeds import ReEDSConfig
+
+    config = ReEDSConfig(
+        solve_year=2032,
+        weather_year=2012,
+        case_name="test",
+        scenario="base",
+    )
+    store = DataStore.from_plugin_config(config, path=loadsite_run_path)
+    return store.read_data(
+        "load_profiles",
+        placeholders={"solve_year": 2032, "weather_year": 2012},
+    ).collect()
+
+
+def test_loadsite_not_applied_during_parse_p4(loadsite_system, loadsite_base_profiles) -> None:
+    """p4 load remains equal to the base profile until optimal siting sysmod is applied."""
+    p4 = loadsite_system.get_component(ReEDSDemand, "p4_load")
+    actual = loadsite_system.get_time_series(p4).data
+    base = loadsite_base_profiles["p4"].to_numpy()[:8760]
+    np.testing.assert_allclose(actual, base, rtol=1e-5)
+
+
+def test_loadsite_not_applied_during_parse_p5(loadsite_system, loadsite_base_profiles) -> None:
+    """p5 load remains equal to the base profile until optimal siting sysmod is applied."""
+    p5 = loadsite_system.get_component(ReEDSDemand, "p5_load")
+    actual = loadsite_system.get_time_series(p5).data
+    base = loadsite_base_profiles["p5"].to_numpy()[:8760]
+    np.testing.assert_allclose(actual, base, rtol=1e-5)
+
+
+def test_loadsite_not_applied_to_p1(loadsite_system, loadsite_base_profiles) -> None:
+    """p1 has no loadsite entry — its time series must equal the base profile exactly."""
+    p1 = loadsite_system.get_component(ReEDSDemand, "p1_load")
+    actual = loadsite_system.get_time_series(p1).data
+    base = loadsite_base_profiles["p1"].to_numpy()[:8760]
+    np.testing.assert_allclose(actual, base, rtol=1e-5)
+
+
+def test_loadsite_data_does_not_change_parser_output(loadsite_system, loadsite_base_profiles) -> None:
+    """Presence of loadsite rows does not affect parser-only load profiles."""
+    p4 = loadsite_system.get_component(ReEDSDemand, "p4_load")
+    actual = loadsite_system.get_time_series(p4).data
+    base = loadsite_base_profiles["p4"].to_numpy()[:8760]
+    np.testing.assert_allclose(actual, base, rtol=1e-5)
