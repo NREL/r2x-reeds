@@ -1,74 +1,140 @@
-### r2x-reeds
-> R2X Core plugin for translating ReEDS power system models
->
-> [![image](https://img.shields.io/pypi/v/r2x-reeds.svg)](https://pypi.python.org/pypi/r2x-reeds)
-> ![PyPI - License](https://img.shields.io/pypi/l/r2x-reeds)
-> ![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FNREL%2Fr2x-reeds%2Frefs%2Fheads%2Fmain%2Fpyproject.toml)
-> [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-> [![codecov](https://codecov.io/gh/NREL/r2x-reeds/branch/main/graph/badge.svg)](https://codecov.io/gh/NREL/r2x-reeds)
-> [![Documentation](https://github.com/NREL/r2x-reeds/actions/workflows/docs.yaml/badge.svg?branch=main)](https://nrel.github.io/r2x-reeds/)
-> [![Docstring Coverage](https://nrel.github.io/r2x-reeds/_static/docstr_coverage_badge.svg)](https://nrel.github.io/r2x-reeds/)
+<div align="center">
 
-R2X ReEDS is an [R2X Core](https://github.com/NREL/r2x-core) plugin for parsing [Regional Energy Deployment System (ReEDS)](https://github.com/NREL/ReEDS-2.0) power system model data. It provides a comprehensive parser for NREL's ReEDS model, enabling seamless data exchange with other power system modeling platforms through the R2X Core framework.
+# r2x-reeds
 
-## Features
+**ReEDS parser and transforms plugin for the `r2x-core` plugin framework.**
 
-- Read ReEDS inputs and outputs from multiple file formats including CSV and HDF5
-- Automatic component mapping for generators, regions, transmission lines, reserves, and emissions data
-- Time series support for capacity factors, load profiles, and reserve requirements
-- Pattern-based technology categorization to automatically handle different technology variants and naming conventions
-- JSON-based configuration through defaults and file mapping specifications
-- Built-in validation against actual data files to ensure data integrity
+[![CI](https://img.shields.io/github/actions/workflow/status/NREL/r2x-reeds/ci.yaml?branch=main&label=CI)](https://github.com/NREL/r2x-reeds/actions/workflows/ci.yaml)
+[![Actions Quality](https://img.shields.io/github/actions/workflow/status/NREL/r2x-reeds/workflow-quality.yaml?branch=main&label=actions-quality)](https://github.com/NREL/r2x-reeds/actions/workflows/workflow-quality.yaml)
+[![Python](https://img.shields.io/badge/python-3.11%20to%203.13-blue)](https://pypi.org/project/r2x-reeds/)
+[![PyPI](https://img.shields.io/pypi/v/r2x-reeds)](https://pypi.org/project/r2x-reeds/)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-green)](./LICENSE.txt)
+[![codecov](https://codecov.io/gh/NREL/r2x-reeds/branch/main/graph/badge.svg)](https://codecov.io/gh/NREL/r2x-reeds)
+[![Documentation](https://github.com/NREL/r2x-reeds/actions/workflows/docs.yaml/badge.svg?branch=main)](https://nrel.github.io/r2x-reeds/)
 
-## Quick Start
+</div>
 
-```console
+> [!WARNING]
+> This project is currently optimized for internal R2X workflows. You are welcome
+> to use it, but APIs and behavior may continue to evolve as `r2x-core` evolves.
+
+`r2x-reeds` integrates [NREL ReEDS](https://github.com/NREL/ReEDS-2.0) model data
+with `r2x-core` and `infrasys`. It provides a parser plugin for building
+`infrasys.System` objects from ReEDS data, plus a set of reusable post-parse
+transforms for common system-modification workflows.
+
+<p align="center">
+  <a href="#quickstart">Quickstart</a> ·
+  <a href="#installation">Installation</a> ·
+  <a href="#what-it-provides">What It Provides</a> ·
+  <a href="#usage-with-r2x-core">Usage with r2x-core</a> ·
+  <a href="#development">Development</a> ·
+  <a href="#license">License</a>
+</p>
+
+## Quickstart
+
+Install:
+
+```bash
 pip install r2x-reeds
 ```
 
-```python
-from r2x_reeds import ReEDSParser, ReEDSConfig, ReEDSGenerator
-from r2x_core import DataStore, PluginContext
+Parse a ReEDS run directory into an `infrasys.System`:
 
-# Configure
+```python
+from pathlib import Path
+
+from r2x_core import DataStore, PluginContext
+from r2x_reeds import ReEDSConfig, ReEDSParser
+
+run_path = Path("path/to/reeds_run")
+
 config = ReEDSConfig(
     solve_year=2030,
     weather_year=2012,
-    case_name="test_Pacific"
+    case_name="test_Pacific",
+)
+ctx = PluginContext(
+    config=config,
+    store=DataStore.from_plugin_config(config, path=run_path),
 )
 
-# Create data store
-run_path = "path/to/reeds_folder/"
-store = DataStore.from_plugin_config(config, path=run_path)
-
-# Create plugin context and run parser
-ctx = PluginContext(config=config, store=store)
-parser = ReEDSParser.from_context(ctx)
-ctx = parser.run()
-
-# Access system and components
-system = ctx.system
-generators = list(system.get_components(ReEDSGenerator))
-print(f"Built system with {len(generators)} generators")
+system = ReEDSParser.from_context(ctx).run().system
+print(system.name)
 ```
 
-## Supported Components
+## Installation
 
-- Solar generators including utility-scale photovoltaic, distributed photovoltaic, concentrating solar power, and photovoltaic with battery storage
-- Wind generators for both onshore and offshore installations
-- Thermal generation including coal, natural gas combined cycle and combustion turbine units, and nuclear power plants
-- Hydroelectric facilities and energy storage systems
-- Regional components modeled at the balancing authority level with transmission region hierarchies
-- Transmission interfaces and lines with bidirectional capacity representation
-- Reserve requirements by type including spinning reserves, regulation reserves, and flexibility reserves organized by region
-- Demand profiles representing load by region over time
-- Emission data including carbon dioxide and nitrogen oxide emission rates for each generator
+### From PyPI
 
-## Documentation
+Python requirement: `>=3.11, <3.14`.
 
-- [Installation Guide](docs/source/install.md) - Installation instructions
-- [Configuration Reference](docs/source/references/configuration.md) - Configuration options and defaults
-- [API Reference](docs/source/references/api.md) - Complete API documentation
-- [Parser Reference](docs/source/references/parser.md) - Parser implementation details
-- [Models Reference](docs/source/references/models.md) - Component model documentation
-- [R2X Core Documentation](https://github.com/NREL/r2x-core) - Core framework documentation
+```bash
+pip install r2x-reeds
+```
+
+Using `uv`:
+
+```bash
+uv add r2x-reeds
+```
+
+### From Source
+
+```bash
+git clone https://github.com/NREL/r2x-reeds.git
+cd r2x-reeds
+uv sync --all-groups
+```
+
+## What It Provides
+
+- `ReEDSParser`: reads ReEDS outputs and inputs (CSV/HDF5-backed mappings) into
+  `infrasys.System` components and time series.
+- `ReEDSUpgrader` and `run_reeds_upgrades(...)`: input version-detection and
+  upgrade pipeline run during parser lifecycle.
+- Plugin entry point for `r2x-core` under the `r2x_plugin` group:
+  - `reeds-parser = r2x_reeds:ReEDSParser`
+- Transform entry points under `r2x.transforms`:
+  - `add-pcm-defaults`
+  - `add-emission-cap`
+  - `add-electrolyzer-load`
+  - `add-ccs-credit`
+  - `break-gens`
+  - `add-imports`
+  - `add-optimal-siting`
+
+## Usage with r2x-core
+
+`r2x-reeds` follows the `r2x-core` plugin lifecycle.
+
+- Build parser instances with `PluginContext`.
+- Run lifecycle hooks with `.run()`.
+- Configure parsing through `ReEDSConfig`.
+- Apply optional `r2x.transforms` after parsing for scenario/system modifiers.
+
+## Development
+
+Install dev dependencies:
+
+```bash
+uv sync --all-groups
+```
+
+Run the same checks used in CI:
+
+```bash
+uv run prek run --all-files --hook-stage pre-push
+```
+
+Targeted commands:
+
+```bash
+uv run pytest -q -m "not slow" --maxfail=1 --disable-warnings
+uv run ty check ./src/r2x_reeds/
+```
+
+## License
+
+BSD 3-Clause. See `LICENSE.txt`.
