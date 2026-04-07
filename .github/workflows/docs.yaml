@@ -10,11 +10,18 @@ on:
 
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
 jobs:
   build:
+    name: Build and Publish Docs
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # Required to push generated docs to the gh-pages branch.
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:

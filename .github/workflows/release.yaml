@@ -20,6 +20,11 @@ env:
 
 jobs:
   release-please:
+    name: Release Please
+    permissions:
+      contents: write # Required for creating tags and GitHub Releases.
+      pull-requests: write # Required for opening/updating the release PR.
+      issues: write # Required for release-please issue/PR annotations.
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       release_tag: ${{ steps.release.outputs.tag_name }}
@@ -68,9 +73,12 @@ jobs:
           path: dist/
 
   publish-pypi:
+    name: Publish to PyPI
     needs:
       - build
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Required for PyPI trusted publishing via OIDC.
     environment:
       name: pypi
       url: https://pypi.org/p/r2x-reeds
