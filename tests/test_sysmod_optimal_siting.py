@@ -153,7 +153,7 @@ def test_optimal_siting_returns_err_when_expand_fails(
         },
     )
 
-    def _boom_expand(loadsite: pl.DataFrame, hour_map: pl.DataFrame) -> Err[str]:
+    def _boom_expand(loadsite: pl.DataFrame, hour_map: pl.DataFrame):
         del loadsite, hour_map
         return Err("failed to expand")
 
@@ -259,7 +259,7 @@ def test_load_and_prepare_frames_returns_none_on_empty_frames(monkeypatch: pytes
 
 
 def test_build_region_increments_empty_expand(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _mock_expand(loadsite: pl.DataFrame, hour_map: pl.DataFrame) -> Ok[pl.DataFrame]:
+    def _mock_expand(loadsite: pl.DataFrame, hour_map: pl.DataFrame):
         del loadsite, hour_map
         return Ok(pl.DataFrame({"region": [], "sequential_hour": [], "value": []}))
 

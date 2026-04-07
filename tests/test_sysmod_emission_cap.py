@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, cast
 
 import polars as pl
 import pytest
@@ -60,7 +61,7 @@ def test_emission_cap_scope(tmp_path: Path, with_ext: bool) -> None:
     """Integrates add_emission_cap end-to-end using real CSV inputs."""
     system, region = _build_system()
     if with_ext:
-        system.ext = {}
+        cast(Any, system).ext = {}
 
     generator_name = "coal_2010_west"
     generator = _add_generator(system, region, generator_name)
@@ -94,7 +95,11 @@ def test_emission_cap_scope(tmp_path: Path, with_ext: bool) -> None:
         co2_cap_fpath=co2_cap_path,
     )
 
-    storage = system.ext["emission_constraints"] if with_ext else system._emission_constraints
+    storage = (
+        cast(Any, system).ext["emission_constraints"]
+        if with_ext
+        else cast(Any, system)._emission_constraints
+    )
     constraint = storage["Annual_EmissionType.CO2_cap"]
     assert constraint["rhs_value"] == 1250.0
     assert constraint["units"] == "tonne"
