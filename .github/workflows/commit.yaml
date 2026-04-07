@@ -2,19 +2,28 @@ name: on-commit
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize]
+    types: [opened, reopened, synchronize, edited]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
 
 jobs:
   labeler:
     name: apply labels
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: write
       issues: write
     runs-on: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/labeler@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+      - uses: actions/labeler@634933edcd8ababfe52f92936142cc22ac488b1b # v6.0.1
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           configuration-path: .github/labeler.yaml
@@ -23,14 +32,18 @@ jobs:
   lint-commit-messages:
     name: lint commit message
     runs-on: [ubuntu-latest]
+    timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
+          persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@b75dde52aef63a238519e7aecbbe79a4a52e4315 # v7
       - name: Commitizen check
         run: |
           uvx --from commitizen cz check --rev-range HEAD^!
@@ -38,9 +51,10 @@ jobs:
     # default: lints titles using https://github.com/commitizen/conventional-commit-types
     name: lint pr title
     runs-on: [ubuntu-latest]
+    timeout-minutes: 5
     permissions:
       pull-requests: read
     steps:
-      - uses: amannn/action-semantic-pull-request@v6.1.1
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
