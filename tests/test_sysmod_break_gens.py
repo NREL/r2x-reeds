@@ -7,8 +7,8 @@ from typing import Any, cast
 
 import pytest
 from infrasys import SingleTimeSeries
-from r2x_core import System
 
+from r2x_core import System
 from r2x_reeds.models.components import ReEDSEmission, ReEDSGenerator
 from r2x_reeds.models.enums import EmissionType
 from r2x_reeds.sysmod.break_gens import BreakGensConfig, break_generators

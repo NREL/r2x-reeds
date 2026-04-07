@@ -1412,8 +1412,8 @@ def test_prepare_generator_inputs_propagates_dataset_error(monkeypatch: pytest.M
     from rust_ok import Err
 
     from r2x_core import ValidationError
-    from r2x_reeds.parser_utils import prepare_generator_inputs
     from r2x_reeds import parser_utils
+    from r2x_reeds.parser_utils import prepare_generator_inputs
 
     def _mock_prepare_generator_dataset(**_kwargs):
         return Err(ValidationError("forced error"))
