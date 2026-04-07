@@ -10,22 +10,27 @@ concurrency:
 env:
   UV_VERSION: "0.9.4"
 
+permissions: {}
+
 jobs:
   prek:
     runs-on: ubuntu-latest
     name: Prek hooks (lint/format/spell/type, all files)
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version-file: "pyproject.toml"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@b75dde52aef63a238519e7aecbbe79a4a52e4315 # v7
         with:
           enable-cache: true
           version: ${{ env.UV_VERSION }}
@@ -37,11 +42,13 @@ jobs:
         run: uv run prek run --show-diff-on-failure --color=always --all-files --hook-stage pre-push
 
 
-
   pytest:
-    name: Tests ${{ matrix.os }}/py${{ matrix.python }}
-    needs: prek
+    name: Tests ${{ matrix.os }} / py${{ matrix.python }}
+    needs: [prek]
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -51,10 +58,12 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@b75dde52aef63a238519e7aecbbe79a4a52e4315 # v7
         with:
           enable-cache: true
           version: ${{ env.UV_VERSION }}
@@ -70,25 +79,30 @@ jobs:
           uv run pytest --cov --cov-report=xml
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad # v5.5.3
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
+          slug: NatLabRockies/r2x-reeds
 
   package:
     name: Package smoke test
     needs: pytest
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version-file: "pyproject.toml"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@b75dde52aef63a238519e7aecbbe79a4a52e4315 # v7
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true

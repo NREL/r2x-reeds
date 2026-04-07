@@ -155,7 +155,7 @@ def test_string_required_value_handling(example_data_store: DataStore) -> None:
         store=example_data_store,
         dataset="modeled_years",
         column_name="modeled_years",
-        required_values=2032,
+        required_values=[2032],
     )
     assert result.is_ok()
 

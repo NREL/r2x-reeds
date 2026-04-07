@@ -108,7 +108,8 @@ def add_pcm_defaults(
         model_fields = type(component).model_fields
         if not config.pcm_defaults_override:
             fields_to_replace = [
-                key for key in pcm_values
+                key
+                for key in pcm_values
                 if key in model_fields and _check_if_null(_get_component_attribute(component, key))
             ]
         else:

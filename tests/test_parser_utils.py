@@ -1406,12 +1406,22 @@ def test_resolve_generator_rule_no_rule_for_class() -> None:
     assert "ReEDSThermalGenerator" in str(result.unwrap_err())
 
 
-def test_prepare_generator_inputs_propagates_dataset_error() -> None:
+def test_prepare_generator_inputs_propagates_dataset_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """Returns Err when _prepare_generator_dataset fails."""
+    import polars as pl
+    from rust_ok import Err
+
+    from r2x_core import ValidationError
+    from r2x_reeds import parser_utils
     from r2x_reeds.parser_utils import prepare_generator_inputs
 
+    def _mock_prepare_generator_dataset(**_kwargs):
+        return Err(ValidationError("forced error"))
+
+    monkeypatch.setattr(parser_utils, "_prepare_generator_dataset", _mock_prepare_generator_dataset)
+
     result = prepare_generator_inputs(
-        capacity_data=None,
+        capacity_data=pl.DataFrame({"technology": []}).lazy(),
         optional_data={},
         excluded_technologies=[],
         technology_categories={},
@@ -1421,6 +1431,9 @@ def test_prepare_generator_inputs_propagates_dataset_error() -> None:
 
 def test_get_rule_for_target_named_miss_returns_first() -> None:
     """When name doesn't match any rule, falls through and returns the first candidate."""
+    from typing import cast
+
+    from r2x_core import Rule
     from r2x_reeds.parser_utils import get_rule_for_target
 
     class _R:
@@ -1429,7 +1442,7 @@ def test_get_rule_for_target_named_miss_returns_first() -> None:
         def get_target_types(self):
             return ["X"]
 
-    result = get_rule_for_target({"X": [_R()]}, target_type="X", name="nonexistent")
+    result = get_rule_for_target({"X": cast(list[Rule], [_R()])}, target_type="X", name="nonexistent")
     assert result.is_ok()
     assert result.unwrap().name == "first"
 

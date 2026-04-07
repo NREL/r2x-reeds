@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
-from infrasys import SingleTimeSeries, System
+from infrasys import SingleTimeSeries
 
+from r2x_core import System
 from r2x_reeds.models.components import ReEDSEmission, ReEDSGenerator
 from r2x_reeds.models.enums import EmissionType
 from r2x_reeds.sysmod.break_gens import BreakGensConfig, break_generators
@@ -64,7 +66,7 @@ def test_break_generator_warns_on_duplicate_reference(tmp_path: Path, caplog):
         )
     )
 
-    result = break_generators(sys, BreakGensConfig(reference_units=reference_path))
+    result = break_generators(cast(Any, sys), BreakGensConfig(reference_units=reference_path))
     assert result.is_ok()
 
     assert "Duplicate entries found for key 'name'" in caplog.text
@@ -321,7 +323,7 @@ def test_normalize_reference_data_invalid_type() -> None:
     assert isinstance(result.unwrap_err(), TypeError)
 
 
-def test_break_generators_return_same_type(system_with_region: System, caplog) -> None:
+def test_break_generators_return_same_type(system_with_region: tuple[System, Any], caplog) -> None:
     from r2x_reeds.models import ReEDSThermalGenerator
 
     sys, _ = system_with_region
@@ -335,7 +337,7 @@ def test_break_generators_return_same_type(system_with_region: System, caplog) -
     _run_break(sys, reference_units=reference, drop_capacity_threshold=40)
 
     assert len(list(sys.get_components(ReEDSThermalGenerator))) == 2
-    assert next(sys.get_components(ReEDSThermalGenerator)).capacity == 50
+    assert next(iter(sys.get_components(ReEDSThermalGenerator))).capacity == 50
 
 
 def test_break_generators_with_default_reference_units(system_with_region) -> None:

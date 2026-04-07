@@ -88,6 +88,9 @@ def _collect_frame(data: pl.DataFrame | pl.LazyFrame | None) -> pl.DataFrame | N
 
 def _load_and_prepare_frames(config: OptimalSitingConfig) -> tuple[pl.DataFrame, pl.DataFrame] | None:
     """Load, normalize, and year-filter input frames; return None when plugin should no-op."""
+    if config.loadsite_op_fpath is None or config.hour_map_myr_fpath is None:
+        return None
+
     loadsite_raw = DataStore.load_file(config.loadsite_op_fpath, name="loadsite_op")
     hour_map_raw = DataStore.load_file(config.hour_map_myr_fpath, name="hour_map_myr")
 

@@ -10,6 +10,8 @@ updates:
       prefix: "build"
       include: "scope"
     rebase-strategy: "auto"
+    cooldown:
+      default-days: 7
   - package-ecosystem: github-actions
     directory: /
     commit-message:
@@ -18,3 +20,5 @@ updates:
     rebase-strategy: "auto"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
