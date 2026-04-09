@@ -190,7 +190,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         # Technology categorization
         self._tech_categories: dict[str, list[str]] = {}
         self._excluded_techs: list[str] = []
-        self._category_to_class_map: dict[str, type] = {}
+        self._category_to_class_map: dict[str, str | type[ReEDSGenerator]] = {}
 
     def _truncate_and_cast_time_series(self, arr: np.ndarray | list[float]) -> np.ndarray:
         """Truncate a time series to 8760 and ensure dtype float64."""
@@ -553,7 +553,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             rule_provider=lambda row: _resolve_generator_rule_from_row(
                 row,
                 self._tech_categories or {},
-                cast(dict[str, str], self._category_to_class_map),
+                self._category_to_class_map,
                 self._rules_by_target,
             ),
             parser_context=self._ctx,
@@ -1584,7 +1584,8 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         biofuel_merged = merge_result.ok()
         if biofuel_merged is not None:
             biofuel_mapped = biofuel_merged.select(pl.exclude("fuel_type"))
-            if not biofuel_mapped.collect().is_empty():
+            biofuel_mapped_df = cast(pl.DataFrame, biofuel_mapped.collect())
+            if not biofuel_mapped_df.is_empty():
                 fuel_price = pl.concat([fuel_price, biofuel_mapped], how="diagonal")
 
         generator_data_result = prepare_generator_inputs(

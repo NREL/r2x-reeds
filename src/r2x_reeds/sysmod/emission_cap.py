@@ -4,7 +4,7 @@ This plugin is only applicable for ReEDS, but could work with similarly arranged
 """
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import polars as pl
 from infrasys import System
@@ -267,16 +267,22 @@ def set_emission_constraint(
         logger.warning("Could not set emission cap value. Skipping plugin.")
         return system
 
-    # Store constraints in system.ext if available, otherwise use private attribute
-    if hasattr(system, "ext"):
-        ext: dict[str, Any] = system.ext  # type: ignore[assignment]
-        if "emission_constraints" not in ext:
-            ext["emission_constraints"] = {}
-        constraint_storage: dict[str, Any] = ext["emission_constraints"]
+    # Store constraints in system.ext if available, otherwise use a private dynamic attribute.
+    ext_obj = getattr(system, "ext", None)
+    if isinstance(ext_obj, dict):
+        ext = cast(dict[str, Any], ext_obj)
+        existing_constraints = ext.get("emission_constraints")
+        if not isinstance(existing_constraints, dict):
+            existing_constraints = {}
+            ext["emission_constraints"] = existing_constraints
+        constraint_storage: dict[str, Any] = cast(dict[str, Any], existing_constraints)
     else:
-        if not hasattr(system, "_emission_constraints"):
-            system._emission_constraints = {}  # type: ignore[attr-defined]
-        constraint_storage = system._emission_constraints  # type: ignore[attr-defined]
+        constraints_attr = "_emission_constraints"
+        existing_constraints = getattr(system, constraints_attr, None)
+        if not isinstance(existing_constraints, dict):
+            existing_constraints = {}
+            setattr(system, constraints_attr, existing_constraints)
+        constraint_storage = cast(dict[str, Any], existing_constraints)
 
     constraint_name = f"Annual_{emission_object}_cap"
 
