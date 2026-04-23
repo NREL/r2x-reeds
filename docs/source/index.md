@@ -25,6 +25,7 @@ R2X ReEDS provides a comprehensive parser for NREL's [ReEDS](https://github.com/
 - Pattern-based technology categorization to automatically handle different technology variants and naming conventions
 - JSON-based configuration through defaults and file mapping specifications
 - Built-in validation against actual data files to ensure data integrity
+- Optional post-parse system modifiers for production workflows (PCM defaults, purchaser load, emission caps, and more)
 
 **Time Series Truncation:**
 ```{note}
@@ -74,19 +75,38 @@ regions = list(system.get_components(ReEDSRegion))
 print(f"Built system with {len(regions)} regions")
 ```
 
+Apply optional transforms after parsing:
+
+```python
+from r2x_reeds.sysmod.purchaser_load import PurchaserLoadConfig, add_purchaser_load
+
+result = add_purchaser_load(
+    system,
+    PurchaserLoadConfig(
+        solve_year=2032,
+        weather_year=2012,
+        hour_map_myr_fpath="/path/to/inputs_case/rep/hmap_myr.csv",
+        loadsite_op_fpath="/path/to/outputs/loadsite_op.csv",
+    ),
+)
+if result.is_err():
+    raise RuntimeError(result.unwrap_err())
+system = result.unwrap()
+```
+
 ## Documentation Sections
 
-- [Tutorials](tutorials/index.md) - Step-by-step learning guides
-- [How-To Guides](how-tos/index.md) - Task-focused recipes
-- [Explanations](explanations/index.md) - Architecture and design
-- [References](references/index.md) - API and configuration reference
+- [Tutorials](tutorials/index.md) - End-to-end examples and workflows
+- [How-To Guides](how-tos/index.md) - Task-focused recipes for transforms and parsing
+- [Explanations](explanations/index.md) - Architecture, lifecycle, and design rationale
+- [References](references/index.md) - API, configuration assets, transforms, and upgrader details
 
 ## Resources
 
-- [Configuration Reference](references/configuration.md) - Configuration options and defaults
+- [Configuration Reference](references/configuration.md) - Parser config, defaults, mappings, and rules
+- [Transforms Reference](references/transforms.md) - Available system modifiers and expected inputs
+- [Upgrader Reference](references/upgrader.md) - ReEDS version detection and upgrade pipeline
 - [API Reference](references/api.md) - Complete API documentation
-- [Parser Reference](references/parser.md) - Parser implementation details
-- [Models Reference](references/models.md) - Component model documentation
 - [R2X Core](https://github.com/NREL/r2x-core) - Core framework documentation
 
 ## Indices and Tables
