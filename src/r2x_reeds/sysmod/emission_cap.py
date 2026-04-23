@@ -284,7 +284,13 @@ def set_emission_constraint(
             setattr(system, constraints_attr, existing_constraints)
         constraint_storage = cast(dict[str, Any], existing_constraints)
 
-    constraint_name = f"Annual_{emission_object}_cap"
+    emission_token = str(emission_object) if emission_object is not None else "None"
+    constraint_name = f"Annual_{emission_token}_cap"
+    legacy_constraint_name = (
+        f"Annual_{emission_object.__class__.__name__}.{emission_object.name}_cap"
+        if emission_object is not None
+        else "Annual_None_cap"
+    )
 
     constraint_properties: dict[str, Any] = {
         "sense": "<=",
@@ -297,10 +303,13 @@ def set_emission_constraint(
     }
 
     constraint_storage[constraint_name] = constraint_properties
+    # Backward compatibility: preserve historical Enum-style key format.
+    constraint_storage[legacy_constraint_name] = constraint_properties
 
     logger.info(
-        "Added emission constraint '{}' with cap {} {} for {}",
+        "Added emission constraint '{}' (legacy key '{}') with cap {} {} for {}",
         constraint_name,
+        legacy_constraint_name,
         emission_cap,
         default_unit,
         emission_object,
