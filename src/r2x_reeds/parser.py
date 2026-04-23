@@ -38,9 +38,7 @@ from .getters import (
     resolve_emission_generator_identifier,
 )
 from .models.components import (
-    ReEDSDataCenterDemand,
     ReEDSDemand,
-    ReEDSElectrolyzerDemand,
     ReEDSEmission,
     ReEDSGenerator,
     ReEDSInterface,
@@ -55,7 +53,6 @@ from .parser_utils import (
     _collect_component_kwargs_from_rule,
     _resolve_generator_rule_from_row,
     calculate_reserve_requirement,
-    expand_loadsite_hourly,
     get_generator_class,
     get_rule_for_target,
     get_rules_by_target,
@@ -891,131 +888,6 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             failure_list = "; ".join(creation_errors)
             return Err(f"Failed to build the following loads: {failure_list}")
 
-        # Build electrolyzer electricity demand components from cap.csv.
-        electrolyzer_capacity_lf = self.read_data_file("electrolyzer_capacity")
-        if electrolyzer_capacity_lf is not None:
-            electrolyzer_capacity = electrolyzer_capacity_lf.collect()
-
-            if not electrolyzer_capacity.is_empty():
-                electrolyzer_capacity = electrolyzer_capacity.filter(
-                    pl.col("technology").cast(pl.Utf8).str.to_lowercase() == "electrolyzer"
-                )
-
-                efficiency = 1.0
-                consume_char_lf = self.read_data_file("consume_characteristics")
-                if consume_char_lf is not None:
-                    consume_char = consume_char_lf.collect()
-                    if not consume_char.is_empty():
-                        eff_rows = consume_char.filter(
-                            (pl.col("technology").cast(pl.Utf8).str.to_lowercase() == "electrolyzer")
-                            & (pl.col("parameter") == "electricity_efficiency")
-                        )
-                        if not eff_rows.is_empty():
-                            efficiency = float(eff_rows["value"].item(0))
-
-                electrolyzer_count = 0
-                for row in electrolyzer_capacity.iter_rows(named=True):
-                    region_name = str(row.get("region", ""))
-                    if not region_name:
-                        continue
-
-                    region = self._region_cache.get(region_name)
-                    if region is None:
-                        logger.debug(
-                            "Skipping electrolyzer load in unknown region '{}'",
-                            region_name,
-                        )
-                        continue
-
-                    capacity = float(row.get("capacity", 0.0) or 0.0)
-                    if capacity <= 0.0:
-                        continue
-
-                    name = f"{region_name}_electrolyzer_demand"
-                    try:
-                        electrolyzer_demand = self.create_component(
-                            ReEDSElectrolyzerDemand,
-                            name=name,
-                            region=region,
-                            technology="electrolyzer",
-                            capacity=capacity,
-                            electricity_efficiency=efficiency,
-                        )
-                    except ComponentCreationError as exc:
-                        creation_errors.append(f"{name}: {exc}")
-                        logger.error("Failed to create electrolyzer demand {}: {}", name, exc)
-                        continue
-
-                    system.add_component(electrolyzer_demand)
-                    electrolyzer_count += 1
-
-                if electrolyzer_count > 0:
-                    logger.info("Attached {} electrolyzer demand components", electrolyzer_count)
-
-        # Build data center demand components from loadsite_op.csv.
-        data_center_profile_lf = self.read_data_file("loadsite_op")
-        hour_map_myr_lf = self.read_data_file("hour_map_myr")
-        if data_center_profile_lf is not None and hour_map_myr_lf is not None:
-            data_center_profile = data_center_profile_lf.collect()
-            hour_map_myr = hour_map_myr_lf.collect()
-
-            if not data_center_profile.is_empty() and not hour_map_myr.is_empty():
-                expanded_result = expand_loadsite_hourly(
-                    loadsite_data=data_center_profile.select("region", "hour_period", "value"),
-                    hour_map_myr=hour_map_myr,
-                )
-                if expanded_result.is_err():
-                    return Err(str(expanded_result.err()))
-                expanded = expanded_result.ok()
-                if expanded is None:
-                    return Err("Failed to expand data center hourly load profiles")
-
-                data_center_count = 0
-                for region_name in expanded.select("region").unique().to_series().to_list():
-                    region_key = str(region_name)
-                    region = self._region_cache.get(region_key)
-                    if region is None:
-                        logger.debug(
-                            "Skipping data center demand in unknown region '{}'",
-                            region_key,
-                        )
-                        continue
-
-                    region_profile = (
-                        expanded.filter(pl.col("region") == region_key)
-                        .sort("sequential_hour")
-                        .select("value")
-                        .to_series()
-                        .to_numpy()
-                    )
-                    if region_profile.size == 0:
-                        continue
-
-                    capacity = float(np.max(region_profile))
-                    if capacity <= 0.0:
-                        continue
-
-                    name = f"{region_key}_data_center_demand"
-                    try:
-                        data_center_demand = self.create_component(
-                            ReEDSDataCenterDemand,
-                            name=name,
-                            region=region,
-                            technology="data-center",
-                            capacity=capacity,
-                            electricity_efficiency=1.0,
-                        )
-                    except ComponentCreationError as exc:
-                        creation_errors.append(f"{name}: {exc}")
-                        logger.error("Failed to create data center demand {}: {}", name, exc)
-                        continue
-
-                    system.add_component(data_center_demand)
-                    data_center_count += 1
-
-                if data_center_count > 0:
-                    logger.info("Attached {} data center demand components", data_center_count)
-
         if creation_errors:
             failure_list = "; ".join(creation_errors)
             return Err(f"Failed to build the following loads: {failure_list}")
@@ -1281,123 +1153,6 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                 )
                 system.add_time_series(ts, demand)
                 attached_count += 1
-
-        # Attach electrolyzer hourly demand profiles from prod_load.csv.
-        electrolyzer_profile_lf = self.read_data_file("electrolyzer_prod_load")
-        hour_map_myr_lf = self.read_data_file("hour_map_myr")
-        annual_lf = self.read_data_file("electrolyzer_prod_load_ann")
-
-        if electrolyzer_profile_lf is not None and hour_map_myr_lf is not None:
-            profile_data = electrolyzer_profile_lf.collect().filter(
-                pl.col("technology").cast(pl.Utf8).str.to_lowercase() == "electrolyzer"
-            )
-            hour_map_myr = hour_map_myr_lf.collect()
-            annual_data = annual_lf.collect() if annual_lf is not None else pl.DataFrame()
-
-            if not profile_data.is_empty() and not hour_map_myr.is_empty():
-                expanded_result = expand_loadsite_hourly(
-                    loadsite_data=profile_data.select("region", "hour_period", "value"),
-                    hour_map_myr=hour_map_myr,
-                )
-                if expanded_result.is_err():
-                    return Err(str(expanded_result.err()))
-                expanded = expanded_result.ok()
-                if expanded is None:
-                    return Err("Failed to expand electrolyzer hourly load profiles")
-
-                annual_targets: dict[str, float] = {}
-                if not annual_data.is_empty():
-                    annual_targets = {
-                        str(row["region"]): float(row["value"])
-                        for row in annual_data.filter(
-                            pl.col("technology").cast(pl.Utf8).str.to_lowercase() == "electrolyzer"
-                        )
-                        .select("region", "value")
-                        .iter_rows(named=True)
-                    }
-
-                electrolyzer_ts_count = 0
-                for demand in system.get_components(ReEDSElectrolyzerDemand):
-                    region_name = demand.region.name
-                    region_profile = (
-                        expanded.filter(pl.col("region") == region_name)
-                        .sort("sequential_hour")
-                        .select("value")
-                        .to_series()
-                        .to_numpy()
-                    )
-                    if region_profile.size == 0:
-                        continue
-
-                    if region_name in annual_targets:
-                        target_annual = annual_targets[region_name]
-                        current_annual = float(region_profile.sum())
-                        if current_annual > 0 and target_annual >= 0:
-                            region_profile = region_profile * (target_annual / current_annual)
-
-                    data = self._truncate_and_cast_time_series(region_profile)
-                    ts = SingleTimeSeries.from_array(
-                        data=data,
-                        name="max_active_power",
-                        initial_timestamp=self.initial_timestamp,
-                        resolution=timedelta(hours=1),
-                    )
-                    system.add_time_series(ts, demand)
-                    electrolyzer_ts_count += 1
-
-                if electrolyzer_ts_count > 0:
-                    logger.info(
-                        "Attached electrolyzer load profiles to {} demand components",
-                        electrolyzer_ts_count,
-                    )
-
-        # Attach data center hourly demand profiles from loadsite_op.csv.
-        data_center_profile_lf = self.read_data_file("loadsite_op")
-        hour_map_myr_lf = self.read_data_file("hour_map_myr")
-
-        if data_center_profile_lf is not None and hour_map_myr_lf is not None:
-            profile_data = data_center_profile_lf.collect()
-            hour_map_myr = hour_map_myr_lf.collect()
-
-            if not profile_data.is_empty() and not hour_map_myr.is_empty():
-                expanded_result = expand_loadsite_hourly(
-                    loadsite_data=profile_data.select("region", "hour_period", "value"),
-                    hour_map_myr=hour_map_myr,
-                )
-                if expanded_result.is_err():
-                    return Err(str(expanded_result.err()))
-                expanded = expanded_result.ok()
-                if expanded is None:
-                    return Err("Failed to expand data center hourly load profiles")
-
-                data_center_ts_count = 0
-                for demand in system.get_components(ReEDSDataCenterDemand):
-                    region_name = demand.region.name
-                    region_profile = (
-                        expanded.filter(pl.col("region") == region_name)
-                        .sort("sequential_hour")
-                        .select("value")
-                        .to_series()
-                        .to_numpy()
-                    )
-                    if region_profile.size == 0:
-                        continue
-
-                    data = self._truncate_and_cast_time_series(region_profile)
-                    ts = SingleTimeSeries.from_array(
-                        data=data,
-                        name="max_active_power",
-                        initial_timestamp=self.initial_timestamp,
-                        resolution=timedelta(hours=1),
-                    )
-                    system.add_time_series(ts, demand)
-                    data_center_ts_count += 1
-
-                if data_center_ts_count > 0:
-                    logger.info(
-                        "Attached data center load profiles to {} demand components",
-                        data_center_ts_count,
-                    )
 
         logger.info("Attached load profiles to {} demand components", attached_count)
         return Ok(None)
