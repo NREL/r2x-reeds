@@ -57,6 +57,70 @@
     }
   },
   {
+    "name": "electrolyzer_capacity",
+    "fpath": "outputs/cap.csv",
+    "info": {
+      "description": "Electrolyzer installed capacity by region and model year",
+      "is_input": false,
+      "is_optional": true,
+      "units": "MW"
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "i": "technology",
+        "r": "region",
+        "t": "year",
+        "Value": "capacity"
+      },
+      "filter_by": {
+        "year": "{solve_year}"
+      }
+    }
+  },
+  {
+    "name": "electrolyzer_prod_load_ann",
+    "fpath": "outputs/prod_load_ann.csv",
+    "info": {
+      "description": "Annual electrolyzer electricity demand by region",
+      "is_input": false,
+      "is_optional": true,
+      "units": "MWh"
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "i": "technology",
+        "r": "region",
+        "t": "year",
+        "Value": "value"
+      },
+      "filter_by": {
+        "year": "{solve_year}"
+      }
+    }
+  },
+  {
+    "name": "electrolyzer_prod_load",
+    "fpath": "outputs/prod_load.csv",
+    "info": {
+      "description": "Representative-period electrolyzer electricity demand",
+      "is_input": false,
+      "is_optional": true,
+      "units": "MW"
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "i": "technology",
+        "r": "region",
+        "allh": "hour_period",
+        "t": "year",
+        "Value": "value"
+      },
+      "filter_by": {
+        "year": "{solve_year}"
+      }
+    }
+  },
+  {
     "name": "hierarchy",
     "fpath": "inputs_case/hierarchy.csv",
     "info": {

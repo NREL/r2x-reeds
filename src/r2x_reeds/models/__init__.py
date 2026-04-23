@@ -10,7 +10,9 @@ This package contains all data models for ReEDS components including:
 from .base import FromTo_ToFrom, MinMax, ReEDSComponent, UpDown
 from .components import (
     ReEDSConsumingTechnology,
+    ReEDSDataCenterDemand,
     ReEDSDemand,
+    ReEDSElectrolyzerDemand,
     ReEDSEmission,
     ReEDSGenerator,
     ReEDSH2Pipeline,
@@ -39,7 +41,9 @@ __all__ = [
     "Percentage",
     "ReEDSComponent",
     "ReEDSConsumingTechnology",
+    "ReEDSDataCenterDemand",
     "ReEDSDemand",
+    "ReEDSElectrolyzerDemand",
     "ReEDSEmission",
     "ReEDSGenerator",
     "ReEDSH2Pipeline",

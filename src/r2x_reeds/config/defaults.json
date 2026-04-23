@@ -1,7 +1,6 @@
 {
   "excluded_techs": [
-    "can-imports",
-    "electrolyzer"
+    "can-imports"
   ],
   "data_validation": {
     "max_capacity_mw": 100000.0,
@@ -152,7 +151,7 @@
     "hydro": "ReEDSHydroGenerator",
     "hydro_dispatchable": "ReEDSHydroGenerator",
     "hydro_nondispatchable": "ReEDSHydroGenerator",
-    "electrolyzer": "ReEDSConsumingTechnology",
+    "electrolyzer": "ReEDSElectrolyzerDemand",
     "thermal": "ReEDSThermalGenerator",
     "solar": "ReEDSVariableGenerator",
     "wind": "ReEDSVariableGenerator",

@@ -537,7 +537,12 @@ def _collect_component_kwargs_from_rule(
         elif hasattr(rule_provider, "get_target_types"):
             rule_result = Ok(cast("Rule", rule_provider))
         else:
-            provider_fn = cast(Callable[[Mapping[str, Any]], Result[Rule, ValidationError]], rule_provider)
+            # Keep this cast annotation as a string to avoid runtime NameError when Rule
+            # is only imported under TYPE_CHECKING.
+            provider_fn = cast(
+                "Callable[[Mapping[str, Any]], Result[Rule, ValidationError]]",
+                rule_provider,
+            )
             rule_result = provider_fn(row)
         if rule_result.is_err():
             rule_error = rule_result.err()

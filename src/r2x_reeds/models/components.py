@@ -232,6 +232,14 @@ class ReEDSConsumingTechnology(HasUnits, ReEDSComponent):
     vintage: Annotated[str | None, Field(description="Vintage bin identifier")] = None
 
 
+class ReEDSElectrolyzerDemand(ReEDSConsumingTechnology):
+    """Electricity demand from electrolyzers."""
+
+
+class ReEDSDataCenterDemand(ReEDSConsumingTechnology):
+    """Electricity demand from data centers or other large facilities."""
+
+
 class ReEDSH2Storage(HasUnits, ReEDSComponent):
     """H2 storage infrastructure."""
 
