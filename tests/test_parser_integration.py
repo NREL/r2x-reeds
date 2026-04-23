@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from infrasys import Component
 
-from r2x_reeds.models.components import ReEDSDemand, ReEDSGenerator
+from r2x_reeds.models.components import ReEDSDataCenterDemand, ReEDSDemand, ReEDSGenerator
 from r2x_reeds.parser_utils import get_technology_category
 
 pytestmark = [pytest.mark.integration]
@@ -227,3 +227,30 @@ def test_loadsite_data_does_not_change_parser_output(loadsite_system, loadsite_b
     actual = loadsite_system.get_time_series(p4).data
     base = loadsite_base_profiles["p4"].to_numpy()[:8760]
     np.testing.assert_allclose(actual, base, rtol=1e-5)
+
+
+def test_data_center_demand_components_from_loadsite(loadsite_system) -> None:
+    """Data center demand components are created for regions present in loadsite_op."""
+    p4 = loadsite_system.get_component(ReEDSDataCenterDemand, "p4_data_center_demand")
+    p5 = loadsite_system.get_component(ReEDSDataCenterDemand, "p5_data_center_demand")
+
+    assert p4.capacity == pytest.approx(500.0)
+    assert p5.capacity == pytest.approx(300.0)
+
+
+@pytest.mark.parametrize(
+    "component_name,expected_value",
+    [
+        ("p4_data_center_demand", 500.0),
+        ("p5_data_center_demand", 300.0),
+    ],
+)
+def test_data_center_demand_time_series_from_loadsite(
+    loadsite_system, component_name: str, expected_value: float
+) -> None:
+    """Data center demand time series is expanded from representative periods and filtered by solve year."""
+    component = loadsite_system.get_component(ReEDSDataCenterDemand, component_name)
+    ts = loadsite_system.get_time_series(component)
+
+    assert ts.length == 8760
+    np.testing.assert_allclose(ts.data, np.full(8760, expected_value), rtol=1e-5)

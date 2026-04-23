@@ -38,6 +38,7 @@ from .getters import (
     resolve_emission_generator_identifier,
 )
 from .models.components import (
+    ReEDSDataCenterDemand,
     ReEDSDemand,
     ReEDSElectrolyzerDemand,
     ReEDSEmission,
@@ -951,6 +952,70 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                 if electrolyzer_count > 0:
                     logger.info("Attached {} electrolyzer demand components", electrolyzer_count)
 
+        # Build data center demand components from loadsite_op.csv.
+        data_center_profile_lf = self.read_data_file("loadsite_op")
+        hour_map_myr_lf = self.read_data_file("hour_map_myr")
+        if data_center_profile_lf is not None and hour_map_myr_lf is not None:
+            data_center_profile = data_center_profile_lf.collect()
+            hour_map_myr = hour_map_myr_lf.collect()
+
+            if not data_center_profile.is_empty() and not hour_map_myr.is_empty():
+                expanded_result = expand_loadsite_hourly(
+                    loadsite_data=data_center_profile.select("region", "hour_period", "value"),
+                    hour_map_myr=hour_map_myr,
+                )
+                if expanded_result.is_err():
+                    return Err(str(expanded_result.err()))
+                expanded = expanded_result.ok()
+                if expanded is None:
+                    return Err("Failed to expand data center hourly load profiles")
+
+                data_center_count = 0
+                for region_name in expanded.select("region").unique().to_series().to_list():
+                    region_key = str(region_name)
+                    region = self._region_cache.get(region_key)
+                    if region is None:
+                        logger.debug(
+                            "Skipping data center demand in unknown region '{}'",
+                            region_key,
+                        )
+                        continue
+
+                    region_profile = (
+                        expanded.filter(pl.col("region") == region_key)
+                        .sort("sequential_hour")
+                        .select("value")
+                        .to_series()
+                        .to_numpy()
+                    )
+                    if region_profile.size == 0:
+                        continue
+
+                    capacity = float(np.max(region_profile))
+                    if capacity <= 0.0:
+                        continue
+
+                    name = f"{region_key}_data_center_demand"
+                    try:
+                        data_center_demand = self.create_component(
+                            ReEDSDataCenterDemand,
+                            name=name,
+                            region=region,
+                            technology="data-center",
+                            capacity=capacity,
+                            electricity_efficiency=1.0,
+                        )
+                    except ComponentCreationError as exc:
+                        creation_errors.append(f"{name}: {exc}")
+                        logger.error("Failed to create data center demand {}: {}", name, exc)
+                        continue
+
+                    system.add_component(data_center_demand)
+                    data_center_count += 1
+
+                if data_center_count > 0:
+                    logger.info("Attached {} data center demand components", data_center_count)
+
         if creation_errors:
             failure_list = "; ".join(creation_errors)
             return Err(f"Failed to build the following loads: {failure_list}")
@@ -1284,6 +1349,54 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                     logger.info(
                         "Attached electrolyzer load profiles to {} demand components",
                         electrolyzer_ts_count,
+                    )
+
+        # Attach data center hourly demand profiles from loadsite_op.csv.
+        data_center_profile_lf = self.read_data_file("loadsite_op")
+        hour_map_myr_lf = self.read_data_file("hour_map_myr")
+
+        if data_center_profile_lf is not None and hour_map_myr_lf is not None:
+            profile_data = data_center_profile_lf.collect()
+            hour_map_myr = hour_map_myr_lf.collect()
+
+            if not profile_data.is_empty() and not hour_map_myr.is_empty():
+                expanded_result = expand_loadsite_hourly(
+                    loadsite_data=profile_data.select("region", "hour_period", "value"),
+                    hour_map_myr=hour_map_myr,
+                )
+                if expanded_result.is_err():
+                    return Err(str(expanded_result.err()))
+                expanded = expanded_result.ok()
+                if expanded is None:
+                    return Err("Failed to expand data center hourly load profiles")
+
+                data_center_ts_count = 0
+                for demand in system.get_components(ReEDSDataCenterDemand):
+                    region_name = demand.region.name
+                    region_profile = (
+                        expanded.filter(pl.col("region") == region_name)
+                        .sort("sequential_hour")
+                        .select("value")
+                        .to_series()
+                        .to_numpy()
+                    )
+                    if region_profile.size == 0:
+                        continue
+
+                    data = self._truncate_and_cast_time_series(region_profile)
+                    ts = SingleTimeSeries.from_array(
+                        data=data,
+                        name="max_active_power",
+                        initial_timestamp=self.initial_timestamp,
+                        resolution=timedelta(hours=1),
+                    )
+                    system.add_time_series(ts, demand)
+                    data_center_ts_count += 1
+
+                if data_center_ts_count > 0:
+                    logger.info(
+                        "Attached data center load profiles to {} demand components",
+                        data_center_ts_count,
                     )
 
         logger.info("Attached load profiles to {} demand components", attached_count)
