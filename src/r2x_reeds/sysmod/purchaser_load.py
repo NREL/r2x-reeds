@@ -61,6 +61,20 @@ class PurchaserLoadConfig(PluginConfig):
 
 
 def _read_optional_frame(path: Path | str | None, name: str) -> pl.DataFrame | None:
+    """Load an optional CSV/HDF-backed frame and collect it eagerly.
+
+    Parameters
+    ----------
+    path : Path | str | None
+        Input path to load. If ``None``, returns ``None``.
+    name : str
+        Logical dataset name used for DataStore reader selection.
+
+    Returns
+    -------
+    pl.DataFrame | None
+        Collected DataFrame if available, otherwise ``None``.
+    """
     if path is None:
         return None
     frame = DataStore.load_file(path, name=name)
@@ -70,6 +84,18 @@ def _read_optional_frame(path: Path | str | None, name: str) -> pl.DataFrame | N
 
 
 def _normalize_hour_map_myr(frame: pl.DataFrame) -> pl.DataFrame:
+    """Normalize `hmap_myr` schema to parser-utils expected column names.
+
+    Parameters
+    ----------
+    frame : pl.DataFrame
+        Raw mapping frame which may contain legacy columns ``yearhour``/``h``.
+
+    Returns
+    -------
+    pl.DataFrame
+        Normalized frame with ``sequential_hour`` and ``hour_period`` columns.
+    """
     rename_map: dict[str, str] = {}
     if "yearhour" in frame.columns:
         rename_map["yearhour"] = "sequential_hour"
@@ -83,6 +109,20 @@ def _normalize_hour_map_myr(frame: pl.DataFrame) -> pl.DataFrame:
 
 
 def _normalize_loadsite(frame: pl.DataFrame, solve_year: int | None) -> pl.DataFrame:
+    """Normalize loadsite-like tables to region/hour/value format.
+
+    Parameters
+    ----------
+    frame : pl.DataFrame
+        Input frame using ReEDS-style columns (e.g. ``r``, ``allh``, ``Value``, ``t``).
+    solve_year : int | None
+        Optional solve year filter.
+
+    Returns
+    -------
+    pl.DataFrame
+        Frame with columns ``region``, ``hour_period``, ``value``.
+    """
     rename_map: dict[str, str] = {}
     if "r" in frame.columns:
         rename_map["r"] = "region"
@@ -110,6 +150,7 @@ def _normalize_loadsite(frame: pl.DataFrame, solve_year: int | None) -> pl.DataF
 
 
 def _get_region(system: System, region_name: str) -> ReEDSRegion | None:
+    """Fetch region component by name, returning ``None`` when absent."""
     try:
         return system.get_component(ReEDSRegion, region_name)
     except Exception:
@@ -117,6 +158,7 @@ def _get_region(system: System, region_name: str) -> ReEDSRegion | None:
 
 
 def _component_exists(system: System, component_type: type[TComponent], name: str) -> bool:
+    """Check whether a component of ``component_type`` exists in system by name."""
     try:
         system.get_component(component_type, name)
         return True
@@ -137,70 +179,84 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
         hour_map = _normalize_hour_map_myr(hour_map_raw)
 
         # Electrolyzer consuming demand components from cap.csv + consume_char.csv.
-        electrolyzer_capacity_raw = _read_optional_frame(config.electrolyzer_capacity_fpath, "electrolyzer_capacity")
+        electrolyzer_capacity_raw = _read_optional_frame(
+            config.electrolyzer_capacity_fpath, "electrolyzer_capacity"
+        )
         consume_char_raw = _read_optional_frame(
             config.consume_characteristics_fpath,
             "consume_characteristics",
         )
         if electrolyzer_capacity_raw is not None and not electrolyzer_capacity_raw.is_empty():
-            cap_df = electrolyzer_capacity_raw.rename(
-                {
-                    "i": "technology",
-                    "r": "region",
-                    "Value": "capacity",
-                    "t": "year",
-                }
-            )
-            if config.solve_year is not None and "year" in cap_df.columns:
-                cap_df = cap_df.filter(pl.col("year").cast(pl.Int64, strict=False) == config.solve_year)
-
-            cap_df = cap_df.filter(pl.col("technology").cast(pl.Utf8).str.to_lowercase() == "electrolyzer")
-
-            efficiency = 1.0
-            if consume_char_raw is not None and not consume_char_raw.is_empty():
-                consume_df = consume_char_raw.rename(
+            existing_electrolyzers = list(system.get_components(ReEDSElectrolyzerDemand))
+            if existing_electrolyzers:
+                logger.info(
+                    "Detected {} existing electrolyzer demand components; "
+                    "skipping cap.csv-based creation to avoid double counting.",
+                    len(existing_electrolyzers),
+                )
+            else:
+                cap_df = electrolyzer_capacity_raw.rename(
                     {
-                        "*i": "technology",
+                        "i": "technology",
+                        "r": "region",
+                        "Value": "capacity",
                         "t": "year",
                     }
                 )
-                if config.solve_year is not None and "year" in consume_df.columns:
-                    consume_df = consume_df.filter(pl.col("year").cast(pl.Int64, strict=False) == config.solve_year)
-                eff_rows = consume_df.filter(
-                    (pl.col("technology").cast(pl.Utf8).str.to_lowercase() == "electrolyzer")
-                    & (pl.col("parameter") == "electricity_efficiency")
+                if config.solve_year is not None and "year" in cap_df.columns:
+                    cap_df = cap_df.filter(pl.col("year").cast(pl.Int64, strict=False) == config.solve_year)
+
+                cap_df = cap_df.filter(
+                    pl.col("technology").cast(pl.Utf8).str.to_lowercase() == "electrolyzer"
                 )
-                if not eff_rows.is_empty():
-                    efficiency = float(eff_rows["value"].item(0))
 
-            created = 0
-            for row in cap_df.iter_rows(named=True):
-                region_name = str(row.get("region", ""))
-                region = _get_region(system, region_name)
-                if not region:
-                    logger.debug("Skipping electrolyzer load in unknown region '{}'", region_name)
-                    continue
-
-                capacity = float(row.get("capacity", 0.0) or 0.0)
-                if capacity <= 0.0:
-                    continue
-
-                name = f"{region_name}_electrolyzer_demand"
-                if _component_exists(system, ReEDSElectrolyzerDemand, name):
-                    continue
-
-                system.add_component(
-                    ReEDSElectrolyzerDemand(
-                        name=name,
-                        region=region,
-                        technology="electrolyzer",
-                        capacity=capacity,
-                        electricity_efficiency=efficiency,
+                efficiency = 1.0
+                if consume_char_raw is not None and not consume_char_raw.is_empty():
+                    consume_df = consume_char_raw.rename(
+                        {
+                            "*i": "technology",
+                            "t": "year",
+                        }
                     )
-                )
-                created += 1
-            if created > 0:
-                logger.info("Attached {} electrolyzer demand components", created)
+                    if config.solve_year is not None and "year" in consume_df.columns:
+                        consume_df = consume_df.filter(
+                            pl.col("year").cast(pl.Int64, strict=False) == config.solve_year
+                        )
+                    eff_rows = consume_df.filter(
+                        (pl.col("technology").cast(pl.Utf8).str.to_lowercase() == "electrolyzer")
+                        & (pl.col("parameter") == "electricity_efficiency")
+                    )
+                    if not eff_rows.is_empty():
+                        efficiency = float(eff_rows["value"].item(0))
+
+                created = 0
+                for row in cap_df.iter_rows(named=True):
+                    region_name = str(row.get("region", ""))
+                    region = _get_region(system, region_name)
+                    if not region:
+                        logger.debug("Skipping electrolyzer load in unknown region '{}'", region_name)
+                        continue
+
+                    capacity = float(row.get("capacity", 0.0) or 0.0)
+                    if capacity <= 0.0:
+                        continue
+
+                    name = f"{region_name}_electrolyzer_demand"
+                    if _component_exists(system, ReEDSElectrolyzerDemand, name):
+                        continue
+
+                    system.add_component(
+                        ReEDSElectrolyzerDemand(
+                            name=name,
+                            region=region,
+                            technology="electrolyzer",
+                            capacity=capacity,
+                            electricity_efficiency=efficiency,
+                        )
+                    )
+                    created += 1
+                if created > 0:
+                    logger.info("Attached {} electrolyzer demand components", created)
 
         # Data center consuming demand components from loadsite_op.csv.
         loadsite_raw = _read_optional_frame(config.loadsite_op_fpath, "loadsite_op")
@@ -271,7 +327,9 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
             profile = profile.filter(pl.col("technology").cast(pl.Utf8).str.to_lowercase() == "electrolyzer")
             profile = profile.select("region", "hour_period", "value")
 
-            expanded_result = expand_loadsite_hourly(loadsite_data=_normalize_loadsite(profile, None), hour_map_myr=hour_map)
+            expanded_result = expand_loadsite_hourly(
+                loadsite_data=_normalize_loadsite(profile, None), hour_map_myr=hour_map
+            )
             if expanded_result.is_err():
                 return Err(str(expanded_result.unwrap_err()))
             expanded = expanded_result.unwrap()
@@ -291,7 +349,9 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
 
                 annual_targets = {
                     str(row["region"]): float(row["value"])
-                    for row in annual.filter(pl.col("technology").cast(pl.Utf8).str.to_lowercase() == "electrolyzer")
+                    for row in annual.filter(
+                        pl.col("technology").cast(pl.Utf8).str.to_lowercase() == "electrolyzer"
+                    )
                     .select("region", "value")
                     .iter_rows(named=True)
                 }

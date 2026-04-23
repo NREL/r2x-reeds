@@ -137,3 +137,60 @@ def test_purchaser_load_scope_missing_hour_map(tmp_path: Path, caplog) -> None:
 
     assert "Missing hour_map_myr input" in caplog.text
     assert not list(system.get_components(ReEDSDataCenterDemand))
+
+
+def test_purchaser_load_skips_electrolyzer_creation_when_existing(tmp_path: Path) -> None:
+    """Existing electrolyzer demand components are reused to avoid double counting."""
+    system, p4, _ = _build_system()
+
+    existing = ReEDSElectrolyzerDemand(
+        name="existing_electrolyzer",
+        region=p4,
+        technology="electrolyzer",
+        capacity=200.0,
+        electricity_efficiency=1.0,
+    )
+    system.add_component(existing)
+
+    hour_map_myr_path = _write_csv(
+        tmp_path / "hmap_myr.csv",
+        {
+            "yearhour": [1, 2, 3],
+            "h": ["h1", "h2", "h3"],
+        },
+    )
+    electrolyzer_capacity_path = _write_csv(
+        tmp_path / "cap.csv",
+        {
+            "i": ["electrolyzer"],
+            "r": ["p4"],
+            "t": [2032],
+            "Value": [120.0],
+        },
+    )
+    electrolyzer_profile_path = _write_csv(
+        tmp_path / "prod_load.csv",
+        {
+            "i": ["electrolyzer", "electrolyzer", "electrolyzer"],
+            "r": ["p4", "p4", "p4"],
+            "allh": ["h1", "h2", "h3"],
+            "t": [2032, 2032, 2032],
+            "Value": [10.0, 20.0, 30.0],
+        },
+    )
+
+    _run_modifier(
+        system,
+        solve_year=2032,
+        weather_year=2012,
+        hour_map_myr_fpath=hour_map_myr_path,
+        electrolyzer_capacity_fpath=electrolyzer_capacity_path,
+        electrolyzer_prod_load_fpath=electrolyzer_profile_path,
+    )
+
+    electrolyzers = list(system.get_components(ReEDSElectrolyzerDemand))
+    assert len(electrolyzers) == 1
+    assert electrolyzers[0].name == "existing_electrolyzer"
+
+    ts = system.get_time_series(electrolyzers[0]).data
+    np.testing.assert_allclose(ts, np.array([10.0, 20.0, 30.0]), rtol=1e-5)
