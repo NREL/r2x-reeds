@@ -7,6 +7,17 @@ R2X ReEDS provides a parser plugin for converting ReEDS model outputs to R2X for
 - {py:class}`~r2x_reeds.ReEDSParser` - Main parser implementation
 - {py:class}`~r2x_reeds.ReEDSConfig` - Configuration model
 
+## System Modifiers
+
+- `add-pcm-defaults`
+- `add-emission-cap`
+- `add-electrolyzer-load`
+- `add-purchaser-load`
+- `add-ccs-credit`
+- `break-gens`
+- `add-imports`
+- `add-optimal-siting`
+
 ## Component Models
 
 - {py:class}`~r2x_reeds.ReEDSGenerator` - Generator component

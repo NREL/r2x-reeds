@@ -100,6 +100,7 @@ uv sync --all-groups
   - `add-pcm-defaults`
   - `add-emission-cap`
   - `add-electrolyzer-load`
+  - `add-purchaser-load`
   - `add-ccs-credit`
   - `break-gens`
   - `add-imports`
