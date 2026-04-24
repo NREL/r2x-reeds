@@ -58,6 +58,16 @@ Purpose:
 - `add-pcm-defaults`: apply PCM default attributes to generators
 - `add-emission-cap`: add annual emissions constraints and optional precombustion adjustments
 - `add-ccs-credit`: apply CCS credit economics
-- `break-gens`: split generators into reference units
+- `break-gens`: split generators into reference units (optionally filtered by region, generator name, or technology)
 - `add-imports`: apply import/export handling
 - `add-optimal-siting`: add loadsite increments to existing load profiles
+
+### break-gens config highlights
+
+The `BreakGensConfig` model supports targeted disaggregation workflows without changing default behavior:
+
+- `include_regions`: only split generators in these balancing areas
+- `include_generators`: only split generators with these names
+- `include_technologies`: only split generators with these technologies
+
+If these fields are omitted, `break-gens` keeps the original workflow and considers all eligible generators.
