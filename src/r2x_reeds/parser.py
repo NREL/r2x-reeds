@@ -11,8 +11,10 @@ import calendar
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 from functools import partial
+from pathlib import Path
 from typing import Any, cast
 
+import h5py
 import numpy as np
 import polars as pl
 from infrasys import Component, SingleTimeSeries
@@ -26,6 +28,7 @@ from r2x_core import (
     System,
     create_component,
 )
+from r2x_core.processors import apply_processing
 
 from .enum_mappings import RESERVE_TYPE_MAP
 from .getters import (
@@ -64,6 +67,32 @@ from .parser_utils import (
 from .plugin_config import ReEDSConfig
 from .rules_helper import create_parser_context
 from .upgrader.data_upgrader import run_reeds_upgrades
+
+OUTPUTS_H5_DATASET_KEYS: dict[str, str] = {
+    "online_capacity": "cap_ivrt",
+    "electrolyzer_capacity": "cap",
+    "electrolyzer_prod_load_ann": "prod_load_ann",
+    "electrolyzer_prod_load": "prod_load",
+    "transmission_capacity": "tran_cap_energy",
+    "transmission_losses": "tranloss",
+    "loadsite_op": "loadsite_op",
+    "heat_rate": "heat_rate",
+    "fuel_price": "fuel_price",
+    "biofuel_price": "repbioprice",
+    "fuel_tech_map": "fuel2tech",
+    "forced_outages": "forced_outage",
+    "planned_outages": "planned_outage",
+    "renewable_cf_adjustment": "cf_adj_t",
+    "ilr": "ilr",
+    "cost_vom": "cost_vom",
+    "cost_hurdle_rate": "cost_hurdle",
+    "emission_rates": "emit_rate",
+    "storage_efficiency": "storage_eff",
+    "storage_duration_out": "storage_duration_out",
+    "storage_duration": "storage_duration",
+    "cost_capital": "cost_cap",
+    "cost_capital_energy": "cost_cap_energy",
+}
 
 
 class ReEDSParser(Plugin[ReEDSConfig]):
@@ -176,6 +205,9 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         self._hydro_cf_prepared: pl.DataFrame | None = None
         self._reserve_percentages: dict[str, dict[str, float]] = {}
         self._reserve_costs: dict[str, dict[str, float]] = {}
+        self._outputs_h5_fpath: Path | None = None
+        self._outputs_h5_handle: h5py.File | None = None
+        self._outputs_h5_cache: dict[str, pl.LazyFrame] = {}
 
         # Parser context and time indices
         self._ctx: Any = None
@@ -243,7 +275,161 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             "solve_year": self.config.solve_year,
             "weather_year": self.config.weather_year,
         }
+
+        if name in self.store and self._is_outputs_h5_mapped(name):
+            return self._read_outputs_dataset(name=name, placeholders=placeholders)
+
         return self.store.read_data(name, placeholders=placeholders)
+
+    def _is_outputs_h5_mapped(self, name: str) -> bool:
+        """Return True if a dataset is configured to read from outputs/outputs.h5."""
+        data_file = self.store[name]
+        if data_file.fpath is None:
+            return False
+        return data_file.fpath.name == "outputs.h5"
+
+    def _read_outputs_dataset(self, name: str, placeholders: dict[str, Any]) -> Any:
+        """Read a single dataset from outputs.h5 with cache and CSV fallback."""
+        data_file = self.store[name]
+        if data_file.fpath is None:
+            return self.store.read_data(name, placeholders=placeholders)
+
+        dataset_key = OUTPUTS_H5_DATASET_KEYS.get(name, name)
+        outputs_h5 = data_file.fpath
+
+        h5_data = self._read_outputs_h5_group(outputs_h5=outputs_h5, dataset_key=dataset_key)
+        if h5_data is None:
+            return self._read_outputs_csv_fallback(
+                name=name,
+                data_file_fpath=data_file.fpath,
+                dataset_key=dataset_key,
+                placeholders=placeholders,
+            )
+
+        processed = apply_processing(
+            h5_data,
+            data_file=data_file,
+            proc_spec=data_file.proc_spec,
+            placeholders=placeholders,
+        )
+        if processed.is_err():
+            raise ValueError(str(processed.err()))
+        value = processed.ok()
+        if value is None:
+            return None
+        return value
+
+    def _read_outputs_h5_group(self, outputs_h5: Path, dataset_key: str) -> pl.LazyFrame | None:
+        """Read one H5 group from outputs.h5 and cache parsed LazyFrames by key."""
+        if self._outputs_h5_fpath != outputs_h5:
+            self._close_outputs_h5()
+            self._outputs_h5_fpath = outputs_h5
+
+        if dataset_key in self._outputs_h5_cache:
+            return self._outputs_h5_cache[dataset_key]
+
+        if self._outputs_h5_handle is None:
+            if not outputs_h5.exists():
+                logger.trace("outputs.h5 not found at {}", outputs_h5)
+                return None
+            self._outputs_h5_handle = h5py.File(outputs_h5, mode="r")
+
+        group = self._outputs_h5_handle.get(dataset_key)
+        if group is None:
+            logger.trace("Dataset '{}' not found in {}", dataset_key, outputs_h5)
+            return None
+        if not isinstance(group, h5py.Group):
+            logger.warning("Expected group for key '{}' in {}, got {}", dataset_key, outputs_h5, type(group))
+            return None
+
+        columns_node = group.get("columns")
+        values_node = group.get("Value")
+        if columns_node is None or values_node is None:
+            logger.warning(
+                "Dataset '{}' is missing required 'columns' or 'Value' nodes in {}",
+                dataset_key,
+                outputs_h5,
+            )
+            return None
+
+        columns = [self._decode_h5_scalar(value) for value in np.asarray(columns_node[()]).tolist()]
+        data: dict[str, Any] = {}
+
+        for column in columns:
+            node = group.get(str(column))
+            if node is None:
+                logger.warning(
+                    "Dataset '{}' missing column '{}' in {}; skipping H5 read",
+                    dataset_key,
+                    column,
+                    outputs_h5,
+                )
+                return None
+            values = np.asarray(node[()])
+            if values.ndim == 0:
+                values = values.reshape(1)
+            if values.dtype.kind in {"S", "O", "U"}:
+                data[str(column)] = [self._decode_h5_scalar(item) for item in values.tolist()]
+            else:
+                data[str(column)] = values
+
+        frame = pl.DataFrame(data, strict=False).lazy()
+        self._outputs_h5_cache[dataset_key] = frame
+        return frame
+
+    def _read_outputs_csv_fallback(
+        self,
+        name: str,
+        data_file_fpath: Path,
+        dataset_key: str,
+        placeholders: dict[str, Any],
+    ) -> Any:
+        """Read legacy outputs/<dataset>.csv when outputs.h5 is missing/incomplete."""
+        csv_fpath = data_file_fpath.parent / f"{dataset_key}.csv"
+        data_file = self.store[name]
+        is_optional = bool(data_file.info and data_file.info.is_optional)
+
+        if not csv_fpath.exists():
+            if is_optional:
+                logger.trace(
+                    "Optional dataset '{}' missing from outputs.h5 and CSV fallback {}",
+                    name,
+                    csv_fpath,
+                )
+                return None
+            raise FileNotFoundError(f"Required dataset '{name}' not found in outputs.h5 or fallback CSV")
+
+        reader_kwargs = data_file.reader.kwargs if data_file.reader else {}
+        csv_kwargs = {key: value for key, value in reader_kwargs.items() if not str(key).startswith("h5_")}
+        raw_csv = pl.scan_csv(csv_fpath, **csv_kwargs)
+
+        processed = apply_processing(
+            raw_csv,
+            data_file=data_file,
+            proc_spec=data_file.proc_spec,
+            placeholders=placeholders,
+        )
+        if processed.is_err():
+            raise ValueError(str(processed.err()))
+        value = processed.ok()
+        if value is None:
+            return None
+        return value
+
+    def _decode_h5_scalar(self, value: Any) -> Any:
+        """Decode bytes-like HDF5 scalar values into Python strings."""
+        if isinstance(value, bytes):
+            return value.decode("utf-8")
+        if isinstance(value, np.bytes_):
+            return value.tobytes().decode("utf-8")
+        return value
+
+    def _close_outputs_h5(self) -> None:
+        """Close active outputs.h5 handle and clear in-memory dataset cache."""
+        if self._outputs_h5_handle is not None:
+            self._outputs_h5_handle.close()
+        self._outputs_h5_handle = None
+        self._outputs_h5_cache = {}
 
     def create_component(self, component_class: type[Component], **kwargs: Any) -> Component:
         """Create a component instance with consistent validation handling."""
@@ -1529,6 +1715,8 @@ class ReEDSParser(Plugin[ReEDSConfig]):
 
     def _initialize_caches(self) -> None:
         """Reset parser caches for a fresh build."""
+        self._close_outputs_h5()
+        self._outputs_h5_fpath = None
         self._variable_generator_df = None
         self._non_variable_generator_df = None
         self._region_cache = {}
