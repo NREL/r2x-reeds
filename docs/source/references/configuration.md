@@ -46,6 +46,12 @@ Each entry includes:
 - optional `reader` settings
 - `proc_spec`: column mapping, filtering, schema, and pivot rules
 
+Output bundle behavior:
+
+- Output datasets that previously pointed to `outputs/*.csv` now point to `outputs/outputs.h5`
+- The parser reads `outputs.h5` once per run and caches dataset groups for reuse
+- For backward compatibility, if `outputs.h5` (or a requested group) is missing, parser read paths fall back to legacy `outputs/<dataset>.csv` when available
+
 Examples of purchaser-load related datasets:
 
 - `electrolyzer_capacity`
