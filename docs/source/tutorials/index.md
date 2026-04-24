@@ -123,7 +123,8 @@ res = break_generators(
 		drop_capacity_threshold=5,
 		skip_categories=["wind", "solar"],
 		break_category="category",
-		# Optional targeting controls (omit to preserve default all-eligible behavior)
+		# Optional targeting controls (omit to preserve default all-eligible behavior).
+		# If multiple include_* lists are provided, they are combined with OR behavior.
 		include_regions=["p1", "p2"],
 		include_generators=["new-battery_2035"],
 		include_technologies=["gas-cc"],

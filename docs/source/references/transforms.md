@@ -70,4 +70,7 @@ The `BreakGensConfig` model supports targeted disaggregation workflows without c
 - `include_generators`: only split generators with these names
 - `include_technologies`: only split generators with these technologies
 
+When more than one include filter is provided, matching uses OR behavior.
+A generator is split if it matches any one of `include_regions`, `include_generators`, or `include_technologies`.
+
 If these fields are omitted, `break-gens` keeps the original workflow and considers all eligible generators.
