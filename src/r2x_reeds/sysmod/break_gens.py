@@ -99,35 +99,31 @@ def _break_system_generators(
     include_technology_set = (
         {str(value).casefold() for value in include_technologies} if include_technologies else None
     )
+    include_filters_enabled = any(
+        include_set is not None
+        for include_set in (include_region_set, include_generator_set, include_technology_set)
+    )
 
     capacity_dropped = 0
     for component in system.get_components(
         ReEDSGenerator, filter_func=lambda comp: getattr(comp, break_category, None)
     ):
-        if include_region_set is not None and component.region.name.casefold() not in include_region_set:
-            logger.trace(
-                "Skipping component {} because region '{}' is not in include_regions",
-                component.name,
-                component.region.name,
-            )
-            continue
-
-        if include_generator_set is not None and component.name.casefold() not in include_generator_set:
-            logger.trace(
-                "Skipping component {} because it is not in include_generators",
-                component.name,
-            )
-            continue
-
-        if (
+        region_match = (
+            include_region_set is not None and component.region.name.casefold() in include_region_set
+        )
+        generator_match = (
+            include_generator_set is not None and component.name.casefold() in include_generator_set
+        )
+        technology_match = (
             include_technology_set is not None
             and component.technology is not None
-            and component.technology.casefold() not in include_technology_set
-        ):
+            and component.technology.casefold() in include_technology_set
+        )
+
+        if include_filters_enabled and not (region_match or generator_match or technology_match):
             logger.trace(
-                "Skipping component {} because technology '{}' is not in include_technologies",
+                "Skipping component {} because it does not match include_regions/include_generators/include_technologies",
                 component.name,
-                component.technology,
             )
             continue
 

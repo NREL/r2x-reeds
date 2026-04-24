@@ -646,6 +646,75 @@ def test_break_generators_include_technologies_filter(system_with_region) -> Non
     assert names == {"wind_gen_01", "wind_gen_02", "wind_gen_03", "solar_gen"}
 
 
+def test_break_generators_include_filters_use_or_behavior() -> None:
+    """A generator should be split when it matches any include filter."""
+    sys = System(name="Test", auto_add_composed_components=True)
+    r1 = ReEDSRegion(name="p1")
+    r2 = ReEDSRegion(name="p2")
+    sys.add_component(r1)
+    sys.add_component(r2)
+
+    region_match_only = ReEDSGenerator(
+        name="region_match",
+        region=r1,
+        technology="coal",
+        capacity=120.0,
+        category="coal",
+    )
+    generator_match_only = ReEDSGenerator(
+        name="target_gen",
+        region=r2,
+        technology="coal",
+        capacity=120.0,
+        category="coal",
+    )
+    technology_match_only = ReEDSGenerator(
+        name="tech_match",
+        region=r2,
+        technology="wind",
+        capacity=120.0,
+        category="wind",
+    )
+    no_match = ReEDSGenerator(
+        name="no_match",
+        region=r2,
+        technology="solar",
+        capacity=120.0,
+        category="solar",
+    )
+
+    sys.add_component(region_match_only)
+    sys.add_component(generator_match_only)
+    sys.add_component(technology_match_only)
+    sys.add_component(no_match)
+
+    _run_break(
+        sys,
+        reference_units={
+            "coal": {"capacity_MW": 50},
+            "wind": {"capacity_MW": 50},
+            "solar": {"capacity_MW": 50},
+        },
+        include_regions=["p1"],
+        include_generators=["target_gen"],
+        include_technologies=["wind"],
+    )
+
+    names = {gen.name for gen in sys.get_components(ReEDSGenerator)}
+    assert names == {
+        "region_match_01",
+        "region_match_02",
+        "region_match_03",
+        "target_gen_01",
+        "target_gen_02",
+        "target_gen_03",
+        "tech_match_01",
+        "tech_match_02",
+        "tech_match_03",
+        "no_match",
+    }
+
+
 def test_load_reference_units_with_dict_input(caplog) -> None:
     """Test _load_reference_units with dict input."""
     from r2x_reeds.sysmod.break_gens import _load_reference_units
