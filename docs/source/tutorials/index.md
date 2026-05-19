@@ -86,7 +86,7 @@ res = add_purchaser_load(
 		consume_characteristics_fpath=run_path / "inputs_case/consume_char.csv",
 		electrolyzer_prod_load_fpath=run_path / "outputs/prod_load.csv",
 		electrolyzer_prod_load_ann_fpath=run_path / "outputs/prod_load_ann.csv",
-		loadsite_op_fpath=run_path / "outputs/loadsite_op.csv",
+		loadsite_op_fpath=run_path / "rep" / "outputs/loadsite_op.csv",
 	),
 )
 if res.is_err():
