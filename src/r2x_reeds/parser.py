@@ -224,6 +224,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         )
 
         def _synthetic(reason: str) -> pl.DataFrame:
+            """Build and log a synthetic hour_map fallback for validation."""
             synthetic = _build_synthetic_hour_map(weather_years)
             logger.warning(
                 "hour_map file is missing or unusable ({}). "
