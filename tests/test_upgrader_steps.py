@@ -7,7 +7,7 @@ import pytest
 
 from r2x_reeds.upgrader.data_upgrader import ReEDSVersionDetector
 from r2x_reeds.upgrader.helpers import LEGACY_VERSION
-from r2x_reeds.upgrader.upgrade_steps import move_hmap_file, move_transmission_cost
+from r2x_reeds.upgrader.upgrade_steps import move_hmap_file, move_hmap_myr_file, move_transmission_cost
 
 pytestmark = [pytest.mark.integration]
 
@@ -107,14 +107,14 @@ def test_move_transmission_cost_moves_and_skips(tmp_path: Path) -> None:
     assert (inputs_case / "transmission_distance.csv").exists()
 
 
-def test_move_hmap_file_raises_when_neither_exists(tmp_path: Path) -> None:
-    """Raises FileNotFoundError when neither old nor new file exists."""
+def test_move_hmap_file_skips_when_neither_exists(tmp_path: Path) -> None:
+    """Skips when neither old nor new file exists."""
     inputs_case = tmp_path / "inputs_case"
     rep_folder = inputs_case / "rep"
     rep_folder.mkdir(parents=True)
 
-    with pytest.raises(FileNotFoundError):
-        move_hmap_file(tmp_path)
+    result = move_hmap_file(tmp_path)
+    assert result == tmp_path
 
 
 def test_move_transmission_cost_skips_missing_files(tmp_path: Path) -> None:
@@ -125,6 +125,22 @@ def test_move_transmission_cost_skips_missing_files(tmp_path: Path) -> None:
     # Neither old files exist - should complete without error
     result = move_transmission_cost(tmp_path)
     assert result == tmp_path
+
+
+def test_move_hmap_myr_file_moves_legacy_file(tmp_path: Path) -> None:
+    """Legacy hmap_myr.csv should be moved into inputs_case/rep/."""
+    inputs_case = tmp_path / "inputs_case"
+    rep_folder = inputs_case / "rep"
+    rep_folder.mkdir(parents=True)
+
+    old_file = inputs_case / "hmap_myr.csv"
+    old_file.write_text("yearhour,h\n1,h1\n")
+
+    result = move_hmap_myr_file(tmp_path)
+
+    assert result == tmp_path
+    assert not old_file.exists()
+    assert (rep_folder / "hmap_myr.csv").exists()
 
 
 def _write_hmap_allyrs(rep_folder: Path, rows: list[dict]) -> None:

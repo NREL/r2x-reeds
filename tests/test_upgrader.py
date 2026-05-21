@@ -165,7 +165,7 @@ def test_upgrader_runs_upgrade_steps(tmp_path):
 
 
 def test_upgrader_handles_failing_step(tmp_path):
-    """Test that upgrader returns error when a step fails."""
+    """Test that upgrader completes when hmap_allyrs is missing in both locations."""
 
     # Create meta.csv with legacy version
     meta_path = tmp_path / "meta.csv"
@@ -180,11 +180,10 @@ def test_upgrader_handles_failing_step(tmp_path):
     rep_folder.mkdir(parents=True)
 
     # Don't create hmap_allyrs.csv so the step will fail
-    # (move_hmap_file raises FileNotFoundError when neither old nor new exists)
+    # (move_hmap_file now warns and skips when neither old nor new exists)
 
     upgrader = ReEDSUpgrader(tmp_path)
     result = upgrader.upgrade(current_version="0.0.0")
 
-    # The upgrade should fail because move_hmap_file will raise FileNotFoundError
-    assert result.is_err()
-    assert "does not exist" in str(result.err())
+    # The upgrade should succeed because missing hmap_allyrs is handled as a warning/skip
+    assert result.is_ok()

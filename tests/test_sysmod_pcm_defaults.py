@@ -6,7 +6,12 @@ from pathlib import Path
 import pytest
 from infrasys import System
 
-from r2x_reeds.models.components import ReEDSGenerator, ReEDSHydroGenerator, ReEDSRegion, ReEDSThermalGenerator
+from r2x_reeds.models.components import (
+    ReEDSGenerator,
+    ReEDSHydroGenerator,
+    ReEDSRegion,
+    ReEDSThermalGenerator,
+)
 from r2x_reeds.sysmod import pcm_defaults
 
 pytestmark = [pytest.mark.integration]
@@ -23,13 +28,20 @@ def _build_generator(name: str = "GEN1", category: str = "coal") -> tuple[System
     return system, generator
 
 
-def _build_thermal_generator(name: str = "GEN1", category: str = "coal") -> tuple[System, ReEDSThermalGenerator]:
+def _build_thermal_generator(
+    name: str = "GEN1", category: str = "coal"
+) -> tuple[System, ReEDSThermalGenerator]:
     system = System(name="test_pcm_defaults")
     region = ReEDSRegion(name="west")
     system.add_component(region)
     generator = ReEDSThermalGenerator(
-        name=name, region=region, capacity=100.0, technology=category, category=category,
-        heat_rate=9.0, fuel_type=category,
+        name=name,
+        region=region,
+        capacity=100.0,
+        technology=category,
+        category=category,
+        heat_rate=9.0,
+        fuel_type=category,
     )
     system.add_component(generator)
     return system, generator
@@ -40,7 +52,11 @@ def _build_hydro_generator(name: str = "GEN1", category: str = "hydro") -> tuple
     region = ReEDSRegion(name="west")
     system.add_component(region)
     generator = ReEDSHydroGenerator(
-        name=name, region=region, capacity=100.0, technology=category, category=category,
+        name=name,
+        region=region,
+        capacity=100.0,
+        technology=category,
+        category=category,
         is_dispatchable=True,
     )
     system.add_component(generator)

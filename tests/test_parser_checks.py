@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -224,3 +225,108 @@ def test_with_placeholder_substitution(example_data_store: DataStore) -> None:
         placeholders=placeholders,
     )
     assert result.is_ok()
+
+
+def test_dataset_h5_signature_error_has_actionable_message() -> None:
+    """Invalid HDF5 signatures should return a clear, actionable validation message."""
+    from r2x_core import ValidationError
+    from r2x_reeds.parser_checks import check_dataset_non_empty
+
+    class _Meta:
+        fpath = "inputs_case/load.h5"
+
+    class _Store:
+        folder = Path("/tmp/reeds_case")
+
+        def __contains__(self, key: str) -> bool:
+            return key == "load_profiles"
+
+        def __getitem__(self, key: str) -> _Meta:
+            return _Meta()
+
+        def read_data(self, name: str, placeholders=None):
+            raise OSError("Unable to synchronously open file (file signature not found)")
+
+    result = check_dataset_non_empty(cast("DataStore", _Store()), "load_profiles")
+    assert result.is_err()
+    err = result.unwrap_err()
+    assert isinstance(err, ValidationError)
+    err_msg = str(err)
+    assert "invalid HDF5 signature" in err_msg
+    assert "load_profiles" in err_msg
+    assert "inputs_case/load.h5" in err_msg
+
+
+def test_dataset_non_h5_oserror_has_generic_message() -> None:
+    """Non-H5 OSErrors should return a generic dataset read failure message."""
+    from r2x_core import ValidationError
+    from r2x_reeds.parser_checks import check_dataset_non_empty
+
+    class _Meta:
+        fpath = "inputs_case/modeledyears.csv"
+
+    class _Store:
+        folder = Path("/tmp/reeds_case")
+
+        def __contains__(self, key: str) -> bool:
+            return key == "modeled_years"
+
+        def __getitem__(self, key: str) -> _Meta:
+            return _Meta()
+
+        def read_data(self, name: str, placeholders=None):
+            raise OSError("permission denied")
+
+    result = check_dataset_non_empty(cast("DataStore", _Store()), "modeled_years")
+    assert result.is_err()
+    err = result.unwrap_err()
+    assert isinstance(err, ValidationError)
+    err_msg = str(err)
+    assert "Failed reading dataset 'modeled_years'" in err_msg
+    assert "permission denied" in err_msg
+
+
+def test_dataset_oserror_with_unknown_fpath_uses_unknown_path() -> None:
+    """When fpath is None, errors should still include a stable placeholder path."""
+    from r2x_core import ValidationError
+    from r2x_reeds.parser_checks import check_dataset_non_empty
+
+    class _Meta:
+        fpath = None
+
+    class _Store:
+        folder = Path("/tmp/reeds_case")
+
+        def __contains__(self, key: str) -> bool:
+            return key == "mystery"
+
+        def __getitem__(self, key: str) -> _Meta:
+            return _Meta()
+
+        def read_data(self, name: str, placeholders=None):
+            raise OSError("boom")
+
+    result = check_dataset_non_empty(cast("DataStore", _Store()), "mystery")
+    assert result.is_err()
+    err = result.unwrap_err()
+    assert isinstance(err, ValidationError)
+    assert "/tmp/reeds_case/<unknown>" in str(err)
+
+
+def test_required_values_single_string_uses_scalar_branch(example_data_store: DataStore) -> None:
+    """String required_values should be treated as a scalar and return a clear missing-values error."""
+    from r2x_core import ValidationError
+    from r2x_reeds.parser_checks import check_required_values_in_column
+
+    result = check_required_values_in_column(
+        store=example_data_store,
+        dataset="modeled_years",
+        column_name="modeled_years",
+        required_values="not-a-year",
+        what="Required",
+    )
+    assert result.is_err()
+    err = result.unwrap_err()
+    assert isinstance(err, ValidationError)
+    assert "Required" in str(err)
+    assert "not-a-year" in str(err)
