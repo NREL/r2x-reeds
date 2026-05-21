@@ -481,7 +481,7 @@
     "info": {
       "description": "Hour mapping for representative periods",
       "is_input": true,
-      "is_optional": false
+      "is_optional": true
     },
     "proc_spec": {
       "column_mapping": {

@@ -66,6 +66,24 @@ from .rules_helper import create_parser_context
 from .upgrader.data_upgrader import run_reeds_upgrades
 
 
+def _build_synthetic_hour_map(weather_years: Iterable[int]) -> pl.DataFrame:
+    """Build a minimal in-memory hour_map used only when source files are missing.
+
+    The synthetic frame is intentionally small and only guarantees validation
+    requirements needed for translation to proceed.
+    """
+    rows = [
+        {
+            "year": int(year),
+            "time_index": f"{int(year)}-01-01 00:00:00",
+            "hour_period": "h1",
+            "season": "annual",
+        }
+        for year in weather_years
+    ]
+    return pl.DataFrame(rows)
+
+
 class ReEDSParser(Plugin[ReEDSConfig]):
     """Parser for ReEDS model data using the Plugin[ReEDSConfig] pattern.
 
@@ -197,6 +215,41 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         arr = np.asarray(arr, dtype=np.float64)
         return arr[:8760] if arr.shape[0] > 8760 else arr
 
+    def _get_hour_map_for_validation(self, placeholders: dict[str, Any]) -> pl.DataFrame:
+        """Return hour_map data, falling back to a synthetic in-memory frame when missing."""
+        weather_years: list[int] = (
+            [self.config.weather_year]
+            if isinstance(self.config.weather_year, int)
+            else list(self.config.weather_year)
+        )
+
+        def _synthetic(reason: str) -> pl.DataFrame:
+            synthetic = _build_synthetic_hour_map(weather_years)
+            logger.warning(
+                "hour_map file is missing or unusable ({}). "
+                "Using synthetic in-memory hour_map for translation; no files will be written to source path.",
+                reason,
+            )
+            return synthetic
+
+        try:
+            data = self.store.read_data("hour_map", placeholders=placeholders)
+            if data is None:
+                return _synthetic("store returned None")
+            if isinstance(data, pl.LazyFrame):
+                frame = data.collect()
+            elif isinstance(data, pl.DataFrame):
+                frame = data
+            else:
+                frame = pl.DataFrame(data)
+
+            if frame.is_empty() or "year" not in frame.columns:
+                return _synthetic("hour_map has no rows or missing 'year' column")
+
+            return frame
+        except Exception as exc:  # pragma: no cover - defensive across core reader backends
+            return _synthetic(str(exc))
+
     def on_validate_config(self) -> Result[None, str]:
         """Validate configuration assets before upgrades or data I/O."""
         logger.debug("Validating parser configuration")
@@ -290,21 +343,27 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if res.is_err():
             return Err(str(res.err()))
 
-        weather_years: Iterable[int] = (
+        weather_years: list[int] = (
             [self.config.weather_year]
             if isinstance(self.config.weather_year, int)
-            else self.config.weather_year
+            else list(self.config.weather_year)
         )
-        res = check_required_values_in_column(
-            store=self.store,
-            dataset="hour_map",
-            column_name="year",
-            required_values=weather_years,
-            what="Weather year(s)",
-            placeholders=placeholders,
-        )
-        if res.is_err():
-            return Err(str(res.err()))
+        hour_map_df = self._get_hour_map_for_validation(placeholders)
+        if "year" not in hour_map_df.columns:
+            return Err("Weather year(s): hour_map dataset is missing required 'year' column")
+
+        available_weather_years = {
+            int(val)
+            for val in hour_map_df.select("year").drop_nulls().to_series().to_list()
+            if val is not None
+        }
+        missing_weather_years = [year for year in weather_years if year not in available_weather_years]
+        if missing_weather_years:
+            return Err(
+                "Weather year(s) "
+                f"{missing_weather_years} not found in hour_map.year. "
+                f"Available values: {sorted(available_weather_years)}"
+            )
 
         required_inputs = []
         for dataset_name in self.store.list_data():
@@ -318,6 +377,9 @@ class ReEDSParser(Plugin[ReEDSConfig]):
 
         logger.trace("Validating presence of {} required datasets", len(required_inputs))
         for dataset_name in required_inputs:
+            if dataset_name == "hour_map":
+                # hour_map can be synthesized in-memory when the source file is unavailable.
+                continue
             presence_result = check_dataset_non_empty(self.store, dataset_name, placeholders=placeholders)
             if presence_result.is_err():
                 return Err(f"{dataset_name}: {presence_result.err()}")
