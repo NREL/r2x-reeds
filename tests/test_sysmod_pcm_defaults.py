@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from infrasys import System
 
-from r2x_reeds.models.components import ReEDSGenerator, ReEDSRegion
+from r2x_reeds.models.components import ReEDSGenerator, ReEDSHydroGenerator, ReEDSRegion, ReEDSThermalGenerator
 from r2x_reeds.sysmod import pcm_defaults
 
 pytestmark = [pytest.mark.integration]
@@ -18,6 +18,30 @@ def _build_generator(name: str = "GEN1", category: str = "coal") -> tuple[System
     system.add_component(region)
     generator = ReEDSGenerator(
         name=name, region=region, capacity=100.0, technology=category, category=category
+    )
+    system.add_component(generator)
+    return system, generator
+
+
+def _build_thermal_generator(name: str = "GEN1", category: str = "coal") -> tuple[System, ReEDSThermalGenerator]:
+    system = System(name="test_pcm_defaults")
+    region = ReEDSRegion(name="west")
+    system.add_component(region)
+    generator = ReEDSThermalGenerator(
+        name=name, region=region, capacity=100.0, technology=category, category=category,
+        heat_rate=9.0, fuel_type=category,
+    )
+    system.add_component(generator)
+    return system, generator
+
+
+def _build_hydro_generator(name: str = "GEN1", category: str = "hydro") -> tuple[System, ReEDSHydroGenerator]:
+    system = System(name="test_pcm_defaults")
+    region = ReEDSRegion(name="west")
+    system.add_component(region)
+    generator = ReEDSHydroGenerator(
+        name=name, region=region, capacity=100.0, technology=category, category=category,
+        is_dispatchable=True,
     )
     system.add_component(generator)
     return system, generator
@@ -113,3 +137,21 @@ def test_pcm_defaults_scope_multiplication_runs() -> None:
 
     _run_pcm_defaults(system, pcm_defaults_dict=defaults)
     assert generator.ext == {}
+
+
+def test_pcm_defaults_ramp_rate_is_multiplied_thermal() -> None:
+    """ramp_rate on a thermal generator is scaled by capacity, not applied as-is."""
+    system, generator = _build_thermal_generator()
+
+    _run_pcm_defaults(system, pcm_defaults_dict={"coal": {"ramp_rate": 0.01}})
+
+    assert generator.ramp_rate == pytest.approx(100.0 * 0.01)
+
+
+def test_pcm_defaults_ramp_rate_is_multiplied_hydro() -> None:
+    """ramp_rate on a hydro generator is scaled by capacity, not applied as-is."""
+    system, generator = _build_hydro_generator()
+
+    _run_pcm_defaults(system, pcm_defaults_dict={"hydro": {"ramp_rate": 0.3}})
+
+    assert generator.ramp_rate == pytest.approx(100.0 * 0.3)

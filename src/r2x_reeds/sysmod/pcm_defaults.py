@@ -82,7 +82,7 @@ def add_pcm_defaults(
             return Err(str(exc))
 
     # Fields that need to be multiplied by generator capacity
-    needs_multiplication = {"startup_cost", "ramp_limits"}
+    needs_multiplication = {"startup_cost", "ramp_rate"}
 
     # Fields that should be processed first (for dependency ordering)
     fields_weight = {"capacity": 1}  # Updated from active_power_limits
