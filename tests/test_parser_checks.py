@@ -252,9 +252,10 @@ def test_dataset_h5_signature_error_has_actionable_message() -> None:
     err = result.unwrap_err()
     assert isinstance(err, ValidationError)
     err_msg = str(err)
+    err_msg_normalized = err_msg.replace("\\", "/")
     assert "invalid HDF5 signature" in err_msg
     assert "load_profiles" in err_msg
-    assert "inputs_case/load.h5" in err_msg
+    assert "inputs_case/load.h5" in err_msg_normalized
 
 
 def test_dataset_non_h5_oserror_has_generic_message() -> None:
@@ -310,7 +311,8 @@ def test_dataset_oserror_with_unknown_fpath_uses_unknown_path() -> None:
     assert result.is_err()
     err = result.unwrap_err()
     assert isinstance(err, ValidationError)
-    assert "/tmp/reeds_case/<unknown>" in str(err)
+    err_msg_normalized = str(err).replace("\\", "/")
+    assert "/tmp/reeds_case/<unknown>" in err_msg_normalized
 
 
 def test_required_values_single_string_uses_scalar_branch(example_data_store: DataStore) -> None:

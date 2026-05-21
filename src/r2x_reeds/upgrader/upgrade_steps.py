@@ -30,6 +30,7 @@ def move_hmap_file(folder: Path, upgrader_context: dict[str, Any] | None = None)
         )
         return folder
 
+    new_location.parent.mkdir(parents=True, exist_ok=True)
     old_location.rename(new_location)
     logger.debug("Moved {} to {}", old_location.name, new_location)
     return folder
