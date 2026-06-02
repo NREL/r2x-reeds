@@ -215,41 +215,64 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         arr = np.asarray(arr, dtype=np.float64)
         return arr[:8760] if arr.shape[0] > 8760 else arr
 
-    def _get_hour_map_for_validation(self, placeholders: dict[str, Any]) -> pl.DataFrame:
-        """Return hour_map data, falling back to a synthetic in-memory frame when missing."""
+    def _get_hour_map_for_validation(self, placeholders: dict[str, Any]) -> Result[pl.DataFrame, str]:
+        """Return hour_map data or a synthetic fallback when the file is genuinely absent.
+
+        A synthetic frame is produced **only** when the hour_map key is not registered
+        in the store (``store.read_data`` returns ``None``) or when the backing file
+        does not exist on disk (``FileNotFoundError``).  All other failure modes are
+        returned as ``Err`` so that an existing-but-bad hour_map is a hard validation
+        error rather than a silent pass:
+
+        * Empty file → ``Err``
+        * Missing ``year`` column → ``Err``
+        * Parse / schema / permission errors on an existing file → ``Err``
+        """
         weather_years: list[int] = (
             [self.config.weather_year]
             if isinstance(self.config.weather_year, int)
             else list(self.config.weather_year)
         )
 
-        def _synthetic(reason: str) -> pl.DataFrame:
-            """Build and log a synthetic hour_map fallback for validation."""
+        def _synthetic(reason: str) -> Result[pl.DataFrame, str]:
+            """Build and log a synthetic hour_map fallback for a genuinely absent file."""
             synthetic = _build_synthetic_hour_map(weather_years)
             logger.warning(
                 "hour_map file is missing or unusable ({}). "
                 "Using synthetic in-memory hour_map for translation; no files will be written to source path.",
                 reason,
             )
-            return synthetic
+            return Ok(synthetic)
 
         try:
             data = self.store.read_data("hour_map", placeholders=placeholders)
-            if data is None:
-                return _synthetic("store returned None")
+        except FileNotFoundError as exc:
+            # File is not on disk at all — synthesize.
+            return _synthetic(str(exc))
+        except Exception as exc:
+            # File exists but could not be read (permissions, corrupt HDF5, etc.).
+            return Err(f"hour_map could not be read: {exc}")
+
+        if data is None:
+            # Key is not registered in the store — synthesize.
+            return _synthetic("store returned None")
+
+        try:
             if isinstance(data, pl.LazyFrame):
                 frame = data.collect()
             elif isinstance(data, pl.DataFrame):
                 frame = data
             else:
                 frame = pl.DataFrame(data)
+        except Exception as exc:
+            return Err(f"hour_map could not be collected: {exc}")
 
-            if frame.is_empty() or "year" not in frame.columns:
-                return _synthetic("hour_map has no rows or missing 'year' column")
+        if frame.is_empty():
+            return Err("hour_map file exists but contains no rows")
+        if "year" not in frame.columns:
+            return Err("hour_map file exists but is missing required 'year' column")
 
-            return frame
-        except Exception as exc:  # pragma: no cover - defensive across core reader backends
-            return _synthetic(str(exc))
+        return Ok(frame)
 
     def on_validate_config(self) -> Result[None, str]:
         """Validate configuration assets before upgrades or data I/O."""
@@ -349,9 +372,10 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             if isinstance(self.config.weather_year, int)
             else list(self.config.weather_year)
         )
-        hour_map_df = self._get_hour_map_for_validation(placeholders)
-        if "year" not in hour_map_df.columns:
-            return Err("Weather year(s): hour_map dataset is missing required 'year' column")
+        hour_map_result = self._get_hour_map_for_validation(placeholders)
+        if hour_map_result.is_err():
+            return Err(f"Weather year(s): {hour_map_result.err()}")
+        hour_map_df = hour_map_result.ok()
 
         available_weather_years = {
             int(val)
