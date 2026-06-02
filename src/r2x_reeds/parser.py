@@ -343,7 +343,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             return None
 
         columns_node = group.get("columns")
-        values_node = group.get("Value")
+        values_node = group.get("Value") or group.get("value")
         if columns_node is None or values_node is None:
             logger.warning(
                 "Dataset '{}' is missing required 'columns' or 'Value' nodes in {}",

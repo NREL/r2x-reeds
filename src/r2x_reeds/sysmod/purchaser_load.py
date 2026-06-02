@@ -187,76 +187,66 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
             "consume_characteristics",
         )
         if electrolyzer_capacity_raw is not None and not electrolyzer_capacity_raw.is_empty():
-            existing_electrolyzers = list(system.get_components(ReEDSElectrolyzerDemand))
-            if existing_electrolyzers:
-                logger.info(
-                    "Detected {} existing electrolyzer demand components; "
-                    "skipping cap.csv-based creation to avoid double counting.",
-                    len(existing_electrolyzers),
-                )
-            else:
-                cap_df = electrolyzer_capacity_raw.rename(
+            cap_df = electrolyzer_capacity_raw.rename(
+                {
+                    "i": "technology",
+                    "r": "region",
+                    "Value": "capacity",
+                    "t": "year",
+                }
+            )
+            if config.solve_year is not None and "year" in cap_df.columns:
+                cap_df = cap_df.filter(pl.col("year").cast(pl.Int64, strict=False) == config.solve_year)
+
+            cap_df = cap_df.filter(pl.col("technology").cast(pl.Utf8).str.to_lowercase() == "electrolyzer")
+
+            efficiency = 1.0
+            if consume_char_raw is not None and not consume_char_raw.is_empty():
+                consume_df = consume_char_raw.rename(
                     {
-                        "i": "technology",
-                        "r": "region",
-                        "Value": "capacity",
+                        "*i": "technology",
                         "t": "year",
                     }
                 )
-                if config.solve_year is not None and "year" in cap_df.columns:
-                    cap_df = cap_df.filter(pl.col("year").cast(pl.Int64, strict=False) == config.solve_year)
-
-                cap_df = cap_df.filter(
-                    pl.col("technology").cast(pl.Utf8).str.to_lowercase() == "electrolyzer"
+                if config.solve_year is not None and "year" in consume_df.columns:
+                    consume_df = consume_df.filter(
+                        pl.col("year").cast(pl.Int64, strict=False) == config.solve_year
+                    )
+                eff_rows = consume_df.filter(
+                    (pl.col("technology").cast(pl.Utf8).str.to_lowercase() == "electrolyzer")
+                    & (pl.col("parameter") == "electricity_efficiency")
                 )
+                if not eff_rows.is_empty():
+                    efficiency = float(eff_rows["value"].item(0))
 
-                efficiency = 1.0
-                if consume_char_raw is not None and not consume_char_raw.is_empty():
-                    consume_df = consume_char_raw.rename(
-                        {
-                            "*i": "technology",
-                            "t": "year",
-                        }
+            created = 0
+            for row in cap_df.iter_rows(named=True):
+                region_name = str(row.get("region", ""))
+                region = _get_region(system, region_name)
+                if not region:
+                    logger.debug("Skipping electrolyzer load in unknown region '{}'", region_name)
+                    continue
+
+                capacity = float(row.get("capacity", 0.0) or 0.0)
+                if capacity <= 0.0:
+                    continue
+
+                name = f"{region_name}_electrolyzer_demand"
+                if _component_exists(system, ReEDSElectrolyzerDemand, name):
+                    continue
+
+                system.add_component(
+                    ReEDSElectrolyzerDemand(
+                        name=name,
+                        region=region,
+                        technology="electrolyzer",
+                        capacity=capacity,
+                        electricity_efficiency=efficiency,
                     )
-                    if config.solve_year is not None and "year" in consume_df.columns:
-                        consume_df = consume_df.filter(
-                            pl.col("year").cast(pl.Int64, strict=False) == config.solve_year
-                        )
-                    eff_rows = consume_df.filter(
-                        (pl.col("technology").cast(pl.Utf8).str.to_lowercase() == "electrolyzer")
-                        & (pl.col("parameter") == "electricity_efficiency")
-                    )
-                    if not eff_rows.is_empty():
-                        efficiency = float(eff_rows["value"].item(0))
-
-                created = 0
-                for row in cap_df.iter_rows(named=True):
-                    region_name = str(row.get("region", ""))
-                    region = _get_region(system, region_name)
-                    if not region:
-                        logger.debug("Skipping electrolyzer load in unknown region '{}'", region_name)
-                        continue
-
-                    capacity = float(row.get("capacity", 0.0) or 0.0)
-                    if capacity <= 0.0:
-                        continue
-
-                    name = f"{region_name}_electrolyzer_demand"
-                    if _component_exists(system, ReEDSElectrolyzerDemand, name):
-                        continue
-
-                    system.add_component(
-                        ReEDSElectrolyzerDemand(
-                            name=name,
-                            region=region,
-                            technology="electrolyzer",
-                            capacity=capacity,
-                            electricity_efficiency=efficiency,
-                        )
-                    )
-                    created += 1
-                if created > 0:
-                    logger.info("Attached {} electrolyzer demand components", created)
+                )
+                created += 1
+            if created > 0:
+                logger.info("Attached {} electrolyzer demand components", created)
 
         # Data center consuming demand components from loadsite_op.csv.
         loadsite_raw = _read_optional_frame(config.loadsite_op_fpath, "loadsite_op")
