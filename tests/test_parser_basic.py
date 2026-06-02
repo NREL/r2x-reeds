@@ -177,6 +177,29 @@ def test_read_outputs_h5_group_missing_column_dataset_returns_none(
     assert result is None
 
 
+def test_read_outputs_h5_group_lowercase_value_dataset(tmp_path: Path, reeds_run_path: Path) -> None:
+    """H5 groups using lowercase 'value' (as declared in several file_mapping.json
+    entries, e.g. online_capacity) must be read without falling back or dropping data."""
+    parser = _build_parser(reeds_run_path)
+    h5_path = tmp_path / "outputs.h5"
+    with h5py.File(h5_path, "w") as h5_file:
+        group = h5_file.create_group("online_capacity")
+        # Mirrors what a ReEDS outputs.h5 group looks like when the measure column is
+        # stored as lowercase 'value' rather than 'Value'.
+        group.create_dataset("columns", data=np.array([b"i", b"r", b"value"]))
+        group.create_dataset("value", data=np.array([10.0, 20.0]))
+        group.create_dataset("i", data=np.array([b"wind-ons", b"upv"]))
+        group.create_dataset("r", data=np.array([b"p4", b"p5"]))
+
+    result = parser._read_outputs_h5_group(h5_path, "online_capacity")
+
+    assert result is not None, "lowercase 'value' dataset should be accepted"
+    df = result.collect()
+    assert not df.is_empty()
+    assert "value" in df.columns
+    assert list(df["value"].to_list()) == pytest.approx([10.0, 20.0])
+
+
 def test_read_outputs_h5_group_uses_cache_for_repeat_reads(tmp_path: Path, reeds_run_path: Path) -> None:
     """Repeated reads should return the cached LazyFrame for a dataset key."""
     parser = _build_parser(reeds_run_path)
@@ -256,7 +279,7 @@ def test_read_outputs_csv_fallback_optional_missing_returns_none(
 
 def test_read_outputs_csv_fallback_required_missing_raises(tmp_path: Path, reeds_run_path: Path) -> None:
     """Required output datasets should raise when neither H5 nor CSV is available."""
-    from r2x_core.datafile import DataFile
+    from r2x_core.datafile import DataFile, FileInfo
 
     parser = _build_parser(reeds_run_path)
     outputs_h5 = tmp_path / "outputs.h5"
@@ -265,7 +288,7 @@ def test_read_outputs_csv_fallback_required_missing_raises(tmp_path: Path, reeds
     parser.store._cache["required_out"] = DataFile(
         name="required_out",
         fpath=outputs_h5,
-        info={"description": "required", "is_input": False, "is_optional": False},
+        info=FileInfo(description="required", is_input=False, is_optional=False),
     )
 
     with pytest.raises(FileNotFoundError):

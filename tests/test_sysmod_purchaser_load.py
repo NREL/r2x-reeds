@@ -140,11 +140,11 @@ def test_purchaser_load_scope_missing_hour_map(tmp_path: Path, caplog) -> None:
 
 
 def test_purchaser_load_skips_electrolyzer_creation_when_existing(tmp_path: Path) -> None:
-    """Existing electrolyzer demand components are reused to avoid double counting."""
+    """Per-region duplicate check skips cap.csv creation when that exact component already exists."""
     system, p4, _ = _build_system()
 
     existing = ReEDSElectrolyzerDemand(
-        name="existing_electrolyzer",
+        name="p4_electrolyzer_demand",
         region=p4,
         technology="electrolyzer",
         capacity=200.0,
@@ -190,7 +190,64 @@ def test_purchaser_load_skips_electrolyzer_creation_when_existing(tmp_path: Path
 
     electrolyzers = list(system.get_components(ReEDSElectrolyzerDemand))
     assert len(electrolyzers) == 1
-    assert electrolyzers[0].name == "existing_electrolyzer"
+    assert electrolyzers[0].name == "p4_electrolyzer_demand"
+    # Pre-existing capacity must be unchanged (cap.csv row was skipped).
+    assert electrolyzers[0].capacity == pytest.approx(200.0)
 
     ts = system.get_time_series(electrolyzers[0]).data
     np.testing.assert_allclose(ts, np.array([10.0, 20.0, 30.0]), rtol=1e-5)
+
+
+def test_purchaser_load_creates_missing_region_when_other_exists(tmp_path: Path) -> None:
+    """Regression: an existing p4 electrolyzer must not prevent p5 from being created.
+
+    The old implementation skipped *all* cap.csv-based creation as soon as any
+    ReEDSElectrolyzerDemand was found in the system.  This test would have
+    failed under that logic because p5_electrolyzer_demand would never be added.
+    """
+    system, p4, _ = _build_system()
+
+    existing_p4 = ReEDSElectrolyzerDemand(
+        name="p4_electrolyzer_demand",
+        region=p4,
+        technology="electrolyzer",
+        capacity=200.0,
+        electricity_efficiency=1.0,
+    )
+    system.add_component(existing_p4)
+
+    hour_map_myr_path = _write_csv(
+        tmp_path / "hmap_myr.csv",
+        {
+            "yearhour": [1, 2, 3],
+            "h": ["h1", "h2", "h3"],
+        },
+    )
+    # cap.csv lists both p4 (already exists) and p5 (new).
+    electrolyzer_capacity_path = _write_csv(
+        tmp_path / "cap.csv",
+        {
+            "i": ["electrolyzer", "electrolyzer"],
+            "r": ["p4", "p5"],
+            "t": [2032, 2032],
+            "Value": [120.0, 80.0],
+        },
+    )
+
+    _run_modifier(
+        system,
+        solve_year=2032,
+        weather_year=2012,
+        hour_map_myr_fpath=hour_map_myr_path,
+        electrolyzer_capacity_fpath=electrolyzer_capacity_path,
+    )
+
+    electrolyzers = {c.name: c for c in system.get_components(ReEDSElectrolyzerDemand)}
+    assert len(electrolyzers) == 2, "Both p4 and p5 demand components should exist"
+
+    # Pre-existing p4 component must be unchanged.
+    assert electrolyzers["p4_electrolyzer_demand"].capacity == pytest.approx(200.0)
+
+    # New p5 component must have been created from cap.csv.
+    assert "p5_electrolyzer_demand" in electrolyzers
+    assert electrolyzers["p5_electrolyzer_demand"].capacity == pytest.approx(80.0)
