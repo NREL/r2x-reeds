@@ -113,6 +113,24 @@ def _build_synthetic_hour_map(weather_years: Iterable[int]) -> pl.DataFrame:
     return pl.DataFrame(rows)
 
 
+def _build_synthetic_hour_map(weather_years: Iterable[int]) -> pl.DataFrame:
+    """Build a minimal in-memory hour_map used only when source files are missing.
+
+    The synthetic frame is intentionally small and only guarantees validation
+    requirements needed for translation to proceed.
+    """
+    rows = [
+        {
+            "year": int(year),
+            "time_index": f"{int(year)}-01-01 00:00:00",
+            "hour_period": "h1",
+            "season": "annual",
+        }
+        for year in weather_years
+    ]
+    return pl.DataFrame(rows)
+
+
 class ReEDSParser(Plugin[ReEDSConfig]):
     """Parser for ReEDS model data using the Plugin[ReEDSConfig] pattern.
 
