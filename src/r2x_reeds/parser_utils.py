@@ -14,7 +14,7 @@ from rust_ok import Err, Ok, Result
 
 from r2x_core import PluginContext, System
 from r2x_core.exceptions import ValidationError
-from r2x_core.utils._rules import build_component_kwargs
+from r2x_core.utils import build_component_kwargs
 from r2x_reeds.models.components import ReEDSDemand, ReEDSRegion
 
 if TYPE_CHECKING:

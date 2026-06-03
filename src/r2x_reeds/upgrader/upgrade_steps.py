@@ -22,10 +22,15 @@ def move_hmap_file(folder: Path, upgrader_context: dict[str, Any] | None = None)
         return folder
 
     if not old_location.exists():
-        raise FileNotFoundError(
-            f"File {old_location} does not exist and target {new_location} does not exist either."
+        logger.warning(
+            "hmap_allyrs.csv not found at {} or {}. "
+            "Skipping file move; parser will use an in-memory fallback hour_map for translation.",
+            old_location,
+            new_location,
         )
+        return folder
 
+    new_location.parent.mkdir(parents=True, exist_ok=True)
     old_location.rename(new_location)
     logger.debug("Moved {} to {}", old_location.name, new_location)
     return folder
