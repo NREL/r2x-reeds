@@ -264,6 +264,46 @@
   },
   {
     "source_type": "data_row",
+    "target_type": "ReEDSElectrolyzerDemand",
+    "version": 1,
+    "name": "electrolyzer_demand",
+    "field_map": {
+      "technology": "technology",
+      "capacity": "capacity",
+      "category": "category",
+      "forced_outage_rate": "forced_outage_rate",
+      "planned_outage_rate": "planned_outage_rate",
+      "fuel_price": "fuel_price",
+      "heat_rate": "heat_rate",
+      "max_age": "max_age",
+      "vom_cost": "vom_cost",
+      "fom_cost": "fom_cost",
+      "capital_cost": "capital_cost",
+      "vintage": "vintage",
+      "electricity_efficiency": "electricity_efficiency",
+      "storage_transport_adder": "storage_transport_adder"
+    },
+    "getters": {
+      "name": "build_generator_name",
+      "region": "lookup_region"
+    },
+    "defaults": {
+      "category": null,
+      "forced_outage_rate": null,
+      "planned_outage_rate": null,
+      "max_age": null,
+      "vom_cost": null,
+      "fuel_price": null,
+      "heat_rate": null,
+      "fom_cost": null,
+      "capital_cost": null,
+      "vintage": null,
+      "electricity_efficiency": 1.0,
+      "storage_transport_adder": null
+    }
+  },
+  {
+    "source_type": "data_row",
     "target_type": "ReEDSRegion",
     "version": 1,
     "name": "region",

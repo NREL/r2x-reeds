@@ -2,5 +2,6 @@
 
 from .break_gens import break_generators
 from .optimal_siting import add_optimal_siting
+from .purchaser_load import add_purchaser_load
 
-__all__ = ["add_optimal_siting", "break_generators"]
+__all__ = ["add_optimal_siting", "add_purchaser_load", "break_generators"]

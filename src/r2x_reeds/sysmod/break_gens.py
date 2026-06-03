@@ -40,6 +40,18 @@ class BreakGensConfig(PluginConfig):
         default="category",
         description="Field name used to look up reference units.",
     )
+    include_regions: list[str] | None = Field(
+        default=None,
+        description="Optional region names (balancing areas) to include for generator splitting.",
+    )
+    include_generators: list[str] | None = Field(
+        default=None,
+        description="Optional generator names to include for splitting.",
+    )
+    include_technologies: list[str] | None = Field(
+        default=None,
+        description="Optional technology names to include for splitting.",
+    )
 
 
 @expose_plugin
@@ -60,6 +72,9 @@ def break_generators(
         capacity_threshold=config.drop_capacity_threshold,
         skip_categories=config.skip_categories,
         break_category=config.break_category,
+        include_regions=config.include_regions,
+        include_generators=config.include_generators,
+        include_technologies=config.include_technologies,
     )
 
     return Ok(system)
@@ -71,14 +86,47 @@ def _break_system_generators(
     capacity_threshold: float,
     skip_categories: list[str] | None = None,
     break_category: str = "category",
+    include_regions: list[str] | None = None,
+    include_generators: list[str] | None = None,
+    include_technologies: list[str] | None = None,
 ) -> System:
     """Break component generator into smaller units."""
     skip_set: set[str] = {str(value) for value in skip_categories} if skip_categories else set()
+    include_region_set = {str(value).casefold() for value in include_regions} if include_regions else None
+    include_generator_set = (
+        {str(value).casefold() for value in include_generators} if include_generators else None
+    )
+    include_technology_set = (
+        {str(value).casefold() for value in include_technologies} if include_technologies else None
+    )
+    include_filters_enabled = any(
+        include_set is not None
+        for include_set in (include_region_set, include_generator_set, include_technology_set)
+    )
 
     capacity_dropped = 0
     for component in system.get_components(
         ReEDSGenerator, filter_func=lambda comp: getattr(comp, break_category, None)
     ):
+        region_match = (
+            include_region_set is not None and component.region.name.casefold() in include_region_set
+        )
+        generator_match = (
+            include_generator_set is not None and component.name.casefold() in include_generator_set
+        )
+        technology_match = (
+            include_technology_set is not None
+            and component.technology is not None
+            and component.technology.casefold() in include_technology_set
+        )
+
+        if include_filters_enabled and not (region_match or generator_match or technology_match):
+            logger.trace(
+                "Skipping component {} because it does not match include_regions/include_generators/include_technologies",
+                component.name,
+            )
+            continue
+
         tech_key = str(getattr(component, break_category))
         logger.trace("Extracted technology key: {}", tech_key)
 

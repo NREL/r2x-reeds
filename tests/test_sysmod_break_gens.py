@@ -9,7 +9,7 @@ import pytest
 from infrasys import SingleTimeSeries
 
 from r2x_core import System
-from r2x_reeds.models.components import ReEDSEmission, ReEDSGenerator
+from r2x_reeds.models.components import ReEDSEmission, ReEDSGenerator, ReEDSRegion
 from r2x_reeds.models.enums import EmissionType
 from r2x_reeds.sysmod.break_gens import BreakGensConfig, break_generators
 
@@ -549,6 +549,170 @@ def test_break_generators_with_custom_break_category(system_with_region) -> None
 
     generators = list(sys.get_components(ReEDSGenerator))
     assert {gen.name for gen in generators} == {"gen_01", "gen_02", "gen_03"}
+
+
+def test_break_generators_include_regions_filter() -> None:
+    """Only generators in selected balancing areas are disaggregated."""
+    sys = System(name="Test", auto_add_composed_components=True)
+    r1 = ReEDSRegion(name="p1")
+    r2 = ReEDSRegion(name="p2")
+    sys.add_component(r1)
+    sys.add_component(r2)
+
+    gen_r1 = ReEDSGenerator(
+        name="gen_p1",
+        region=r1,
+        technology="wind",
+        capacity=120.0,
+        category="wind",
+    )
+    gen_r2 = ReEDSGenerator(
+        name="gen_p2",
+        region=r2,
+        technology="wind",
+        capacity=120.0,
+        category="wind",
+    )
+    sys.add_component(gen_r1)
+    sys.add_component(gen_r2)
+
+    _run_break(
+        sys,
+        reference_units={"wind": {"capacity_MW": 50}},
+        include_regions=["p1"],
+    )
+
+    names = {gen.name for gen in sys.get_components(ReEDSGenerator)}
+    assert names == {"gen_p1_01", "gen_p1_02", "gen_p1_03", "gen_p2"}
+
+
+def test_break_generators_include_generators_filter(system_with_region) -> None:
+    """Only explicitly selected generators are disaggregated."""
+    sys, region = system_with_region
+    selected = ReEDSGenerator(
+        name="selected_gen",
+        region=region,
+        technology="wind",
+        capacity=120.0,
+        category="wind",
+    )
+    untouched = ReEDSGenerator(
+        name="untouched_gen",
+        region=region,
+        technology="wind",
+        capacity=120.0,
+        category="wind",
+    )
+    sys.add_component(selected)
+    sys.add_component(untouched)
+
+    _run_break(
+        sys,
+        reference_units={"wind": {"capacity_MW": 50}},
+        include_generators=["selected_gen"],
+    )
+
+    names = {gen.name for gen in sys.get_components(ReEDSGenerator)}
+    assert names == {"selected_gen_01", "selected_gen_02", "selected_gen_03", "untouched_gen"}
+
+
+def test_break_generators_include_technologies_filter(system_with_region) -> None:
+    """Only selected technologies are disaggregated."""
+    sys, region = system_with_region
+    wind = ReEDSGenerator(
+        name="wind_gen",
+        region=region,
+        technology="wind",
+        capacity=120.0,
+        category="wind",
+    )
+    solar = ReEDSGenerator(
+        name="solar_gen",
+        region=region,
+        technology="pv",
+        capacity=120.0,
+        category="solar",
+    )
+    sys.add_component(wind)
+    sys.add_component(solar)
+
+    _run_break(
+        sys,
+        reference_units={"wind": {"capacity_MW": 50}, "solar": {"capacity_MW": 50}},
+        include_technologies=["wind"],
+    )
+
+    names = {gen.name for gen in sys.get_components(ReEDSGenerator)}
+    assert names == {"wind_gen_01", "wind_gen_02", "wind_gen_03", "solar_gen"}
+
+
+def test_break_generators_include_filters_use_or_behavior() -> None:
+    """A generator should be split when it matches any include filter."""
+    sys = System(name="Test", auto_add_composed_components=True)
+    r1 = ReEDSRegion(name="p1")
+    r2 = ReEDSRegion(name="p2")
+    sys.add_component(r1)
+    sys.add_component(r2)
+
+    region_match_only = ReEDSGenerator(
+        name="region_match",
+        region=r1,
+        technology="coal",
+        capacity=120.0,
+        category="coal",
+    )
+    generator_match_only = ReEDSGenerator(
+        name="target_gen",
+        region=r2,
+        technology="coal",
+        capacity=120.0,
+        category="coal",
+    )
+    technology_match_only = ReEDSGenerator(
+        name="tech_match",
+        region=r2,
+        technology="wind",
+        capacity=120.0,
+        category="wind",
+    )
+    no_match = ReEDSGenerator(
+        name="no_match",
+        region=r2,
+        technology="solar",
+        capacity=120.0,
+        category="solar",
+    )
+
+    sys.add_component(region_match_only)
+    sys.add_component(generator_match_only)
+    sys.add_component(technology_match_only)
+    sys.add_component(no_match)
+
+    _run_break(
+        sys,
+        reference_units={
+            "coal": {"capacity_MW": 50},
+            "wind": {"capacity_MW": 50},
+            "solar": {"capacity_MW": 50},
+        },
+        include_regions=["p1"],
+        include_generators=["target_gen"],
+        include_technologies=["wind"],
+    )
+
+    names = {gen.name for gen in sys.get_components(ReEDSGenerator)}
+    assert names == {
+        "region_match_01",
+        "region_match_02",
+        "region_match_03",
+        "target_gen_01",
+        "target_gen_02",
+        "target_gen_03",
+        "tech_match_01",
+        "tech_match_02",
+        "tech_match_03",
+        "no_match",
+    }
 
 
 def test_load_reference_units_with_dict_input(caplog) -> None:

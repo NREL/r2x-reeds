@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import calendar
 import importlib
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
@@ -170,7 +170,7 @@ def merge_lazy_frames(
 def get_generator_class(
     tech: str,
     technology_categories: dict[str, Any],
-    category_class_mapping: dict[str, str] | dict[str, type],
+    category_class_mapping: Mapping[str, str | type[ReEDSGenerator]],
     models_path: Literal["r2x_reeds.models"] = "r2x_reeds.models",
 ) -> Result[type[ReEDSGenerator], TypeError]:
     """Determine the appropriate generator class based on technology category using config mapping.
@@ -204,7 +204,7 @@ def get_generator_class(
             continue
         # If it's already a type, return it directly
         if isinstance(class_or_name, type):
-            return Ok(cast("type[ReEDSGenerator]", class_or_name))
+            return Ok(class_or_name)
         # Otherwise it's a string class name, look it up in the module
         class_name: str = class_or_name
         if model := getattr(module, class_name, None):
@@ -215,8 +215,8 @@ def get_generator_class(
 
 
 def _prepare_generator_dataset(
-    capacity_data: pl.LazyFrame,
-    optional_data: dict[str, pl.LazyFrame | None],
+    capacity_data: pl.LazyFrame | None,
+    optional_data: Mapping[str, pl.LazyFrame | None],
     excluded_technologies: list[str],
     technology_categories: dict[str, Any],
 ) -> Result[pl.DataFrame, ValidationError]:
@@ -333,7 +333,7 @@ def _prepare_generator_dataset(
         except Exception as e:
             return Err(ValidationError(f"Failed to join {name} data: {e}"))
 
-    collected: pl.DataFrame = df.collect()
+    collected = cast(pl.DataFrame, df.collect())
     df_out = collected.with_columns(pl.col("technology").str.split("_").list.get(0).alias("technology_base"))
 
     if "fuel_type" not in df_out.columns:
@@ -506,7 +506,7 @@ def _collect_component_kwargs_from_rule(
     data: pl.DataFrame,
     *,
     rule_provider: Rule | Callable[[Mapping[str, Any]], Result[Rule, ValidationError]],
-    parser_context: PluginContext,
+    parser_context: PluginContext | None,
     row_identifier_getter: Callable[[Mapping[str, Any]], Result[str, Exception]],
 ) -> Result[list[tuple[str, dict[str, Any]]], ValidationError]:
     """Collect kwargs dictionaries for rule-driven components."""
@@ -532,7 +532,18 @@ def _collect_component_kwargs_from_rule(
             case _:
                 continue
 
-        rule_result = rule_provider(row) if callable(rule_provider) else Ok(rule_provider)
+        if isinstance(rule_provider, type):
+            rule_result = Err(ValidationError(f"{identifier_value}: Invalid rule provider type"))
+        elif hasattr(rule_provider, "get_target_types"):
+            rule_result = Ok(cast("Rule", rule_provider))
+        else:
+            # Keep this cast annotation as a string to avoid runtime NameError when Rule
+            # is only imported under TYPE_CHECKING.
+            provider_fn = cast(
+                "Callable[[Mapping[str, Any]], Result[Rule, ValidationError]]",
+                rule_provider,
+            )
+            rule_result = provider_fn(row)
         if rule_result.is_err():
             rule_error = rule_result.err()
             errors.append(f"{identifier_value}: {rule_error}")
@@ -542,6 +553,12 @@ def _collect_component_kwargs_from_rule(
         if selected_rule is None:
             errors.append(f"{identifier_value}: Rule resolution returned None")
             logger.error("Failed to resolve rule for %s: returned None", identifier_value)
+            continue
+
+        if parser_context is None:
+            error_msg = "Parser context is required to build component kwargs"
+            errors.append(f"{identifier_value}: {error_msg}")
+            logger.error("Failed to build kwargs for %s: %s", identifier_value, error_msg)
             continue
 
         result = build_component_kwargs(row, rule=selected_rule, context=parser_context)
@@ -570,7 +587,7 @@ def _collect_component_kwargs_from_rule(
 def _resolve_generator_rule_from_row(
     row: Mapping[str, Any],
     technology_categories: dict[str, Any],
-    category_class_mapping: dict[str, str],
+    category_class_mapping: Mapping[str, str | type[ReEDSGenerator]],
     rules_by_target: dict[str, list[Rule]],
 ) -> Result[Rule, ValidationError]:
     """Return the parser rule that matches the generator technology."""
@@ -599,8 +616,8 @@ def _resolve_generator_rule_from_row(
 
 
 def prepare_generator_inputs(
-    capacity_data: pl.LazyFrame,
-    optional_data: dict[str, pl.LazyFrame | None],
+    capacity_data: pl.LazyFrame | None,
+    optional_data: Mapping[str, pl.LazyFrame | None],
     excluded_technologies: list[str],
     technology_categories: dict[str, Any],
     *,
@@ -645,15 +662,16 @@ def prepare_generator_inputs(
     return Ok((aggregated_variable_df, non_variable_df))
 
 
-def get_rules_by_target(rules: list[Rule]) -> Result[dict[str, list[Rule]], ValidationError]:
+def get_rules_by_target(rules: list[Any]) -> Result[dict[str, list[Rule]], ValidationError]:
     """Group parser rules by their target component types."""
 
     from collections import defaultdict
 
     rules_by_target: defaultdict[Any, list[Rule]] = defaultdict(list)
     for rule in rules:
-        for target_type in rule.get_target_types():
-            rules_by_target[target_type].append(rule)
+        typed_rule = cast("Rule", rule)
+        for target_type in typed_rule.get_target_types():
+            rules_by_target[target_type].append(typed_rule)
     return Ok(rules_by_target)
 
 
@@ -733,7 +751,7 @@ def build_generator_emission_lookup(
 def match_emission_rows_to_generators(
     emission_df: pl.DataFrame,
     *,
-    generator_lookup: dict[tuple[str | None, str, str], list[str]],
+    generator_lookup: Mapping[tuple[Any, str, str], Sequence[str]],
 ) -> pl.DataFrame:
     """Match emission rows to generators using the lookup."""
     emission_df = emission_df.with_columns(

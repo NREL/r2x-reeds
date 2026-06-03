@@ -14,6 +14,7 @@ from r2x_reeds.sysmod.emission_cap import add_emission_cap
 from r2x_reeds.sysmod.imports import add_imports
 from r2x_reeds.sysmod.optimal_siting import add_optimal_siting
 from r2x_reeds.sysmod.pcm_defaults import add_pcm_defaults
+from r2x_reeds.sysmod.purchaser_load import add_purchaser_load
 from r2x_reeds.upgrader.data_upgrader import ReEDSUpgrader, ReEDSVersionDetector
 
 # Main parser plugin
@@ -29,6 +30,7 @@ system_modifiers = {
     "break-gens": break_generators,
     "add-imports": add_imports,
     "add-optimal-siting": add_optimal_siting,
+    "add-purchaser-load": add_purchaser_load,
 }
 
 __all__ = [

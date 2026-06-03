@@ -1,9 +1,9 @@
 """Enumerations for ReEDS model components."""
 
-from enum import Enum
+from enum import StrEnum
 
 
-class EmissionType(str, Enum):
+class EmissionType(StrEnum):
     """Types of emissions tracked in power system models."""
 
     CO2E = "CO2E"
@@ -19,14 +19,14 @@ class EmissionType(str, Enum):
     H2 = "H2"
 
 
-class EmissionSource(str, Enum):
+class EmissionSource(StrEnum):
     """Sources for emissions tracking, used by emission components."""
 
     COMBUSTION = "COMBUSTION"
     PRECOMBUSTION = "PRECOMBUSTION"
 
 
-class ReserveType(str, Enum):
+class ReserveType(StrEnum):
     """Types of operating reserves."""
 
     REGULATION = "REGULATION"
@@ -37,14 +37,14 @@ class ReserveType(str, Enum):
     COMBO = "COMBO"
 
 
-class ReserveDirection(str, Enum):
+class ReserveDirection(StrEnum):
     """Direction of reserve provision."""
 
     UP = "Up"
     DOWN = "Down"
 
 
-class FuelType(str, Enum):
+class FuelType(StrEnum):
     """Fuel types mapped from ReEDS ``fuel2tech`` data."""
 
     COAL = "COAL"

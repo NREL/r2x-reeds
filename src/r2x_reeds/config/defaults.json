@@ -152,7 +152,7 @@
     "hydro": "ReEDSHydroGenerator",
     "hydro_dispatchable": "ReEDSHydroGenerator",
     "hydro_nondispatchable": "ReEDSHydroGenerator",
-    "electrolyzer": "ReEDSConsumingTechnology",
+    "electrolyzer": "ReEDSElectrolyzerDemand",
     "thermal": "ReEDSThermalGenerator",
     "solar": "ReEDSVariableGenerator",
     "wind": "ReEDSVariableGenerator",

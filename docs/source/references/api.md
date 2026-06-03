@@ -24,6 +24,22 @@ Complete API documentation for all r2x-reeds classes and functions.
    :field-list-validators: False
 ```
 
+## Upgrader
+
+```{eval-rst}
+.. autoclass:: r2x_reeds.upgrader.data_upgrader.ReEDSVersionDetector
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+```{eval-rst}
+.. autoclass:: r2x_reeds.upgrader.data_upgrader.ReEDSUpgrader
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Component Models
 
 ### Generator
@@ -124,3 +140,4 @@ Complete API documentation for all r2x-reeds classes and functions.
 ## See Also
 
 - {doc}`../how-tos/index` - How-to guides
+- {doc}`transforms` - Transform behavior and config overview

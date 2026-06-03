@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 
 pytestmark = [pytest.mark.unit]
@@ -88,7 +90,7 @@ def test_merge_lazy_frames_success() -> None:
 
     left = pl.DataFrame({"key": [1, 2], "value": ["a", "b"]}).lazy()
     right = pl.DataFrame({"key": [1], "other": ["x"]}).lazy()
-    merged_df = parser_utils.merge_lazy_frames(left, right, on=["key"]).unwrap().collect()
+    merged_df = cast(pl.DataFrame, parser_utils.merge_lazy_frames(left, right, on=["key"]).unwrap().collect())
     assert merged_df.shape[0] == 2
     assert merged_df.filter(pl.col("other").is_not_null()).shape[0] == 1
     assert merged_df["other"][0] == "x"
@@ -627,6 +629,7 @@ def test_calculate_reserve_requirement_empty_generators() -> None:
 def test_collect_component_kwargs_missing_identifier() -> None:
     """Test error handling when identifier is empty/None."""
     import polars as pl
+    from rust_ok import Err
 
     from r2x_core.exceptions import ValidationError
     from r2x_reeds import parser_utils
@@ -644,8 +647,8 @@ def test_collect_component_kwargs_missing_identifier() -> None:
 
     result = parser_utils._collect_component_kwargs_from_rule(
         data=df,
-        rule_provider=DummyRule(),  # type: ignore[arg-type]
-        parser_context=None,  # type: ignore[arg-type]
+        rule_provider=lambda _row: Err(ValidationError("unused")),
+        parser_context=None,
         row_identifier_getter=failing_identifier_getter,
     )
     assert result.is_err()
@@ -739,7 +742,7 @@ def test_merge_lazy_frames_with_no_matches() -> None:
     left = pl.DataFrame({"key": [1, 2], "value": ["a", "b"]}).lazy()
     right = pl.DataFrame({"key": [3, 4], "other": ["x", "y"]}).lazy()
 
-    merged = parser_utils.merge_lazy_frames(left, right, on=["key"]).unwrap().collect()
+    merged = cast(pl.DataFrame, parser_utils.merge_lazy_frames(left, right, on=["key"]).unwrap().collect())
     # No matches, so right values should be null
     assert merged.filter(pl.col("other").is_not_null()).shape[0] == 0
 
@@ -839,7 +842,7 @@ def test_merge_lazy_frames_empty_left() -> None:
     left = pl.DataFrame({"key": [], "value": []}).cast({"key": pl.Int64, "value": pl.Utf8}).lazy()
     right = pl.DataFrame({"key": [1, 2], "other": ["x", "y"]}).lazy()
 
-    merged = parser_utils.merge_lazy_frames(left, right, on=["key"]).unwrap().collect()
+    merged = cast(pl.DataFrame, parser_utils.merge_lazy_frames(left, right, on=["key"]).unwrap().collect())
     assert merged.shape[0] == 0
 
 
@@ -852,7 +855,10 @@ def test_merge_lazy_frames_inner_join() -> None:
     left = pl.DataFrame({"key": [1, 2, 3], "value": ["a", "b", "c"]}).lazy()
     right = pl.DataFrame({"key": [2, 3, 4], "other": ["x", "y", "z"]}).lazy()
 
-    merged = parser_utils.merge_lazy_frames(left, right, on=["key"], how="inner").unwrap().collect()
+    merged = cast(
+        pl.DataFrame,
+        parser_utils.merge_lazy_frames(left, right, on=["key"], how="inner").unwrap().collect(),
+    )
     # Only keys 2 and 3 are in both
     assert merged.shape[0] == 2
     assert set(merged["key"].to_list()) == {2, 3}
@@ -867,7 +873,10 @@ def test_merge_lazy_frames_custom_suffix() -> None:
     left = pl.DataFrame({"key": [1], "value": ["a"]}).lazy()
     right = pl.DataFrame({"key": [1], "value": ["x"]}).lazy()
 
-    merged = parser_utils.merge_lazy_frames(left, right, on=["key"], suffix="_other").unwrap().collect()
+    merged = cast(
+        pl.DataFrame,
+        parser_utils.merge_lazy_frames(left, right, on=["key"], suffix="_other").unwrap().collect(),
+    )
     assert "value" in merged.columns
     assert "value_other" in merged.columns
 
@@ -1173,8 +1182,8 @@ def test_collect_component_kwargs_identifier_returns_err() -> None:
 
     result = parser_utils._collect_component_kwargs_from_rule(
         data=df,
-        rule_provider=DummyRule(),  # type: ignore[arg-type]
-        parser_context=None,  # type: ignore[arg-type]
+        rule_provider=lambda _row: Err(ValidationError("unused")),
+        parser_context=None,
         row_identifier_getter=failing_identifier_getter,
     )
     assert result.is_err()
@@ -1189,8 +1198,9 @@ def test_collect_component_kwargs_empty_dataframe() -> None:
     from typing import Any
 
     import polars as pl
-    from rust_ok import Ok, Result
+    from rust_ok import Err, Ok, Result
 
+    from r2x_core.exceptions import ValidationError
     from r2x_reeds import parser_utils
 
     df = pl.DataFrame({"col1": []})
@@ -1203,8 +1213,8 @@ def test_collect_component_kwargs_empty_dataframe() -> None:
 
     result = parser_utils._collect_component_kwargs_from_rule(
         data=df,
-        rule_provider=DummyRule(),  # type: ignore[arg-type]
-        parser_context=None,  # type: ignore[arg-type]
+        rule_provider=lambda _row: Err(ValidationError("unused")),
+        parser_context=None,
         row_identifier_getter=identifier_getter,
     )
     collected = result.unwrap()

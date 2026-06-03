@@ -27,5 +27,6 @@ def test_plugins_exports() -> None:
     assert "break-gens" in system_modifiers
     assert "add-imports" in system_modifiers
     assert "add-optimal-siting" in system_modifiers
+    assert "add-purchaser-load" in system_modifiers
     assert ReEDSUpgrader is not None
     assert ReEDSVersionDetector is not None

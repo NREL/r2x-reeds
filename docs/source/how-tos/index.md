@@ -1,3 +1,9 @@
 # How-To Guides
 
-🚧 **Documentation in Progress**
+Task-focused guides for common workflows.
+
+```{toctree}
+:maxdepth: 1
+
+purchaser-load
+```

@@ -232,6 +232,26 @@ class ReEDSConsumingTechnology(HasUnits, ReEDSComponent):
     vintage: Annotated[str | None, Field(description="Vintage bin identifier")] = None
 
 
+class ReEDSElectrolyzerDemand(ReEDSConsumingTechnology):
+    """Electricity demand from electrolyzers."""
+
+    region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
+    max_active_power: Annotated[
+        float | None,
+        Field(description="Maximum active power demand in MW"),
+    ] = None
+
+
+class ReEDSDataCenterDemand(ReEDSConsumingTechnology):
+    """Electricity demand from data centers or other large facilities."""
+
+    region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
+    max_active_power: Annotated[
+        float | None,
+        Field(description="Maximum active power demand in MW"),
+    ] = None
+
+
 class ReEDSH2Storage(HasUnits, ReEDSComponent):
     """H2 storage infrastructure."""
 

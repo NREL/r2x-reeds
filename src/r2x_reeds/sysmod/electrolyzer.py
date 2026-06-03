@@ -6,6 +6,7 @@ each of the ReEDS regions.
 
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import polars as pl
@@ -189,14 +190,16 @@ def _add_electrolyzer_load(
     return system
 
 
-def _add_hydrogen_fuel_price(system: System, h2_prices: pl.DataFrame, weather_year: int) -> System:
+def _add_hydrogen_fuel_price(
+    system: System, h2_prices: pl.DataFrame | pl.LazyFrame | None, weather_year: int
+) -> System:
     """Add monthly hydrogen fuel price for generators using hydrogen.
 
     Parameters
     ----------
     system : System
         The system to modify.
-    h2_prices : pl.DataFrame
+    h2_prices : pl.DataFrame | pl.LazyFrame | None
         Hydrogen fuel price data with columns: region, month, h2_price.
     weather_year : int
         The weather year for the time series.
@@ -207,7 +210,7 @@ def _add_hydrogen_fuel_price(system: System, h2_prices: pl.DataFrame, weather_ye
         The modified system.
     """
     if isinstance(h2_prices, pl.LazyFrame):
-        h2_prices = h2_prices.collect()
+        h2_prices = cast(pl.DataFrame, h2_prices.collect())
 
     if h2_prices is None or h2_prices.is_empty():
         logger.warning("Hydrogen fuel price data is empty. Skipping hydrogen fuel price.")
