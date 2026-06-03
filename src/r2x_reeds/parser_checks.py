@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from r2x_core import Err, Ok, Result
@@ -28,8 +29,27 @@ def check_dataset_non_empty(
         msg = f"Key {name} not found in data store. Check spelling."
         return Err(ValidationError(msg))
 
-    data = store.read_data(name, placeholders=placeholders)
     datafile_metadata = store[name]
+    raw_fpath = datafile_metadata.fpath
+    if raw_fpath is None:
+        absolute_fpath = store.folder / "<unknown>"
+    else:
+        fpath = Path(raw_fpath)
+        absolute_fpath = fpath if fpath.is_absolute() else store.folder / fpath
+
+    try:
+        data = store.read_data(name, placeholders=placeholders)
+    except OSError as exc:
+        if absolute_fpath.suffix.lower() == ".h5" and "file signature not found" in str(exc).lower():
+            msg = (
+                f"Dataset {name!r} failed to read from {absolute_fpath}: invalid HDF5 signature. "
+                "The file is not a valid HDF5 binary (often zero-filled/corrupted or mislabeled). "
+                "Re-copy/regenerate this .h5 from the ReEDS run output."
+            )
+            return Err(ValidationError(msg))
+
+        msg = f"Failed reading dataset {name!r} from {absolute_fpath}: {exc}"
+        return Err(ValidationError(msg))
 
     if not data.limit(1).collect().is_empty():
         return Ok()
