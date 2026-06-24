@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.6.0](https://github.com/NatLabRockies/r2x-reeds/compare/v0.5.0...v0.6.0) (2026-06-24)
+
+
+### 🚀 Features
+
+* add compatibility with old missing hmap all hours reeds runs ([#72](https://github.com/NatLabRockies/r2x-reeds/issues/72)) ([a0f4176](https://github.com/NatLabRockies/r2x-reeds/commit/a0f4176089c007276a0899231322f3b76c388d83))
+* add new system modifier for Purchaser loads (Electrolyzers and DataCenter loads) ([#68](https://github.com/NatLabRockies/r2x-reeds/issues/68)) ([a85589b](https://github.com/NatLabRockies/r2x-reeds/commit/a85589b35d72a28418e2406c72ee699688a33640))
+
+
+### 🐛 Bug Fixes
+
+* make deprecated agglevels optional ([#76](https://github.com/NatLabRockies/r2x-reeds/issues/76)) ([218cfaf](https://github.com/NatLabRockies/r2x-reeds/commit/218cfaf6781446aa7263e439f5ff7a5a6364243b))
+* Update ramp_limits to ramp_rate ([#70](https://github.com/NatLabRockies/r2x-reeds/issues/70)) ([da782c7](https://github.com/NatLabRockies/r2x-reeds/commit/da782c71bd6896da08d09c9d9ad460e89f6274ac))
+
+
+### 📦 Build
+
+* **deps:** bump actions/labeler from 6.0.1 to 6.1.0 ([#69](https://github.com/NatLabRockies/r2x-reeds/issues/69)) ([117f066](https://github.com/NatLabRockies/r2x-reeds/commit/117f066ca845d68b7d1ea03ba588b7819f637dac))
+* **deps:** bump actions/upload-artifact from 7.0.0 to 7.0.1 ([#67](https://github.com/NatLabRockies/r2x-reeds/issues/67)) ([5560f01](https://github.com/NatLabRockies/r2x-reeds/commit/5560f01355c9d2e592c822b154d5dd929a6e22d4))
+* **deps:** bump codecov/codecov-action from 5.5.3 to 6.0.1 ([#74](https://github.com/NatLabRockies/r2x-reeds/issues/74)) ([401d9a2](https://github.com/NatLabRockies/r2x-reeds/commit/401d9a2ec277ccfd13f007019b3a6743cf57bb23))
+* **deps:** bump googleapis/release-please-action ([#62](https://github.com/NatLabRockies/r2x-reeds/issues/62)) ([68365a4](https://github.com/NatLabRockies/r2x-reeds/commit/68365a4da9428f166ee04ae372b8243b2e9ff190))
+* **deps:** bump peaceiris/actions-gh-pages from 4.0.0 to 4.1.0 ([#73](https://github.com/NatLabRockies/r2x-reeds/issues/73)) ([bd28120](https://github.com/NatLabRockies/r2x-reeds/commit/bd28120fd7078f8a686624ba80116947187b3997))
+* **deps:** bump pypa/gh-action-pypi-publish from 1.13.0 to 1.14.0 ([#66](https://github.com/NatLabRockies/r2x-reeds/issues/66)) ([bc443e2](https://github.com/NatLabRockies/r2x-reeds/commit/bc443e249af95d8ff730c58fc6c734ec1c1a808b))
+
 ## [0.5.0](https://github.com/NatLabRockies/r2x-reeds/compare/v0.4.0...v0.5.0) (2026-04-06)
 
 
