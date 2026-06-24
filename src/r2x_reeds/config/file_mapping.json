@@ -718,8 +718,9 @@
     "info": {
       "description": "test",
       "is_input": true,
-      "is_optional": false
-    }
+      "is_optional": true
+    },
+    "removed": true
   },
   {
     "name": "region_timezone_map",
