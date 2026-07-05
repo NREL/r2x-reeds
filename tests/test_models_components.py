@@ -174,7 +174,7 @@ def test_resource_site_valid_and_exported(sample_region):
         capacity=341.13,
         available_capacity=254.58,
         capacity_factor=0.1877,
-        supply_curve_cost_per_mw=577564.52875,
+        supply_curve_cost={"value": 577564.52875, "unit": "$/MW"},
     )
 
     assert site.region == sample_region
@@ -183,6 +183,7 @@ def test_resource_site_valid_and_exported(sample_region):
     assert site.capacity == 341.13
     assert site.available_capacity == 254.58
     assert site.capacity_factor == 0.1877
+    assert site.supply_curve_cost == 577564.52875
 
 
 def test_resource_build_valid_and_exported(sample_region):
@@ -200,13 +201,14 @@ def test_resource_build_valid_and_exported(sample_region):
         capacity=341.13,
         available_capacity=254.58,
         capacity_factor=0.1877,
-        supply_curve_cost_per_mw=577564.52875,
+        supply_curve_cost=577564.52875,
     )
 
     assert build.year == 2009
     assert build.built_capacity == 0.3731343025384888
     assert build.investment_bool is True
     assert build.sc_point_gid == 416
+    assert build.supply_curve_cost == 577564.52875
 
 
 def test_storage_generator_valid(storage_generator):

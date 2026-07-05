@@ -673,7 +673,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },
@@ -690,7 +691,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },
@@ -707,7 +709,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },
@@ -724,7 +727,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },
@@ -741,7 +745,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },
@@ -758,7 +763,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },
@@ -775,7 +781,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },
@@ -792,7 +799,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },
@@ -809,7 +817,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },
@@ -826,7 +835,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },
@@ -843,7 +853,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },
@@ -860,7 +871,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },
@@ -877,7 +889,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },
@@ -894,7 +907,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },
@@ -911,7 +925,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },
@@ -928,7 +943,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },
@@ -945,7 +961,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },
@@ -962,7 +979,8 @@
         "class": "resource_class",
         "cf": "capacity_factor",
         "cap_avail": "available_capacity",
-        "cost_per_mw": "supply_curve_cost_per_mw"
+        "cost_per_mw": "supply_curve_cost",
+        "supply_curve_cost_per_mw": "supply_curve_cost"
       }
     }
   },

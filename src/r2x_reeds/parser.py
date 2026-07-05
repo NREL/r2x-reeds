@@ -1087,6 +1087,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                 "retire_year",
                 "bin",
                 "capacity",
+                "supply_curve_cost",
             )
             if column in normalized_enrichment.columns and column not in join_keys
         ]
@@ -1148,7 +1149,9 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if capacity is None:
             capacity = available_capacity
 
-        supply_curve_cost = _coerce_optional_float(row.get("supply_curve_cost_per_mw"))
+        supply_curve_cost = _coerce_optional_float(row.get("supply_curve_cost"))
+        if supply_curve_cost is None:
+            supply_curve_cost = _coerce_optional_float(row.get("supply_curve_cost_per_mw"))
         if supply_curve_cost is None:
             supply_curve_cost = _coerce_optional_float(row.get("cost_per_mw"))
 
@@ -1165,7 +1168,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             "bin": _coerce_optional_int(row.get("bin")),
             "latitude": _coerce_optional_float(row.get("latitude")),
             "longitude": _coerce_optional_float(row.get("longitude")),
-            "supply_curve_cost_per_mw": supply_curve_cost,
+            "supply_curve_cost": supply_curve_cost,
             "existing_capacity": _coerce_optional_float(row.get("existing_capacity")),
             "online_year": _coerce_optional_int(row.get("online_year")),
             "retire_year": _coerce_optional_int(row.get("retire_year")),

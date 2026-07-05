@@ -321,17 +321,18 @@ class ReEDSResourceClass(ReEDSComponent):
     ] = None
 
 
-class ReEDSResourceSite(ReEDSComponent):
+class ReEDSResourceSite(HasUnits, ReEDSComponent):
     """Candidate reV/supply-curve resource site component."""
 
     technology: Annotated[str, Field(description="Technology type (e.g., 'upv', 'wind-ons')")]
     region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
     sc_point_gid: Annotated[int, Field(description="Supply-curve site identifier")]
     resource_class: Annotated[str, Field(description="Resource class identifier")]
-    capacity: Annotated[float | None, Field(description="Site capacity in MW")] = None
+    capacity: Annotated[float | None, Unit("MW"), Field(description="Site capacity")] = None
     available_capacity: Annotated[
         float | None,
-        Field(description="Available capacity in MW"),
+        Unit("MW"),
+        Field(description="Available capacity"),
     ] = None
     capacity_factor: Annotated[
         float | None,
@@ -339,19 +340,21 @@ class ReEDSResourceSite(ReEDSComponent):
     ] = None
     sc_gid: Annotated[int | None, Field(description="Supply-curve group identifier")] = None
     bin: Annotated[int | None, Field(description="Supply-curve bin identifier")] = None
-    supply_curve_cost_per_mw: Annotated[
+    supply_curve_cost: Annotated[
         float | None,
-        Field(description="Supply-curve cost per MW"),
+        Unit("$/MW"),
+        Field(description="Supply-curve cost"),
     ] = None
     existing_capacity: Annotated[
         float | None,
-        Field(description="Existing capacity in MW"),
+        Unit("MW"),
+        Field(description="Existing capacity"),
     ] = None
     online_year: Annotated[int | None, Field(description="Online year")] = None
     retire_year: Annotated[int | None, Field(description="Retire year")] = None
 
 
-class ReEDSResourceBuild(ReEDSComponent):
+class ReEDSResourceBuild(HasUnits, ReEDSComponent):
     """Selected/built reV resource result row component."""
 
     technology: Annotated[str, Field(description="Technology type (e.g., 'upv', 'wind-ons')")]
@@ -359,12 +362,13 @@ class ReEDSResourceBuild(ReEDSComponent):
     sc_point_gid: Annotated[int, Field(description="Supply-curve site identifier")]
     resource_class: Annotated[str, Field(description="Resource class identifier")]
     year: Annotated[int, Field(description="Model year")]
-    built_capacity: Annotated[float, Field(description="Built capacity in MW")]
+    built_capacity: Annotated[float, Unit("MW"), Field(description="Built capacity", ge=0)]
     investment_bool: Annotated[bool, Field(description="Investment indicator")]
-    capacity: Annotated[float | None, Field(description="Site capacity in MW")] = None
+    capacity: Annotated[float | None, Unit("MW"), Field(description="Site capacity")] = None
     available_capacity: Annotated[
         float | None,
-        Field(description="Available capacity in MW"),
+        Unit("MW"),
+        Field(description="Available capacity"),
     ] = None
     capacity_factor: Annotated[
         float | None,
@@ -372,13 +376,15 @@ class ReEDSResourceBuild(ReEDSComponent):
     ] = None
     sc_gid: Annotated[int | None, Field(description="Supply-curve group identifier")] = None
     bin: Annotated[int | None, Field(description="Supply-curve bin identifier")] = None
-    supply_curve_cost_per_mw: Annotated[
+    supply_curve_cost: Annotated[
         float | None,
-        Field(description="Supply-curve cost per MW"),
+        Unit("$/MW"),
+        Field(description="Supply-curve cost"),
     ] = None
     existing_capacity: Annotated[
         float | None,
-        Field(description="Existing capacity in MW"),
+        Unit("MW"),
+        Field(description="Existing capacity"),
     ] = None
     online_year: Annotated[int | None, Field(description="Online year")] = None
     retire_year: Annotated[int | None, Field(description="Retire year")] = None
