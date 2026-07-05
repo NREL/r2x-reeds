@@ -3,7 +3,7 @@ import csv
 import pytest
 
 from r2x_core import SemanticVersioningStrategy
-from r2x_reeds.upgrader.data_upgrader import ReEDSUpgrader
+from r2x_reeds.upgrader.data_upgrader import ReEDSUpgrader, run_reeds_upgrades
 from r2x_reeds.upgrader.helpers import LEGACY_VERSION
 
 pytestmark = [pytest.mark.integration]
@@ -73,6 +73,72 @@ def test_upgrader_missing_meta_file(tmp_path):
     result = upgrader.upgrade()
     assert result.is_err()
     assert "not found" in str(result.err())
+
+
+def test_upgrader_missing_version_value(tmp_path, monkeypatch):
+    """Upgrader should fail when version detection returns None."""
+
+    from r2x_reeds.upgrader.data_upgrader import ReEDSVersionDetector
+
+    meta_path = tmp_path / "meta.csv"
+    meta_path.write_text("computer,repo,branch,commit,description\nhost,/path,main,abc123,desc\n")
+
+    monkeypatch.setattr(ReEDSVersionDetector, "read_version", lambda self, folder_path: None)
+
+    upgrader = ReEDSUpgrader(tmp_path)
+    result = upgrader.upgrade()
+    assert result.is_err()
+    assert "could not be determined" in str(result.err())
+
+
+def test_run_reeds_upgrades_missing_meta_file(tmp_path):
+    """run_reeds_upgrades should return an error when meta.csv is missing."""
+    from types import SimpleNamespace
+    from typing import cast
+
+    class _Store:
+        folder = tmp_path
+
+    ctx = SimpleNamespace(current_version=None, target_version=None, version_strategy=SemanticVersioningStrategy())
+    result = run_reeds_upgrades(store=cast(object, _Store()), ctx=cast(object, ctx))
+    assert result.is_err()
+    assert "not found" in str(result.err())
+
+
+def test_run_reeds_upgrades_missing_version_value(tmp_path, monkeypatch):
+    """run_reeds_upgrades should fail when the version reader returns None."""
+    from types import SimpleNamespace
+    from typing import cast
+
+    from r2x_reeds.upgrader.data_upgrader import ReEDSVersionDetector
+
+    class _Store:
+        folder = tmp_path
+
+    ctx = SimpleNamespace(current_version=None, target_version=None, version_strategy=SemanticVersioningStrategy())
+    monkeypatch.setattr(ReEDSVersionDetector, "read_version", lambda self, folder_path: None)
+
+    result = run_reeds_upgrades(store=cast(object, _Store()), ctx=cast(object, ctx))
+    assert result.is_err()
+    assert "could not be determined" in str(result.err())
+
+
+def test_run_reeds_upgrades_propagates_upgrade_error(tmp_path, monkeypatch):
+    """run_reeds_upgrades should surface upgrade failures from ReEDSUpgrader.upgrade."""
+    from types import SimpleNamespace
+    from typing import cast
+
+    from rust_ok import Err
+
+    class _Store:
+        folder = tmp_path
+
+    ctx = SimpleNamespace(current_version="2026.01.22", target_version=None, version_strategy=SemanticVersioningStrategy())
+    monkeypatch.setattr(ReEDSUpgrader, "upgrade", lambda self, **kwargs: Err("boom"))
+
+    result = run_reeds_upgrades(store=cast(object, _Store()), ctx=cast(object, ctx))
+    assert result.is_err()
+    assert "boom" in str(result.err())
 
 
 def test_upgrader_with_explicit_version(tmp_path):
@@ -187,3 +253,32 @@ def test_upgrader_handles_failing_step(tmp_path):
 
     # The upgrade should succeed because missing hmap_allyrs is handled as a warning/skip
     assert result.is_ok()
+
+
+def test_run_reeds_upgrades_reads_version_when_missing(tmp_path, monkeypatch):
+    """run_reeds_upgrades should populate ctx.current_version from meta.csv when absent."""
+
+    from types import SimpleNamespace
+    from typing import cast
+
+    meta_path = tmp_path / "meta.csv"
+    with open(meta_path, "w", newline="") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(["computer", "repo", "branch", "commit", "description", "tag"])
+        writer.writerow(["host", "/path", "main", "abc123", "desc", "2026.01.22"])
+
+    class _Store:
+        folder = tmp_path
+
+    ctx = SimpleNamespace(current_version=None, target_version=None, version_strategy=SemanticVersioningStrategy())
+
+    def _fake_upgrade(self, **kwargs):
+        return self.version_reader.read_version(self.path) and __import__("rust_ok").Ok(tmp_path)
+
+    monkeypatch.setattr(ReEDSUpgrader, "upgrade", _fake_upgrade)
+
+    result = run_reeds_upgrades(store=cast(object, _Store()), ctx=cast(object, ctx))
+    assert result.is_ok()
+    assert ctx.current_version == "2026.01.22"
+
+

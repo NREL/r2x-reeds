@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+import polars as pl
 import pytest
 
 pytestmark = [pytest.mark.integration]
@@ -332,3 +333,58 @@ def test_required_values_single_string_uses_scalar_branch(example_data_store: Da
     assert isinstance(err, ValidationError)
     assert "Required" in str(err)
     assert "not-a-year" in str(err)
+
+
+def test_required_values_early_return_for_missing_dataset() -> None:
+    """Missing datasets should return early from required-value validation."""
+    from r2x_core import ValidationError
+    from r2x_reeds.parser_checks import check_required_values_in_column
+
+    class _Store:
+        folder = Path("/tmp/reeds_case")
+
+        def __contains__(self, key: str) -> bool:
+            return False
+
+        def __getitem__(self, key: str):
+            raise AssertionError("should not be called")
+
+        def read_data(self, name: str, placeholders=None):
+            raise AssertionError("should not be called")
+
+    result = check_required_values_in_column(
+        store=cast("DataStore", _Store()),
+        dataset="missing_dataset",
+        required_values=[1],
+    )
+    assert result.is_err()
+    err = result.unwrap_err()
+    assert isinstance(err, ValidationError)
+    assert "missing_dataset" in str(err)
+
+
+def test_dataset_non_empty_empty_dataset_returns_error() -> None:
+    """Empty datasets should return a validation error instead of passing."""
+    from r2x_core import ValidationError
+    from r2x_reeds.parser_checks import check_dataset_non_empty
+
+    class _Meta:
+        fpath = "inputs_case/empty.csv"
+
+    class _Store:
+        folder = Path("/tmp/reeds_case")
+
+        def __contains__(self, key: str) -> bool:
+            return key == "empty_dataset"
+
+        def __getitem__(self, key: str) -> _Meta:
+            return _Meta()
+
+        def read_data(self, name: str, placeholders=None):
+            return pl.DataFrame({"value": []}).lazy()
+
+    result = check_dataset_non_empty(cast("DataStore", _Store()), "empty_dataset")
+    assert result.is_err()
+    err = result.unwrap_err()
+    assert isinstance(err, ValidationError)
+    assert "is empty" in str(err)

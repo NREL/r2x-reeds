@@ -7,6 +7,7 @@ import pytest
 
 from r2x_core import System
 from r2x_reeds.models import ReEDSResourceBuild, ReEDSResourceSite, ReEDSVariableGenerator
+from r2x_reeds.parser import _coerce_optional_bool, _coerce_optional_float, _coerce_optional_int
 
 pytestmark = [pytest.mark.unit]
 
@@ -145,3 +146,59 @@ def test_resource_components_skip_missing_selected_output(parser, sample_region)
     assert len(generators) == 1
     assert generators[0].capacity == 10.0
     assert generators[0].name == "upv_p1"
+
+
+def test_resource_helpers_coerce_and_merge(parser, sample_region):
+    _prepare_parser(parser, sample_region)
+
+    assert _coerce_optional_int(True) == 1
+    assert _coerce_optional_int("7") == 7
+    assert _coerce_optional_int("not-an-int") is None
+    assert _coerce_optional_float("2.5") == pytest.approx(2.5)
+    assert _coerce_optional_float("bad") is None
+    assert _coerce_optional_bool("yes") is True
+    assert _coerce_optional_bool("0") is False
+
+    base = pl.DataFrame(
+        {
+            "sc_point_gid": [416],
+            "class": [1],
+            "region": ["p1"],
+            "capacity": [341.13],
+            "cf": [0.1877],
+            "cap_avail": [None],
+            "supply_curve_cost_per_mw": [577564.52875],
+        }
+    )
+    enrichment = pl.DataFrame(
+        {
+            "sc_point_gid": [416],
+            "resource_class": [1],
+            "latitude": [48.994427],
+            "longitude": [-122.73455],
+            "available_capacity": [254.5761171604243],
+            "existing_capacity": [0.0],
+            "online_year": [0],
+            "retire_year": [0],
+            "bin": [18],
+            "sc_gid": [0],
+        }
+    )
+
+    normalized = parser._normalize_resource_frame(base, source_name="upv")
+    assert normalized.columns.count("resource_class") == 1
+    assert normalized.columns.count("capacity_factor") == 1
+    assert normalized.columns.count("available_capacity") == 1
+    assert normalized[0, "technology"] == "upv"
+
+    merged = parser._merge_resource_frames(normalized, enrichment, "upv")
+    merged_row = merged.row(0, named=True)
+
+    assert merged_row["available_capacity"] == pytest.approx(254.5761171604243)
+    assert merged_row["capacity_factor"] == pytest.approx(0.1877)
+    assert merged_row["latitude"] == pytest.approx(48.994427)
+    assert merged_row["longitude"] == pytest.approx(-122.73455)
+    assert merged_row["bin"] == 18
+    assert merged_row["sc_gid"] == 0
+    assert parser._build_resource_name("upv", 1.0, 416, None) == "upv_1.0_416"
+    assert parser._build_resource_name("upv", "1", 416, 2009) == "upv_1_2009_416"

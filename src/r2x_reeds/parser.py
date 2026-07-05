@@ -1098,7 +1098,17 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             return normalized_base
 
         enrichment_select = normalized_enrichment.select(join_keys + enrichment_columns)
-        return normalized_base.join(enrichment_select, on=join_keys, how="left", suffix="_enrichment")
+        merged = normalized_base.join(enrichment_select, on=join_keys, how="left", suffix="_enrichment")
+
+        coalesced_columns = [
+            pl.coalesce(pl.col(column), pl.col(f"{column}_enrichment")).alias(column)
+            for column in enrichment_columns
+            if f"{column}_enrichment" in merged.columns
+        ]
+        if coalesced_columns:
+            merged = merged.with_columns(coalesced_columns)
+            merged = merged.drop([f"{column}_enrichment" for column in enrichment_columns if f"{column}_enrichment" in merged.columns])
+        return merged
 
     def _normalize_resource_frame(self, df: pl.DataFrame, *, source_name: str) -> pl.DataFrame:
         """Normalize resource dataset column names."""
@@ -1199,9 +1209,10 @@ class ReEDSParser(Plugin[ReEDSConfig]):
     ) -> str:
         """Build a stable name for resource components."""
 
+        resource_class_name = str(resource_class)
         if year is None:
-            return f"{technology}_{resource_class}_{sc_point_gid}"
-        return f"{technology}_{resource_class}_{year}_{sc_point_gid}"
+            return f"{technology}_{resource_class_name}_{sc_point_gid}"
+        return f"{technology}_{resource_class_name}_{year}_{sc_point_gid}"
 
     def _instantiate_generator(
         self,
