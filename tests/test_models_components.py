@@ -174,8 +174,6 @@ def test_resource_site_valid_and_exported(sample_region):
         capacity=341.13,
         available_capacity=254.58,
         capacity_factor=0.1877,
-        latitude=48.994427,
-        longitude=-122.73455,
         supply_curve_cost_per_mw=577564.52875,
     )
 
@@ -202,8 +200,6 @@ def test_resource_build_valid_and_exported(sample_region):
         capacity=341.13,
         available_capacity=254.58,
         capacity_factor=0.1877,
-        latitude=48.994427,
-        longitude=-122.73455,
         supply_curve_cost_per_mw=577564.52875,
     )
 

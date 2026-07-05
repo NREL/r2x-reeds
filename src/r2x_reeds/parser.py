@@ -18,6 +18,7 @@ import h5py
 import numpy as np
 import polars as pl
 from infrasys import Component, SingleTimeSeries
+from infrasys.location import GeographicInfo
 from loguru import logger
 from rust_ok import Err, Ok, Result
 
@@ -36,6 +37,7 @@ from .getters import (
     build_load_name,
     build_region_name,
     build_reserve_name,
+    build_resource_name,
     build_transmission_interface_name,
     build_transmission_line_name,
     resolve_emission_generator_identifier,
@@ -95,16 +97,6 @@ OUTPUTS_H5_DATASET_KEYS: dict[str, str] = {
     "cost_capital": "cost_cap",
     "cost_capital_energy": "cost_cap_energy",
 }
-
-RESOURCE_SUPPLY_CURVE_DATASETS: tuple[str, ...] = (
-    "csp",
-    "egs",
-    "geohydro",
-    "upv",
-    "wind-ons",
-    "wind-ofs",
-)
-
 
 def _resource_dataset_names(technology: str) -> tuple[str, str, str]:
     """Return dataset names for source, candidate, and selected resource rows."""
@@ -322,6 +314,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         self._tech_categories: dict[str, list[str]] = {}
         self._excluded_techs: list[str] = []
         self._category_to_class_map: dict[str, str | type[ReEDSGenerator]] = {}
+        self._resource_supply_curve_datasets: tuple[str, ...] = ()
 
     def _truncate_and_cast_time_series(self, arr: np.ndarray | list[float]) -> np.ndarray:
         """Truncate a time series to 8760 and ensure dtype float64."""
@@ -957,7 +950,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         total_sites = 0
         total_builds = 0
 
-        for technology in RESOURCE_SUPPLY_CURVE_DATASETS:
+        for technology in self._resource_supply_curve_datasets:
             candidate_result = self._build_resource_components_for_technology(
                 system=system,
                 technology=technology,
@@ -1045,6 +1038,9 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                 continue
 
             system.add_component(component)
+            geographic_info = self._resource_geographic_info(component_kwargs)
+            if geographic_info is not None:
+                system.add_supplemental_attribute(component, geographic_info)
             created += 1
 
         if creation_errors:
@@ -1113,17 +1109,9 @@ class ReEDSParser(Plugin[ReEDSConfig]):
     def _normalize_resource_frame(self, df: pl.DataFrame, *, source_name: str) -> pl.DataFrame:
         """Normalize resource dataset column names."""
 
-        rename_map: dict[str, str] = {}
-        if "class" in df.columns and "resource_class" not in df.columns:
-            rename_map["class"] = "resource_class"
-        if "cf" in df.columns and "capacity_factor" not in df.columns:
-            rename_map["cf"] = "capacity_factor"
-        if "cap_avail" in df.columns and "available_capacity" not in df.columns:
-            rename_map["cap_avail"] = "available_capacity"
-        normalized = df.rename(rename_map) if rename_map else df
-        if "technology" not in normalized.columns:
-            normalized = normalized.with_columns(pl.lit(source_name).alias("technology"))
-        return normalized
+        if "technology" not in df.columns:
+            return df.with_columns(pl.lit(source_name).alias("technology"))
+        return df
 
     def _resource_component_kwargs(
         self,
@@ -1165,7 +1153,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             supply_curve_cost = _coerce_optional_float(row.get("cost_per_mw"))
 
         base_kwargs: dict[str, Any] = {
-            "name": self._build_resource_name(technology, resource_class, sc_point_gid, row.get("year")),
+            "name": build_resource_name(technology, resource_class, sc_point_gid, row.get("year")),
             "technology": technology,
             "region": region,
             "sc_point_gid": sc_point_gid,
@@ -1201,18 +1189,30 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         return base_kwargs
 
     @staticmethod
-    def _build_resource_name(
-        technology: str,
-        resource_class: Any,
-        sc_point_gid: int,
-        year: Any,
-    ) -> str:
-        """Build a stable name for resource components."""
+    def _resource_geographic_info(component_kwargs: dict[str, Any]) -> GeographicInfo | None:
+        """Build a geographic supplemental attribute from resource coordinates."""
 
-        resource_class_name = str(resource_class)
-        if year is None:
-            return f"{technology}_{resource_class_name}_{sc_point_gid}"
-        return f"{technology}_{resource_class_name}_{year}_{sc_point_gid}"
+        latitude = component_kwargs.pop("latitude", None)
+        longitude = component_kwargs.pop("longitude", None)
+        if latitude is None or longitude is None:
+            return None
+
+        properties: dict[str, Any] = {
+            "name": component_kwargs["name"],
+            "technology": component_kwargs["technology"],
+            "sc_point_gid": component_kwargs["sc_point_gid"],
+            "resource_class": component_kwargs["resource_class"],
+        }
+        if "year" in component_kwargs:
+            properties["year"] = component_kwargs["year"]
+
+        return GeographicInfo(
+            geo_json={
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [longitude, latitude]},
+                "properties": properties,
+            },
+        )
 
     def _instantiate_generator(
         self,
@@ -2197,6 +2197,9 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         self._tech_categories = self._defaults.get("tech_categories", {})
         self._excluded_techs = self._defaults.get("excluded_techs", [])
         self._category_to_class_map = self._defaults.get("category_class_mapping", {})
+        self._resource_supply_curve_datasets = tuple(
+            self._defaults.get("resource_supply_curve_datasets", [])
+        )
         return Ok(None)
 
     def _prepare_generator_datasets(self) -> Result[None, str]:

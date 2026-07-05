@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import polars as pl
 import pytest
+from infrasys.location import GeographicInfo
 
 from r2x_core import System
+from r2x_reeds.getters import build_resource_name
 from r2x_reeds.models import ReEDSResourceBuild, ReEDSResourceSite, ReEDSVariableGenerator
 from r2x_reeds.parser import _coerce_optional_bool, _coerce_optional_float, _coerce_optional_int
 
@@ -17,6 +19,7 @@ def _prepare_parser(parser, sample_region):
     system.add_component(sample_region)
     parser._ctx.system = system
     parser._region_cache = {sample_region.name: sample_region}
+    parser._resource_supply_curve_datasets = ("upv",)
     return system
 
 
@@ -24,9 +27,9 @@ def _resource_frames(include_selected: bool = True) -> dict[str, pl.LazyFrame | 
     source = pl.DataFrame(
         {
             "sc_point_gid": [416, 796, 797],
-            "class": [1, 1, 1],
+            "resource_class": [1, 1, 1],
             "capacity": [341.13, 920.14, 629.61],
-            "cf": [0.1877, 0.1913, 0.1855],
+            "capacity_factor": [0.1877, 0.1913, 0.1855],
             "region": ["p1", "p1", "p1"],
             "supply_curve_cost_per_mw": [577564.52875, 743009.39875, 823633.64125],
         }
@@ -38,9 +41,9 @@ def _resource_frames(include_selected: bool = True) -> dict[str, pl.LazyFrame | 
             "latitude": [48.994427, 48.900375, 48.927494],
             "longitude": [-122.73455, -122.688286, -122.5285],
             "region": ["p1", "p1", "p1"],
-            "class": [1, 1, 1],
+            "resource_class": [1, 1, 1],
             "bin": [18, 25, 26],
-            "cap_avail": [254.5761171604243, 686.6734177143724, 469.85664464240193],
+            "available_capacity": [254.5761171604243, 686.6734177143724, 469.85664464240193],
             "existing_capacity": [0.0, 0.0, 0.0],
             "online_year": [0, 0, 0],
             "retire_year": [0, 0, 0],
@@ -56,7 +59,7 @@ def _resource_frames(include_selected: bool = True) -> dict[str, pl.LazyFrame | 
                 "latitude": [48.994427],
                 "longitude": [-122.73455],
                 "region": ["p1"],
-                "class": [1],
+                "resource_class": [1],
                 "bin": [18],
                 "supply_curve_cost_per_mw": [1165487.0620945962],
                 "built_capacity": [0.3731343025384888],
@@ -107,8 +110,9 @@ def test_resource_components_preserve_candidates_and_selected_rows(parser, sampl
     assert first_site.capacity == 341.13
     assert first_site.available_capacity == pytest.approx(254.5761171604243)
     assert first_site.capacity_factor == pytest.approx(0.1877)
-    assert first_site.latitude == pytest.approx(48.994427)
-    assert first_site.longitude == pytest.approx(-122.73455)
+    site_geo = system.get_supplemental_attributes_with_component(first_site, GeographicInfo)
+    assert len(site_geo) == 1
+    assert site_geo[0].geo_json["geometry"]["coordinates"] == pytest.approx([-122.73455, 48.994427])
 
     first_build = builds[0]
     assert first_build.year == 2009
@@ -117,6 +121,9 @@ def test_resource_components_preserve_candidates_and_selected_rows(parser, sampl
     assert first_build.investment_bool is True
     assert first_build.capacity == 341.13
     assert first_build.available_capacity == pytest.approx(254.5761171604243)
+    build_geo = system.get_supplemental_attributes_with_component(first_build, GeographicInfo)
+    assert len(build_geo) == 1
+    assert build_geo[0].geo_json["properties"]["year"] == 2009
 
 
 def test_resource_components_skip_missing_selected_output(parser, sample_region):
@@ -148,6 +155,30 @@ def test_resource_components_skip_missing_selected_output(parser, sample_region)
     assert generators[0].name == "upv_p1"
 
 
+def test_resource_defaults_and_geographic_info_helpers(parser, sample_region):
+    system = _prepare_parser(parser, sample_region)
+
+    parser._defaults = {"resource_supply_curve_datasets": ["upv", "wind-ons"]}
+    assert not parser._prepare_default_metadata().is_err()
+    assert parser._resource_supply_curve_datasets == ("upv", "wind-ons")
+
+    kwargs = {
+        "name": "upv_1_416",
+        "technology": "upv",
+        "sc_point_gid": 416,
+        "resource_class": "1",
+    }
+    assert parser._resource_geographic_info(kwargs) is None
+
+    skipped = parser._resource_component_kwargs(
+        row={"region": "p1", "sc_point_gid": 416, "resource_class": "1"},
+        technology="upv",
+        selected_only=True,
+        system=system,
+    )
+    assert skipped is None
+
+
 def test_resource_helpers_coerce_and_merge(parser, sample_region):
     _prepare_parser(parser, sample_region)
 
@@ -162,11 +193,11 @@ def test_resource_helpers_coerce_and_merge(parser, sample_region):
     base = pl.DataFrame(
         {
             "sc_point_gid": [416],
-            "class": [1],
+            "resource_class": [1],
             "region": ["p1"],
             "capacity": [341.13],
-            "cf": [0.1877],
-            "cap_avail": [None],
+            "capacity_factor": [0.1877],
+            "available_capacity": [None],
             "supply_curve_cost_per_mw": [577564.52875],
         }
     )
@@ -200,5 +231,5 @@ def test_resource_helpers_coerce_and_merge(parser, sample_region):
     assert merged_row["longitude"] == pytest.approx(-122.73455)
     assert merged_row["bin"] == 18
     assert merged_row["sc_gid"] == 0
-    assert parser._build_resource_name("upv", 1.0, 416, None) == "upv_1.0_416"
-    assert parser._build_resource_name("upv", "1", 416, 2009) == "upv_1_2009_416"
+    assert build_resource_name("upv", 1.0, 416, None) == "upv_1.0_416"
+    assert build_resource_name("upv", "1", 416, 2009) == "upv_1_2009_416"

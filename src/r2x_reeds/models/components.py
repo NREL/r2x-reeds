@@ -339,8 +339,6 @@ class ReEDSResourceSite(ReEDSComponent):
     ] = None
     sc_gid: Annotated[int | None, Field(description="Supply-curve group identifier")] = None
     bin: Annotated[int | None, Field(description="Supply-curve bin identifier")] = None
-    latitude: Annotated[float | None, Field(description="Latitude")] = None
-    longitude: Annotated[float | None, Field(description="Longitude")] = None
     supply_curve_cost_per_mw: Annotated[
         float | None,
         Field(description="Supply-curve cost per MW"),
@@ -374,8 +372,6 @@ class ReEDSResourceBuild(ReEDSComponent):
     ] = None
     sc_gid: Annotated[int | None, Field(description="Supply-curve group identifier")] = None
     bin: Annotated[int | None, Field(description="Supply-curve bin identifier")] = None
-    latitude: Annotated[float | None, Field(description="Latitude")] = None
-    longitude: Annotated[float | None, Field(description="Longitude")] = None
     supply_curve_cost_per_mw: Annotated[
         float | None,
         Field(description="Supply-curve cost per MW"),

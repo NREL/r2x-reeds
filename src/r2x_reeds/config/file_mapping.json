@@ -308,7 +308,9 @@
     },
     "reader": {
       "kwargs": {
-        "null_values": ["Eps"]
+        "null_values": [
+          "Eps"
+        ]
       },
       "function": null
     },
@@ -665,6 +667,14 @@
       "description": "CSP supply-curve candidate sites from inputs_case",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -674,6 +684,14 @@
       "description": "CSP candidate supply-curve sites from outputs/df_sc_in",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -683,6 +701,14 @@
       "description": "CSP selected/built supply-curve rows from outputs/df_sc_out_reduced",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -692,6 +718,14 @@
       "description": "EGS supply-curve candidate sites from inputs_case",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -701,6 +735,14 @@
       "description": "EGS candidate supply-curve sites from outputs/df_sc_in",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -710,6 +752,14 @@
       "description": "EGS selected/built supply-curve rows from outputs/df_sc_out_reduced",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -719,6 +769,14 @@
       "description": "Geothermal hydro supply-curve candidate sites from inputs_case",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -728,6 +786,14 @@
       "description": "Geothermal hydro candidate supply-curve sites from outputs/df_sc_in",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -737,6 +803,14 @@
       "description": "Geothermal hydro selected/built supply-curve rows from outputs/df_sc_out_reduced",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -746,6 +820,14 @@
       "description": "UPV supply-curve candidate sites from inputs_case",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -755,6 +837,14 @@
       "description": "UPV candidate supply-curve sites from outputs/df_sc_in",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -764,6 +854,14 @@
       "description": "UPV selected/built supply-curve rows from outputs/df_sc_out_reduced",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -773,6 +871,14 @@
       "description": "Onshore wind supply-curve candidate sites from inputs_case",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -782,6 +888,14 @@
       "description": "Onshore wind candidate supply-curve sites from outputs/df_sc_in",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -791,6 +905,14 @@
       "description": "Onshore wind selected/built supply-curve rows from outputs/df_sc_out_reduced",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -800,6 +922,14 @@
       "description": "Offshore wind supply-curve candidate sites from inputs_case",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -809,6 +939,14 @@
       "description": "Offshore wind candidate supply-curve sites from outputs/df_sc_in",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -818,6 +956,14 @@
       "description": "Offshore wind selected/built supply-curve rows from outputs/df_sc_out_reduced",
       "is_input": true,
       "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "class": "resource_class",
+        "cf": "capacity_factor",
+        "cap_avail": "available_capacity",
+        "cost_per_mw": "supply_curve_cost_per_mw"
+      }
     }
   },
   {
@@ -902,7 +1048,10 @@
     "reader": {
       "kwargs": {
         "has_header": false,
-        "new_columns": ["technology", "ramp_rate"]
+        "new_columns": [
+          "technology",
+          "ramp_rate"
+        ]
       },
       "function": null
     },
@@ -925,7 +1074,10 @@
     "reader": {
       "kwargs": {
         "has_header": false,
-        "new_columns": ["technology", "min_load_frac"]
+        "new_columns": [
+          "technology",
+          "min_load_frac"
+        ]
       },
       "function": null
     },
