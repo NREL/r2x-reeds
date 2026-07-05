@@ -48,6 +48,8 @@ from .models.components import (
     ReEDSRegion,
     ReEDSReserve,
     ReEDSReserveRegion,
+    ReEDSResourceBuild,
+    ReEDSResourceSite,
     ReEDSTransmissionLine,
 )
 from .models.enums import ReserveType
@@ -93,6 +95,61 @@ OUTPUTS_H5_DATASET_KEYS: dict[str, str] = {
     "cost_capital": "cost_cap",
     "cost_capital_energy": "cost_cap_energy",
 }
+
+RESOURCE_SUPPLY_CURVE_DATASETS: tuple[str, ...] = (
+    "csp",
+    "egs",
+    "geohydro",
+    "upv",
+    "wind-ons",
+    "wind-ofs",
+)
+
+
+def _resource_dataset_names(technology: str) -> tuple[str, str, str]:
+    """Return dataset names for source, candidate, and selected resource rows."""
+
+    return (
+        f"{technology}_supply_curve",
+        f"df_sc_in_{technology}",
+        f"df_sc_out_{technology}_reduced",
+    )
+
+
+def _coerce_optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return int(value)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_optional_bool(value: Any) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "t", "yes", "y", "1"}:
+            return True
+        if normalized in {"false", "f", "no", "n", "0"}:
+            return False
+    return None
 
 
 def _build_synthetic_hour_map(weather_years: Iterable[int]) -> pl.DataFrame:
@@ -580,6 +637,8 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if hour_map_result.is_err():
             return Err(f"Weather year(s): {hour_map_result.err()}")
         hour_map_df = hour_map_result.ok()
+        if hour_map_df is None:
+            return Err("Weather year(s): hour map validation returned no data")
 
         available_weather_years = {
             int(val)
@@ -696,6 +755,10 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         generator_result = self._build_generators(system)
         if generator_result.is_err():
             return Err(str(generator_result.err()))
+
+        resource_result = self._build_resource_components(system)
+        if resource_result.is_err():
+            return Err(str(resource_result.err()))
 
         transmission_result = self._build_transmission(system)
         if transmission_result.is_err():
@@ -880,6 +943,259 @@ class ReEDSParser(Plugin[ReEDSConfig]):
 
         logger.info("Attached {} {} generators", built, label)
         return Ok(built)
+
+    def _build_resource_components(self, system: System) -> Result[None, str]:
+        """Build candidate and selected reV resource components."""
+
+        logger.info("Building ReEDS resource site components")
+        total_sites = 0
+        total_builds = 0
+
+        for technology in RESOURCE_SUPPLY_CURVE_DATASETS:
+            candidate_result = self._build_resource_components_for_technology(
+                system=system,
+                technology=technology,
+                component_type=ReEDSResourceSite,
+                selected_only=False,
+            )
+            if candidate_result.is_err():
+                return Err(str(candidate_result.err()))
+            total_sites += candidate_result.ok() or 0
+
+            build_result = self._build_resource_components_for_technology(
+                system=system,
+                technology=technology,
+                component_type=ReEDSResourceBuild,
+                selected_only=True,
+            )
+            if build_result.is_err():
+                return Err(str(build_result.err()))
+            total_builds += build_result.ok() or 0
+
+        logger.info(
+            "Attached {} resource site components and {} selected resource components",
+            total_sites,
+            total_builds,
+        )
+        return Ok(None)
+
+    def _build_resource_components_for_technology(
+        self,
+        system: System,
+        technology: str,
+        component_type: type[ReEDSResourceSite] | type[ReEDSResourceBuild],
+        selected_only: bool,
+    ) -> Result[int, str]:
+        """Build resource components for one technology."""
+
+        source_name, candidate_name, selected_name = _resource_dataset_names(technology)
+        source_df = self._collect_resource_frame(source_name)
+        candidate_df = self._collect_resource_frame(candidate_name)
+        selected_df = self._collect_resource_frame(selected_name)
+
+        if component_type is ReEDSResourceSite:
+            base_df = source_df if source_df is not None and not source_df.is_empty() else candidate_df
+            if base_df is None or base_df.is_empty():
+                logger.debug("No resource site data found for {}", technology)
+                return Ok(0)
+            enrichment_df = None if base_df is candidate_df else candidate_df
+            resource_df = self._merge_resource_frames(base_df, enrichment_df, technology)
+        else:
+            if selected_df is None or selected_df.is_empty():
+                logger.debug("No selected resource data found for {}", technology)
+                return Ok(0)
+            reference_base = source_df if source_df is not None and not source_df.is_empty() else candidate_df
+            if (
+                reference_base is not None
+                and candidate_df is not None
+                and reference_base is not candidate_df
+            ):
+                reference_df = self._merge_resource_frames(reference_base, candidate_df, technology)
+            else:
+                reference_df = reference_base
+            resource_df = self._merge_resource_frames(selected_df, reference_df, technology)
+
+        if resource_df.is_empty():
+            logger.debug("Resource frame for {} is empty after normalization", technology)
+            return Ok(0)
+
+        creation_errors: list[str] = []
+        created = 0
+        for row in resource_df.iter_rows(named=True):
+            component_kwargs = self._resource_component_kwargs(
+                row=row,
+                technology=technology,
+                selected_only=selected_only,
+                system=system,
+            )
+            if component_kwargs is None:
+                continue
+
+            identifier = str(component_kwargs["name"])
+            try:
+                component = self.create_component(component_type, **component_kwargs)
+            except ComponentCreationError as exc:
+                creation_errors.append(f"{identifier}: {exc}")
+                continue
+
+            system.add_component(component)
+            created += 1
+
+        if creation_errors:
+            failure_list = "; ".join(creation_errors)
+            return Err(f"Failed to create the following {technology} resource components: {failure_list}")
+
+        logger.info("Attached {} {} resource components", created, technology)
+        return Ok(created)
+
+    def _collect_resource_frame(self, name: str) -> pl.DataFrame | None:
+        """Read and collect an optional resource dataset."""
+
+        data = self.read_data_file(name)
+        if data is None:
+            return None
+        if isinstance(data, pl.DataFrame):
+            return data
+        return data.collect()
+
+    def _merge_resource_frames(
+        self,
+        base_df: pl.DataFrame,
+        enrichment_df: pl.DataFrame | None,
+        technology: str,
+    ) -> pl.DataFrame:
+        """Normalize resource columns and enrich from the candidate frame when possible."""
+
+        normalized_base = self._normalize_resource_frame(base_df, source_name=technology)
+        if enrichment_df is None or enrichment_df.is_empty():
+            return normalized_base
+
+        normalized_enrichment = self._normalize_resource_frame(enrichment_df, source_name=technology)
+        join_keys = ["sc_point_gid", "resource_class"]
+        enrichment_columns = [
+            column
+            for column in (
+                "sc_gid",
+                "available_capacity",
+                "capacity_factor",
+                "latitude",
+                "longitude",
+                "existing_capacity",
+                "online_year",
+                "retire_year",
+                "bin",
+                "capacity",
+            )
+            if column in normalized_enrichment.columns and column not in join_keys
+        ]
+        if not enrichment_columns:
+            return normalized_base
+
+        enrichment_select = normalized_enrichment.select(join_keys + enrichment_columns)
+        return normalized_base.join(enrichment_select, on=join_keys, how="left", suffix="_enrichment")
+
+    def _normalize_resource_frame(self, df: pl.DataFrame, *, source_name: str) -> pl.DataFrame:
+        """Normalize resource dataset column names."""
+
+        rename_map: dict[str, str] = {}
+        if "class" in df.columns and "resource_class" not in df.columns:
+            rename_map["class"] = "resource_class"
+        if "cf" in df.columns and "capacity_factor" not in df.columns:
+            rename_map["cf"] = "capacity_factor"
+        if "cap_avail" in df.columns and "available_capacity" not in df.columns:
+            rename_map["cap_avail"] = "available_capacity"
+        normalized = df.rename(rename_map) if rename_map else df
+        if "technology" not in normalized.columns:
+            normalized = normalized.with_columns(pl.lit(source_name).alias("technology"))
+        return normalized
+
+    def _resource_component_kwargs(
+        self,
+        *,
+        row: dict[str, Any],
+        technology: str,
+        selected_only: bool,
+        system: System,
+    ) -> dict[str, Any] | None:
+        """Convert a resource row into component kwargs."""
+
+        region_name = row.get("region")
+        if region_name is None:
+            logger.debug("Skipping {} row missing region", technology)
+            return None
+
+        region = self._region_cache.get(str(region_name))
+        if region is None:
+            region = system.get_component(ReEDSRegion, str(region_name))
+        if region is None:
+            logger.debug("Skipping {} row with unknown region {}", technology, region_name)
+            return None
+
+        sc_point_gid = _coerce_optional_int(row.get("sc_point_gid"))
+        resource_class = row.get("resource_class")
+        if sc_point_gid is None or resource_class is None:
+            logger.debug("Skipping {} row missing sc_point_gid or resource_class", technology)
+            return None
+
+        capacity = _coerce_optional_float(row.get("capacity"))
+        available_capacity = _coerce_optional_float(row.get("available_capacity"))
+        if available_capacity is None:
+            available_capacity = _coerce_optional_float(row.get("cap_avail"))
+        if capacity is None:
+            capacity = available_capacity
+
+        supply_curve_cost = _coerce_optional_float(row.get("supply_curve_cost_per_mw"))
+        if supply_curve_cost is None:
+            supply_curve_cost = _coerce_optional_float(row.get("cost_per_mw"))
+
+        base_kwargs: dict[str, Any] = {
+            "name": self._build_resource_name(technology, resource_class, sc_point_gid, row.get("year")),
+            "technology": technology,
+            "region": region,
+            "sc_point_gid": sc_point_gid,
+            "resource_class": str(resource_class),
+            "capacity": capacity,
+            "available_capacity": available_capacity,
+            "capacity_factor": _coerce_optional_float(row.get("capacity_factor")),
+            "sc_gid": _coerce_optional_int(row.get("sc_gid")),
+            "bin": _coerce_optional_int(row.get("bin")),
+            "latitude": _coerce_optional_float(row.get("latitude")),
+            "longitude": _coerce_optional_float(row.get("longitude")),
+            "supply_curve_cost_per_mw": supply_curve_cost,
+            "existing_capacity": _coerce_optional_float(row.get("existing_capacity")),
+            "online_year": _coerce_optional_int(row.get("online_year")),
+            "retire_year": _coerce_optional_int(row.get("retire_year")),
+        }
+
+        if selected_only:
+            year = _coerce_optional_int(row.get("year"))
+            built_capacity = _coerce_optional_float(row.get("built_capacity"))
+            investment_bool = _coerce_optional_bool(row.get("investment_bool"))
+            if year is None or built_capacity is None or investment_bool is None:
+                logger.debug("Skipping {} selected row missing year, built_capacity, or investment_bool", technology)
+                return None
+            base_kwargs.update(
+                {
+                    "year": year,
+                    "built_capacity": built_capacity,
+                    "investment_bool": investment_bool,
+                }
+            )
+
+        return base_kwargs
+
+    @staticmethod
+    def _build_resource_name(
+        technology: str,
+        resource_class: Any,
+        sc_point_gid: int,
+        year: Any,
+    ) -> str:
+        """Build a stable name for resource components."""
+
+        if year is None:
+            return f"{technology}_{resource_class}_{sc_point_gid}"
+        return f"{technology}_{resource_class}_{year}_{sc_point_gid}"
 
     def _instantiate_generator(
         self,

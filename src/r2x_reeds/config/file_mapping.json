@@ -662,7 +662,25 @@
     "name": "csp_supply_curve",
     "fpath": "inputs_case/supplycurve_csp.csv",
     "info": {
-      "description": "test",
+      "description": "CSP supply-curve candidate sites from inputs_case",
+      "is_input": true,
+      "is_optional": true
+    }
+  },
+  {
+    "name": "df_sc_in_csp",
+    "fpath": "outputs/df_sc_in_csp.csv",
+    "info": {
+      "description": "CSP candidate supply-curve sites from outputs/df_sc_in",
+      "is_input": true,
+      "is_optional": true
+    }
+  },
+  {
+    "name": "df_sc_out_csp_reduced",
+    "fpath": "outputs/df_sc_out_csp_reduced.csv",
+    "info": {
+      "description": "CSP selected/built supply-curve rows from outputs/df_sc_out_reduced",
       "is_input": true,
       "is_optional": true
     }
@@ -671,7 +689,25 @@
     "name": "egs_supply_curve",
     "fpath": "inputs_case/supplycurve_egs.csv",
     "info": {
-      "description": "test",
+      "description": "EGS supply-curve candidate sites from inputs_case",
+      "is_input": true,
+      "is_optional": true
+    }
+  },
+  {
+    "name": "df_sc_in_egs",
+    "fpath": "outputs/df_sc_in_egs.csv",
+    "info": {
+      "description": "EGS candidate supply-curve sites from outputs/df_sc_in",
+      "is_input": true,
+      "is_optional": true
+    }
+  },
+  {
+    "name": "df_sc_out_egs_reduced",
+    "fpath": "outputs/df_sc_out_egs_reduced.csv",
+    "info": {
+      "description": "EGS selected/built supply-curve rows from outputs/df_sc_out_reduced",
       "is_input": true,
       "is_optional": true
     }
@@ -680,7 +716,25 @@
     "name": "geohydro_supply_curve",
     "fpath": "inputs_case/supplycurve_geohydro.csv",
     "info": {
-      "description": "test",
+      "description": "Geothermal hydro supply-curve candidate sites from inputs_case",
+      "is_input": true,
+      "is_optional": true
+    }
+  },
+  {
+    "name": "df_sc_in_geohydro",
+    "fpath": "outputs/df_sc_in_geohydro.csv",
+    "info": {
+      "description": "Geothermal hydro candidate supply-curve sites from outputs/df_sc_in",
+      "is_input": true,
+      "is_optional": true
+    }
+  },
+  {
+    "name": "df_sc_out_geohydro_reduced",
+    "fpath": "outputs/df_sc_out_geohydro_reduced.csv",
+    "info": {
+      "description": "Geothermal hydro selected/built supply-curve rows from outputs/df_sc_out_reduced",
       "is_input": true,
       "is_optional": true
     }
@@ -689,7 +743,25 @@
     "name": "upv_supply_curve",
     "fpath": "inputs_case/supplycurve_upv.csv",
     "info": {
-      "description": "test",
+      "description": "UPV supply-curve candidate sites from inputs_case",
+      "is_input": true,
+      "is_optional": true
+    }
+  },
+  {
+    "name": "df_sc_in_upv",
+    "fpath": "outputs/df_sc_in_upv.csv",
+    "info": {
+      "description": "UPV candidate supply-curve sites from outputs/df_sc_in",
+      "is_input": true,
+      "is_optional": true
+    }
+  },
+  {
+    "name": "df_sc_out_upv_reduced",
+    "fpath": "outputs/df_sc_out_upv_reduced.csv",
+    "info": {
+      "description": "UPV selected/built supply-curve rows from outputs/df_sc_out_reduced",
       "is_input": true,
       "is_optional": true
     }
@@ -698,7 +770,25 @@
     "name": "wind-ons_supply_curve",
     "fpath": "inputs_case/supplycurve_wind-ons.csv",
     "info": {
-      "description": "test",
+      "description": "Onshore wind supply-curve candidate sites from inputs_case",
+      "is_input": true,
+      "is_optional": true
+    }
+  },
+  {
+    "name": "df_sc_in_wind-ons",
+    "fpath": "outputs/df_sc_in_wind-ons.csv",
+    "info": {
+      "description": "Onshore wind candidate supply-curve sites from outputs/df_sc_in",
+      "is_input": true,
+      "is_optional": true
+    }
+  },
+  {
+    "name": "df_sc_out_wind-ons_reduced",
+    "fpath": "outputs/df_sc_out_wind-ons_reduced.csv",
+    "info": {
+      "description": "Onshore wind selected/built supply-curve rows from outputs/df_sc_out_reduced",
       "is_input": true,
       "is_optional": true
     }
@@ -707,7 +797,25 @@
     "name": "wind-ofs_supply_curve",
     "fpath": "inputs_case/supplycurve_wind-ofs.csv",
     "info": {
-      "description": "test",
+      "description": "Offshore wind supply-curve candidate sites from inputs_case",
+      "is_input": true,
+      "is_optional": true
+    }
+  },
+  {
+    "name": "df_sc_in_wind-ofs",
+    "fpath": "outputs/df_sc_in_wind-ofs.csv",
+    "info": {
+      "description": "Offshore wind candidate supply-curve sites from outputs/df_sc_in",
+      "is_input": true,
+      "is_optional": true
+    }
+  },
+  {
+    "name": "df_sc_out_wind-ofs_reduced",
+    "fpath": "outputs/df_sc_out_wind-ofs_reduced.csv",
+    "info": {
+      "description": "Offshore wind selected/built supply-curve rows from outputs/df_sc_out_reduced",
       "is_input": true,
       "is_optional": true
     }

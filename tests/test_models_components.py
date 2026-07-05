@@ -5,6 +5,17 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from r2x_reeds import ReEDSResourceBuild, ReEDSResourceClass, ReEDSResourceSite
+from r2x_reeds.models import (
+    ReEDSResourceBuild as ModelsReEDSResourceBuild,
+)
+from r2x_reeds.models import (
+    ReEDSResourceClass as ModelsReEDSResourceClass,
+)
+from r2x_reeds.models import (
+    ReEDSResourceSite as ModelsReEDSResourceSite,
+)
+
 pytestmark = [pytest.mark.unit]
 
 
@@ -148,6 +159,58 @@ def test_renewable_generator_valid(renewable_generator):
     assert renewable_generator.technology == "upv"
     assert renewable_generator.inverter_loading_ratio == 1.3
     assert renewable_generator.resource_class == "class1"
+
+
+def test_resource_site_valid_and_exported(sample_region):
+    assert ReEDSResourceSite is ModelsReEDSResourceSite
+    assert ReEDSResourceClass is ModelsReEDSResourceClass
+
+    site = ReEDSResourceSite(
+        name="upv_1_416",
+        technology="upv",
+        region=sample_region,
+        sc_point_gid=416,
+        resource_class="1",
+        capacity=341.13,
+        available_capacity=254.58,
+        capacity_factor=0.1877,
+        latitude=48.994427,
+        longitude=-122.73455,
+        supply_curve_cost_per_mw=577564.52875,
+    )
+
+    assert site.region == sample_region
+    assert site.sc_point_gid == 416
+    assert site.resource_class == "1"
+    assert site.capacity == 341.13
+    assert site.available_capacity == 254.58
+    assert site.capacity_factor == 0.1877
+
+
+def test_resource_build_valid_and_exported(sample_region):
+    assert ReEDSResourceBuild is ModelsReEDSResourceBuild
+
+    build = ReEDSResourceBuild(
+        name="upv_1_2009_416",
+        technology="upv",
+        region=sample_region,
+        sc_point_gid=416,
+        resource_class="1",
+        year=2009,
+        built_capacity=0.3731343025384888,
+        investment_bool=True,
+        capacity=341.13,
+        available_capacity=254.58,
+        capacity_factor=0.1877,
+        latitude=48.994427,
+        longitude=-122.73455,
+        supply_curve_cost_per_mw=577564.52875,
+    )
+
+    assert build.year == 2009
+    assert build.built_capacity == 0.3731343025384888
+    assert build.investment_bool is True
+    assert build.sc_point_gid == 416
 
 
 def test_storage_generator_valid(storage_generator):
