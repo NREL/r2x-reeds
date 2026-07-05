@@ -280,5 +280,3 @@ def test_run_reeds_upgrades_reads_version_when_missing(tmp_path, monkeypatch):
     result = run_reeds_upgrades(store=cast(object, _Store()), ctx=cast(object, ctx))
     assert result.is_ok()
     assert ctx.current_version == "2026.01.22"
-
-
