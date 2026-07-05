@@ -85,6 +85,12 @@ class ReEDSReserve(ReEDSComponent):
     ] = None
     direction: Annotated[ReserveDirection, Field(description="Reserve direction")]
     reserve_type: Annotated[ReserveType, Field(description="Reserve type")]
+    or_load_percentage: Annotated[float | None, Field(description="Operating reserve load percentage")] = None
+    or_wind_percentage: Annotated[float | None, Field(description="Operating reserve wind percentage")] = None
+    or_pv_percentage: Annotated[float | None, Field(description="Operating reserve solar percentage")] = None
+    spin_cost: Annotated[float | None, Field(description="Spinning reserve cost")] = None
+    reg_cost: Annotated[float | None, Field(description="Regulation reserve cost")] = None
+    flex_cost: Annotated[float | None, Field(description="Flexible reserve cost")] = None
 
 
 class ReEDSInterface(ReEDSComponent):

@@ -117,6 +117,8 @@ def _resource_dataset_names(technology: str) -> tuple[str, str, str]:
 
 
 def _coerce_optional_int(value: Any) -> int | None:
+    """Convert a value to an int when possible, else return None."""
+
     if value is None:
         return None
     if isinstance(value, bool):
@@ -128,6 +130,8 @@ def _coerce_optional_int(value: Any) -> int | None:
 
 
 def _coerce_optional_float(value: Any) -> float | None:
+    """Convert a value to a float when possible, else return None."""
+
     if value is None:
         return None
     try:
@@ -137,6 +141,8 @@ def _coerce_optional_float(value: Any) -> float | None:
 
 
 def _coerce_optional_bool(value: Any) -> bool | None:
+    """Convert common truthy/falsy values to bool when possible."""
+
     if value is None:
         return None
     if isinstance(value, bool):
