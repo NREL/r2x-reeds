@@ -168,24 +168,6 @@ def _build_synthetic_hour_map(weather_years: Iterable[int]) -> pl.DataFrame:
     return pl.DataFrame(rows)
 
 
-def _build_synthetic_hour_map(weather_years: Iterable[int]) -> pl.DataFrame:
-    """Build a minimal in-memory hour_map used only when source files are missing.
-
-    The synthetic frame is intentionally small and only guarantees validation
-    requirements needed for translation to proceed.
-    """
-    rows = [
-        {
-            "year": int(year),
-            "time_index": f"{int(year)}-01-01 00:00:00",
-            "hour_period": "h1",
-            "season": "annual",
-        }
-        for year in weather_years
-    ]
-    return pl.DataFrame(rows)
-
-
 class ReEDSParser(Plugin[ReEDSConfig]):
     """Parser for ReEDS model data using the Plugin[ReEDSConfig] pattern.
 
@@ -1155,8 +1137,10 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if supply_curve_cost is None:
             supply_curve_cost = _coerce_optional_float(row.get("cost_per_mw"))
 
+        resource_year = _coerce_optional_int(row.get("year"))
+
         base_kwargs: dict[str, Any] = {
-            "name": build_resource_name(technology, resource_class, sc_point_gid, row.get("year")),
+            "name": build_resource_name(technology, resource_class, sc_point_gid, resource_year),
             "technology": technology,
             "region": region,
             "sc_point_gid": sc_point_gid,
@@ -1175,15 +1159,14 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         }
 
         if selected_only:
-            year = _coerce_optional_int(row.get("year"))
             built_capacity = _coerce_optional_float(row.get("built_capacity"))
             investment_bool = _coerce_optional_bool(row.get("investment_bool"))
-            if year is None or built_capacity is None or investment_bool is None:
+            if resource_year is None or built_capacity is None or investment_bool is None:
                 logger.debug("Skipping {} selected row missing year, built_capacity, or investment_bool", technology)
                 return None
             base_kwargs.update(
                 {
-                    "year": year,
+                    "year": resource_year,
                     "built_capacity": built_capacity,
                     "investment_bool": investment_bool,
                 }

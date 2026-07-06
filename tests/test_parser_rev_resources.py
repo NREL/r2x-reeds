@@ -178,6 +178,23 @@ def test_resource_defaults_and_geographic_info_helpers(parser, sample_region):
     )
     assert skipped is None
 
+    selected = parser._resource_component_kwargs(
+        row={
+            "region": "p1",
+            "sc_point_gid": 416,
+            "resource_class": "1",
+            "year": 2009.0,
+            "built_capacity": 1.5,
+            "investment_bool": 1,
+        },
+        technology="upv",
+        selected_only=True,
+        system=system,
+    )
+    assert selected is not None
+    assert selected["year"] == 2009
+    assert selected["name"] == "upv_1_2009_416"
+
 
 def test_resource_helpers_coerce_and_merge(parser, sample_region):
     _prepare_parser(parser, sample_region)
