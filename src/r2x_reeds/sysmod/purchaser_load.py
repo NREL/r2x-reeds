@@ -9,7 +9,7 @@ from typing import TypeVar
 import polars as pl
 from infrasys import Component, SingleTimeSeries, System
 from loguru import logger
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from rust_ok import Err, Ok, Result
 
 from r2x_core import DataStore, PluginConfig, expose_plugin
@@ -22,12 +22,12 @@ from r2x_reeds.models.components import (
 from r2x_reeds.parser_utils import expand_loadsite_hourly
 
 TComponent = TypeVar("TComponent", bound=Component)
-PURCHASER_COMPONENT_TYPES = {
+HYDROGEN_PRODUCTION_COMPONENT_TYPES = {
     "electrolyzer": ReEDSElectrolyzerDemand,
     "smr": ReEDSSteamMethaneReformingDemand,
     "smr_ccs": ReEDSSteamMethaneReformingDemand,
 }
-PURCHASER_TECHNOLOGIES = tuple(PURCHASER_COMPONENT_TYPES)
+HYDROGEN_PRODUCTION_TECHNOLOGIES = tuple(HYDROGEN_PRODUCTION_COMPONENT_TYPES)
 
 
 class PurchaserLoadConfig(PluginConfig):
@@ -41,21 +41,26 @@ class PurchaserLoadConfig(PluginConfig):
         default=2012,
         description="Weather year used for time series initial timestamp.",
     )
-    electrolyzer_capacity_fpath: Path | str | None = Field(
+    hydrogen_production_capacity_fpath: Path | str | None = Field(
         default=None,
-        description="Path to cap.csv containing electrolyzer installed capacity.",
+        description="Path to cap.csv containing hydrogen-production installed capacity.",
+        validation_alias=AliasChoices("hydrogen_production_capacity_fpath", "electrolyzer_capacity_fpath"),
     )
     consume_characteristics_fpath: Path | str | None = Field(
         default=None,
-        description="Path to consume_char.csv containing electricity_efficiency.",
+        description="Path to consume_char.csv containing electricity-consumption efficiency.",
     )
-    electrolyzer_prod_load_fpath: Path | str | None = Field(
+    hydrogen_production_load_fpath: Path | str | None = Field(
         default=None,
-        description="Path to prod_load.csv containing representative-period electrolyzer demand.",
+        description="Path to prod_load.csv containing representative-period hydrogen-production demand.",
+        validation_alias=AliasChoices("hydrogen_production_load_fpath", "electrolyzer_prod_load_fpath"),
     )
-    electrolyzer_prod_load_ann_fpath: Path | str | None = Field(
+    hydrogen_production_annual_load_fpath: Path | str | None = Field(
         default=None,
-        description="Path to prod_load_ann.csv with annual electrolyzer demand targets.",
+        description="Path to prod_load_ann.csv with annual hydrogen-production demand targets.",
+        validation_alias=AliasChoices(
+            "hydrogen_production_annual_load_fpath", "electrolyzer_prod_load_ann_fpath"
+        ),
     )
     loadsite_op_fpath: Path | str | None = Field(
         default=None,
@@ -185,16 +190,17 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
 
         hour_map = _normalize_hour_map_myr(hour_map_raw)
 
-        # Purchaser consuming demand components from cap.csv + consume_char.csv.
-        electrolyzer_capacity_raw = _read_optional_frame(
-            config.electrolyzer_capacity_fpath, "electrolyzer_capacity"
+        # Hydrogen-production demand components from cap.csv + consume_char.csv.
+        hydrogen_production_capacity_raw = _read_optional_frame(
+            config.hydrogen_production_capacity_fpath,
+            "hydrogen_production_capacity",
         )
         consume_char_raw = _read_optional_frame(
             config.consume_characteristics_fpath,
             "consume_characteristics",
         )
-        if electrolyzer_capacity_raw is not None and not electrolyzer_capacity_raw.is_empty():
-            cap_df = electrolyzer_capacity_raw.rename(
+        if hydrogen_production_capacity_raw is not None and not hydrogen_production_capacity_raw.is_empty():
+            cap_df = hydrogen_production_capacity_raw.rename(
                 {
                     "i": "technology",
                     "r": "region",
@@ -207,7 +213,7 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
 
             cap_df = cap_df.with_columns(
                 pl.col("technology").cast(pl.Utf8).str.to_lowercase().alias("technology")
-            ).filter(pl.col("technology").is_in(PURCHASER_TECHNOLOGIES))
+            ).filter(pl.col("technology").is_in(HYDROGEN_PRODUCTION_TECHNOLOGIES))
 
             efficiencies: dict[str, float] = {}
             if consume_char_raw is not None and not consume_char_raw.is_empty():
@@ -225,13 +231,11 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
                     pl.col("technology").cast(pl.Utf8).str.to_lowercase().alias("technology"),
                     pl.col("parameter").cast(pl.Utf8).str.to_lowercase().alias("parameter"),
                 ).filter(
-                    pl.col("technology").is_in(PURCHASER_TECHNOLOGIES)
-                    & (pl.col("parameter") == "electricity_efficiency")
+                    pl.col("technology").is_in(HYDROGEN_PRODUCTION_TECHNOLOGIES)
+                    & pl.col("parameter").is_in(("electricity_efficiency", "ele_efficiency"))
                 )
-                efficiencies = {
-                    str(row["technology"]): float(row["value"])
-                    for row in eff_rows.select("technology", "value").iter_rows(named=True)
-                }
+                for row in eff_rows.select("technology", "value").iter_rows(named=True):
+                    efficiencies.setdefault(str(row["technology"]), float(row["value"]))
 
             created = 0
             for row in cap_df.iter_rows(named=True):
@@ -247,7 +251,7 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
                     continue
 
                 name = f"{region_name}_{technology}_demand"
-                component_type = PURCHASER_COMPONENT_TYPES[technology]
+                component_type = HYDROGEN_PRODUCTION_COMPONENT_TYPES[technology]
                 if _component_exists(system, component_type, name):
                     continue
 
@@ -262,7 +266,7 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
                 )
                 created += 1
             if created > 0:
-                logger.info("Attached {} purchaser demand components", created)
+                logger.info("Attached {} hydrogen-production demand components", created)
 
         # Data center consuming demand components from loadsite_op.csv.
         loadsite_raw = _read_optional_frame(config.loadsite_op_fpath, "loadsite_op")
@@ -308,17 +312,17 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
             if created > 0:
                 logger.info("Attached {} data center demand components", created)
 
-        # Attach electrolyzer profile time series.
-        electrolyzer_profile_raw = _read_optional_frame(
-            config.electrolyzer_prod_load_fpath,
-            "electrolyzer_prod_load",
+        # Attach hydrogen-production profile time series.
+        hydrogen_production_profile_raw = _read_optional_frame(
+            config.hydrogen_production_load_fpath,
+            "hydrogen_production_load",
         )
-        electrolyzer_annual_raw = _read_optional_frame(
-            config.electrolyzer_prod_load_ann_fpath,
-            "electrolyzer_prod_load_ann",
+        hydrogen_production_annual_raw = _read_optional_frame(
+            config.hydrogen_production_annual_load_fpath,
+            "hydrogen_production_annual_load",
         )
-        if electrolyzer_profile_raw is not None and not electrolyzer_profile_raw.is_empty():
-            profile = electrolyzer_profile_raw.rename(
+        if hydrogen_production_profile_raw is not None and not hydrogen_production_profile_raw.is_empty():
+            profile = hydrogen_production_profile_raw.rename(
                 {
                     "i": "technology",
                     "r": "region",
@@ -330,19 +334,14 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
             if config.solve_year is not None and "year" in profile.columns:
                 profile = profile.filter(pl.col("year").cast(pl.Int64, strict=False) == config.solve_year)
 
-            profile = profile.filter(pl.col("technology").cast(pl.Utf8).str.to_lowercase() == "electrolyzer")
-            profile = profile.select("region", "hour_period", "value")
+            profile = profile.with_columns(
+                pl.col("technology").cast(pl.Utf8).str.to_lowercase().alias("technology")
+            ).filter(pl.col("technology").is_in(HYDROGEN_PRODUCTION_TECHNOLOGIES))
+            profile = profile.select("technology", "region", "hour_period", "value")
 
-            expanded_result = expand_loadsite_hourly(
-                loadsite_data=_normalize_loadsite(profile, None), hour_map_myr=hour_map
-            )
-            if expanded_result.is_err():
-                return Err(str(expanded_result.unwrap_err()))
-            expanded = expanded_result.unwrap()
-
-            annual_targets: dict[str, float] = {}
-            if electrolyzer_annual_raw is not None and not electrolyzer_annual_raw.is_empty():
-                annual = electrolyzer_annual_raw.rename(
+            annual_targets: dict[tuple[str, str], float] = {}
+            if hydrogen_production_annual_raw is not None and not hydrogen_production_annual_raw.is_empty():
+                annual = hydrogen_production_annual_raw.rename(
                     {
                         "i": "technology",
                         "r": "region",
@@ -353,43 +352,60 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
                 if config.solve_year is not None and "year" in annual.columns:
                     annual = annual.filter(pl.col("year").cast(pl.Int64, strict=False) == config.solve_year)
 
+                annual = annual.with_columns(
+                    pl.col("technology").cast(pl.Utf8).str.to_lowercase().alias("technology")
+                )
                 annual_targets = {
-                    str(row["region"]): float(row["value"])
-                    for row in annual.filter(
-                        pl.col("technology").cast(pl.Utf8).str.to_lowercase() == "electrolyzer"
-                    )
-                    .select("region", "value")
+                    (str(row["technology"]), str(row["region"])): float(row["value"])
+                    for row in annual.filter(pl.col("technology").is_in(HYDROGEN_PRODUCTION_TECHNOLOGIES))
+                    .select("technology", "region", "value")
                     .iter_rows(named=True)
                 }
 
             attached = 0
-            for demand in system.get_components(ReEDSElectrolyzerDemand):
-                region_profile = (
-                    expanded.filter(pl.col("region") == demand.region.name)
-                    .sort("sequential_hour")
-                    .select("value")
-                    .to_series()
-                    .to_numpy()
-                )
-                if region_profile.size == 0:
+            for technology, component_type in HYDROGEN_PRODUCTION_COMPONENT_TYPES.items():
+                technology_profile = profile.filter(pl.col("technology") == technology)
+                if technology_profile.is_empty():
                     continue
 
-                if demand.region.name in annual_targets:
-                    target = annual_targets[demand.region.name]
+                expanded_result = expand_loadsite_hourly(
+                    loadsite_data=_normalize_loadsite(
+                        technology_profile.select("region", "hour_period", "value"), None
+                    ),
+                    hour_map_myr=hour_map,
+                )
+                if expanded_result.is_err():
+                    return Err(str(expanded_result.unwrap_err()))
+                expanded = expanded_result.unwrap()
+
+                for demand in system.get_components(component_type):
+                    if demand.technology.casefold() != technology:
+                        continue
+                    region_profile = (
+                        expanded.filter(pl.col("region") == demand.region.name)
+                        .sort("sequential_hour")
+                        .select("value")
+                        .to_series()
+                        .to_numpy()
+                    )
+                    if region_profile.size == 0:
+                        continue
+
+                    target = annual_targets.get((technology, demand.region.name))
                     current = float(region_profile.sum())
-                    if current > 0 and target >= 0:
+                    if target is not None and current > 0 and target >= 0:
                         region_profile = region_profile * (target / current)
 
-                ts = SingleTimeSeries.from_array(
-                    data=region_profile,
-                    name="max_active_power",
-                    initial_timestamp=datetime(year=config.weather_year, month=1, day=1),
-                    resolution=timedelta(hours=1),
-                )
-                system.add_time_series(ts, demand)
-                attached += 1
+                    ts = SingleTimeSeries.from_array(
+                        data=region_profile,
+                        name="max_active_power",
+                        initial_timestamp=datetime(year=config.weather_year, month=1, day=1),
+                        resolution=timedelta(hours=1),
+                    )
+                    system.add_time_series(ts, demand)
+                    attached += 1
             if attached > 0:
-                logger.info("Attached electrolyzer load profiles to {} demand components", attached)
+                logger.info("Attached hydrogen-production profiles to {} demand components", attached)
 
         # Attach data center profile time series from loadsite_op.
         if loadsite_raw is not None and not loadsite_raw.is_empty():

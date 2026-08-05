@@ -38,6 +38,18 @@ def _run_modifier(system: System, **kwargs) -> System:
     return result.unwrap()
 
 
+def test_purchaser_load_config_accepts_legacy_electrolyzer_paths() -> None:
+    config = purchaser_load.PurchaserLoadConfig(
+        electrolyzer_capacity_fpath="cap.csv",
+        electrolyzer_prod_load_fpath="prod_load.csv",
+        electrolyzer_prod_load_ann_fpath="prod_load_ann.csv",
+    )
+
+    assert str(config.hydrogen_production_capacity_fpath) == "cap.csv"
+    assert str(config.hydrogen_production_load_fpath) == "prod_load.csv"
+    assert str(config.hydrogen_production_annual_load_fpath) == "prod_load_ann.csv"
+
+
 def test_purchaser_load_scope_full_flow(tmp_path: Path) -> None:
     system, _, _ = _build_system()
 
@@ -48,7 +60,7 @@ def test_purchaser_load_scope_full_flow(tmp_path: Path) -> None:
             "h": ["h1", "h2", "h3"],
         },
     )
-    electrolyzer_capacity_path = _write_csv(
+    hydrogen_production_capacity_path = _write_csv(
         tmp_path / "cap.csv",
         {
             "i": ["electrolyzer"],
@@ -66,7 +78,7 @@ def test_purchaser_load_scope_full_flow(tmp_path: Path) -> None:
             "value": [1.25],
         },
     )
-    electrolyzer_profile_path = _write_csv(
+    hydrogen_production_load_path = _write_csv(
         tmp_path / "prod_load.csv",
         {
             "i": ["electrolyzer", "electrolyzer", "electrolyzer"],
@@ -76,7 +88,7 @@ def test_purchaser_load_scope_full_flow(tmp_path: Path) -> None:
             "Value": [50.0, 40.0, 30.0],
         },
     )
-    electrolyzer_annual_path = _write_csv(
+    hydrogen_production_annual_load_path = _write_csv(
         tmp_path / "prod_load_ann.csv",
         {
             "i": ["electrolyzer"],
@@ -100,10 +112,10 @@ def test_purchaser_load_scope_full_flow(tmp_path: Path) -> None:
         solve_year=2032,
         weather_year=2012,
         hour_map_myr_fpath=hour_map_myr_path,
-        electrolyzer_capacity_fpath=electrolyzer_capacity_path,
+        hydrogen_production_capacity_fpath=hydrogen_production_capacity_path,
         consume_characteristics_fpath=consume_char_path,
-        electrolyzer_prod_load_fpath=electrolyzer_profile_path,
-        electrolyzer_prod_load_ann_fpath=electrolyzer_annual_path,
+        hydrogen_production_load_fpath=hydrogen_production_load_path,
+        hydrogen_production_annual_load_fpath=hydrogen_production_annual_load_path,
         loadsite_op_fpath=loadsite_op_path,
     )
 
@@ -126,14 +138,14 @@ def test_purchaser_load_scope_full_flow(tmp_path: Path) -> None:
     np.testing.assert_allclose(p5_ts, np.array([300.0, 300.0, 300.0]), rtol=1e-5)
 
 
-def test_purchaser_load_creates_smr_purchasers_from_aggregate_capacity(tmp_path: Path) -> None:
-    """Aggregate ReEDS capacity creates SMR purchasers in their region."""
+def test_purchaser_load_creates_smr_purchasers_with_profiles(tmp_path: Path) -> None:
+    """ReEDS capacity and production load create profiled SMR purchasers."""
     system, _, _ = _build_system()
     hour_map_myr_path = _write_csv(
         tmp_path / "hmap_myr.csv",
-        {"yearhour": [1], "h": ["h1"]},
+        {"yearhour": [1, 2, 3], "h": ["h1", "h2", "h3"]},
     )
-    purchaser_capacity_path = _write_csv(
+    hydrogen_production_capacity_path = _write_csv(
         tmp_path / "cap.csv",
         {
             "i": ["smr", "smr_ccs"],
@@ -147,8 +159,27 @@ def test_purchaser_load_creates_smr_purchasers_from_aggregate_capacity(tmp_path:
         {
             "*i": ["smr", "smr_ccs"],
             "t": [2032, 2032],
-            "parameter": ["electricity_efficiency", "electricity_efficiency"],
+            "parameter": ["ele_efficiency", "ele_efficiency"],
             "value": [0.88, 1.9],
+        },
+    )
+    hydrogen_production_load_path = _write_csv(
+        tmp_path / "prod_load.csv",
+        {
+            "i": ["smr", "smr", "smr", "smr_ccs", "smr_ccs", "smr_ccs"],
+            "r": ["p4", "p4", "p4", "p4", "p4", "p4"],
+            "allh": ["h1", "h2", "h3", "h1", "h2", "h3"],
+            "t": [2032, 2032, 2032, 2032, 2032, 2032],
+            "Value": [10.0, 20.0, 30.0, 5.0, 5.0, 10.0],
+        },
+    )
+    hydrogen_production_annual_load_path = _write_csv(
+        tmp_path / "prod_load_ann.csv",
+        {
+            "i": ["smr", "smr_ccs"],
+            "r": ["p4", "p4"],
+            "t": [2032, 2032],
+            "Value": [120.0, 40.0],
         },
     )
 
@@ -156,8 +187,10 @@ def test_purchaser_load_creates_smr_purchasers_from_aggregate_capacity(tmp_path:
         system,
         solve_year=2032,
         hour_map_myr_fpath=hour_map_myr_path,
-        electrolyzer_capacity_fpath=purchaser_capacity_path,
+        hydrogen_production_capacity_fpath=hydrogen_production_capacity_path,
         consume_characteristics_fpath=consume_char_path,
+        hydrogen_production_load_fpath=hydrogen_production_load_path,
+        hydrogen_production_annual_load_fpath=hydrogen_production_annual_load_path,
     )
 
     smr = system.get_component(ReEDSSteamMethaneReformingDemand, "p4_smr_demand")
@@ -168,6 +201,8 @@ def test_purchaser_load_creates_smr_purchasers_from_aggregate_capacity(tmp_path:
     assert smr_ccs.technology == "smr_ccs"
     assert smr_ccs.capacity == pytest.approx(25.0)
     assert smr_ccs.electricity_efficiency == pytest.approx(1.9)
+    np.testing.assert_allclose(system.get_time_series(smr).data, np.array([20.0, 40.0, 60.0]))
+    np.testing.assert_allclose(system.get_time_series(smr_ccs).data, np.array([10.0, 10.0, 20.0]))
 
 
 def test_purchaser_load_scope_missing_hour_map(tmp_path: Path, caplog) -> None:
@@ -208,7 +243,7 @@ def test_purchaser_load_skips_electrolyzer_creation_when_existing(tmp_path: Path
             "h": ["h1", "h2", "h3"],
         },
     )
-    electrolyzer_capacity_path = _write_csv(
+    hydrogen_production_capacity_path = _write_csv(
         tmp_path / "cap.csv",
         {
             "i": ["electrolyzer"],
@@ -217,7 +252,7 @@ def test_purchaser_load_skips_electrolyzer_creation_when_existing(tmp_path: Path
             "Value": [120.0],
         },
     )
-    electrolyzer_profile_path = _write_csv(
+    hydrogen_production_load_path = _write_csv(
         tmp_path / "prod_load.csv",
         {
             "i": ["electrolyzer", "electrolyzer", "electrolyzer"],
@@ -233,8 +268,8 @@ def test_purchaser_load_skips_electrolyzer_creation_when_existing(tmp_path: Path
         solve_year=2032,
         weather_year=2012,
         hour_map_myr_fpath=hour_map_myr_path,
-        electrolyzer_capacity_fpath=electrolyzer_capacity_path,
-        electrolyzer_prod_load_fpath=electrolyzer_profile_path,
+        hydrogen_production_capacity_fpath=hydrogen_production_capacity_path,
+        hydrogen_production_load_fpath=hydrogen_production_load_path,
     )
 
     electrolyzers = list(system.get_components(ReEDSElectrolyzerDemand))
@@ -273,7 +308,7 @@ def test_purchaser_load_creates_missing_region_when_other_exists(tmp_path: Path)
         },
     )
     # cap.csv lists both p4 (already exists) and p5 (new).
-    electrolyzer_capacity_path = _write_csv(
+    hydrogen_production_capacity_path = _write_csv(
         tmp_path / "cap.csv",
         {
             "i": ["electrolyzer", "electrolyzer"],
@@ -288,7 +323,7 @@ def test_purchaser_load_creates_missing_region_when_other_exists(tmp_path: Path)
         solve_year=2032,
         weather_year=2012,
         hour_map_myr_fpath=hour_map_myr_path,
-        electrolyzer_capacity_fpath=electrolyzer_capacity_path,
+        hydrogen_production_capacity_fpath=hydrogen_production_capacity_path,
     )
 
     electrolyzers = {c.name: c for c in system.get_components(ReEDSElectrolyzerDemand)}
