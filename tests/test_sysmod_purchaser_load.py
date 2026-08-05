@@ -7,7 +7,12 @@ import polars as pl
 import pytest
 from infrasys import System
 
-from r2x_reeds.models.components import ReEDSDataCenterDemand, ReEDSElectrolyzerDemand, ReEDSRegion
+from r2x_reeds.models.components import (
+    ReEDSDataCenterDemand,
+    ReEDSElectrolyzerDemand,
+    ReEDSRegion,
+    ReEDSSteamMethaneReformingDemand,
+)
 from r2x_reeds.sysmod import purchaser_load
 
 pytestmark = [pytest.mark.integration]
@@ -119,6 +124,50 @@ def test_purchaser_load_scope_full_flow(tmp_path: Path) -> None:
     p5_ts = system.get_time_series(data_center_p5).data
     np.testing.assert_allclose(p4_ts, np.array([500.0, 500.0, 500.0]), rtol=1e-5)
     np.testing.assert_allclose(p5_ts, np.array([300.0, 300.0, 300.0]), rtol=1e-5)
+
+
+def test_purchaser_load_creates_smr_purchasers_from_aggregate_capacity(tmp_path: Path) -> None:
+    """Aggregate ReEDS capacity creates SMR purchasers in their region."""
+    system, _, _ = _build_system()
+    hour_map_myr_path = _write_csv(
+        tmp_path / "hmap_myr.csv",
+        {"yearhour": [1], "h": ["h1"]},
+    )
+    purchaser_capacity_path = _write_csv(
+        tmp_path / "cap.csv",
+        {
+            "i": ["smr", "smr_ccs"],
+            "r": ["p4", "p4"],
+            "t": [2032, 2032],
+            "Value": [100.0, 25.0],
+        },
+    )
+    consume_char_path = _write_csv(
+        tmp_path / "consume_char.csv",
+        {
+            "*i": ["smr", "smr_ccs"],
+            "t": [2032, 2032],
+            "parameter": ["electricity_efficiency", "electricity_efficiency"],
+            "value": [0.88, 1.9],
+        },
+    )
+
+    _run_modifier(
+        system,
+        solve_year=2032,
+        hour_map_myr_fpath=hour_map_myr_path,
+        electrolyzer_capacity_fpath=purchaser_capacity_path,
+        consume_characteristics_fpath=consume_char_path,
+    )
+
+    smr = system.get_component(ReEDSSteamMethaneReformingDemand, "p4_smr_demand")
+    smr_ccs = system.get_component(ReEDSSteamMethaneReformingDemand, "p4_smr_ccs_demand")
+    assert smr.technology == "smr"
+    assert smr.capacity == pytest.approx(100.0)
+    assert smr.electricity_efficiency == pytest.approx(0.88)
+    assert smr_ccs.technology == "smr_ccs"
+    assert smr_ccs.capacity == pytest.approx(25.0)
+    assert smr_ccs.electricity_efficiency == pytest.approx(1.9)
 
 
 def test_purchaser_load_scope_missing_hour_map(tmp_path: Path, caplog) -> None:

@@ -242,6 +242,16 @@ class ReEDSElectrolyzerDemand(ReEDSConsumingTechnology):
     ] = None
 
 
+class ReEDSSteamMethaneReformingDemand(ReEDSConsumingTechnology):
+    """Electricity demand from steam methane reforming."""
+
+    region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
+    max_active_power: Annotated[
+        float | None,
+        Field(description="Maximum active power demand in MW"),
+    ] = None
+
+
 class ReEDSDataCenterDemand(ReEDSConsumingTechnology):
     """Electricity demand from data centers or other large facilities."""
 
