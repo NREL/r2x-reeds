@@ -38,18 +38,6 @@ def _run_modifier(system: System, **kwargs) -> System:
     return result.unwrap()
 
 
-def test_purchaser_load_config_accepts_legacy_electrolyzer_paths() -> None:
-    config = purchaser_load.PurchaserLoadConfig(
-        electrolyzer_capacity_fpath="cap.csv",
-        electrolyzer_prod_load_fpath="prod_load.csv",
-        electrolyzer_prod_load_ann_fpath="prod_load_ann.csv",
-    )
-
-    assert str(config.hydrogen_production_capacity_fpath) == "cap.csv"
-    assert str(config.hydrogen_production_load_fpath) == "prod_load.csv"
-    assert str(config.hydrogen_production_annual_load_fpath) == "prod_load_ann.csv"
-
-
 def test_purchaser_load_scope_full_flow(tmp_path: Path) -> None:
     system, _, _ = _build_system()
 
@@ -159,7 +147,7 @@ def test_purchaser_load_creates_smr_purchasers_with_profiles(tmp_path: Path) -> 
         {
             "*i": ["smr", "smr_ccs"],
             "t": [2032, 2032],
-            "parameter": ["ele_efficiency", "ele_efficiency"],
+            "parameter": ["electricity_efficiency", "electricity_efficiency"],
             "value": [0.88, 1.9],
         },
     )

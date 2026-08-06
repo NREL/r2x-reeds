@@ -9,7 +9,7 @@ from typing import TypeVar
 import polars as pl
 from infrasys import Component, SingleTimeSeries, System
 from loguru import logger
-from pydantic import AliasChoices, Field
+from pydantic import Field
 from rust_ok import Err, Ok, Result
 
 from r2x_core import DataStore, PluginConfig, expose_plugin
@@ -44,23 +44,18 @@ class PurchaserLoadConfig(PluginConfig):
     hydrogen_production_capacity_fpath: Path | str | None = Field(
         default=None,
         description="Path to cap.csv containing hydrogen-production installed capacity.",
-        validation_alias=AliasChoices("hydrogen_production_capacity_fpath", "electrolyzer_capacity_fpath"),
     )
     consume_characteristics_fpath: Path | str | None = Field(
         default=None,
-        description="Path to consume_char.csv containing electricity-consumption efficiency.",
+        description="Path to consume_char.csv containing electricity_efficiency.",
     )
     hydrogen_production_load_fpath: Path | str | None = Field(
         default=None,
         description="Path to prod_load.csv containing representative-period hydrogen-production demand.",
-        validation_alias=AliasChoices("hydrogen_production_load_fpath", "electrolyzer_prod_load_fpath"),
     )
     hydrogen_production_annual_load_fpath: Path | str | None = Field(
         default=None,
         description="Path to prod_load_ann.csv with annual hydrogen-production demand targets.",
-        validation_alias=AliasChoices(
-            "hydrogen_production_annual_load_fpath", "electrolyzer_prod_load_ann_fpath"
-        ),
     )
     loadsite_op_fpath: Path | str | None = Field(
         default=None,
@@ -232,7 +227,7 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
                     pl.col("parameter").cast(pl.Utf8).str.to_lowercase().alias("parameter"),
                 ).filter(
                     pl.col("technology").is_in(HYDROGEN_PRODUCTION_TECHNOLOGIES)
-                    & pl.col("parameter").is_in(("electricity_efficiency", "ele_efficiency"))
+                    & (pl.col("parameter") == "electricity_efficiency")
                 )
                 for row in eff_rows.select("technology", "value").iter_rows(named=True):
                     efficiencies.setdefault(str(row["technology"]), float(row["value"]))
