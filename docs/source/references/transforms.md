@@ -28,7 +28,7 @@ Purpose:
 
 Important behavior:
 
-- If a purchaser-demand component already exists, capacity-based creation of that component is skipped to avoid double counting.
+- If the demand component for one of the ReEDS electricity-consuming technologies handled here (`electrolyzer`, `smr` or `smr_ccs`) already exists, capacity-based creation of that component is skipped to avoid double counting.
 
 Config model: `PurchaserLoadConfig`
 

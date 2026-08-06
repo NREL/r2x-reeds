@@ -12,7 +12,7 @@ This transform adds and/or updates:
 
 Purchaser load is intentionally handled outside the parser build flow so it can be enabled only when needed.
 
-For purchaser technologies, this transform also avoids duplicate creation by skipping `cap.csv`-based component creation when the corresponding demand component already exists in the system.
+For the ReEDS electricity-consuming technologies handled here (`electrolyzer`, `smr` for steam methane reforming and `smr_ccs` for steam methane reforming with CCS), this transform also avoids duplicate creation by skipping `cap.csv`-based component creation when the corresponding demand component already exists in the system.
 
 ## Required Inputs
 
@@ -21,7 +21,7 @@ For purchaser technologies, this transform also avoids duplicate creation by ski
 ## Optional Inputs
 
 - `hydrogen_production_capacity_fpath`: path to `cap.csv` with hydrogen-production capacity
-- `consume_characteristics_fpath`: path to `consume_char.csv` with purchaser characteristics
+- `consume_characteristics_fpath`: path to `consume_char.csv` with electricity-consuming technology characteristics
 - `hydrogen_production_load_fpath`: path to `prod_load.csv` with hydrogen-production demand profiles
 - `hydrogen_production_annual_load_fpath`: path to `prod_load_ann.csv` with annual hydrogen-production demand
 - `loadsite_op_fpath`: path to `loadsite_op.csv`
