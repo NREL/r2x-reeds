@@ -60,7 +60,9 @@
         "nuclear",
         "o-g-s",
         "biopower",
-        "beccs"
+        "beccs",
+        "h2-ct",
+        "h2-cc"
       ],
       "exact": []
     },
@@ -105,9 +107,7 @@
     },
     "hydrogen": {
       "prefixes": [
-        "smr",
-        "h2-ct",
-        "h2-cc"
+        "smr"
       ],
       "exact": [
         "electrolyzer"
