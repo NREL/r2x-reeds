@@ -70,9 +70,9 @@ from .upgrader.data_upgrader import run_reeds_upgrades
 
 OUTPUTS_H5_DATASET_KEYS: dict[str, str] = {
     "online_capacity": "cap_ivrt",
-    "electrolyzer_capacity": "cap",
-    "electrolyzer_prod_load_ann": "prod_load_ann",
-    "electrolyzer_prod_load": "prod_load",
+    "hydrogen_production_capacity": "cap",
+    "hydrogen_production_annual_load": "prod_load_ann",
+    "hydrogen_production_load": "prod_load",
     "transmission_capacity": "tran_cap_energy",
     "transmission_losses": "tranloss",
     "loadsite_op": "loadsite_op",

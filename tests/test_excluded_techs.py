@@ -13,7 +13,12 @@ def test_excluded_techs_empty_list_default(reeds_config, reeds_run_path):
     from r2x_reeds.models import ReEDSGenerator
 
     config_dicts = reeds_config.load_config()
-    assert config_dicts["defaults"].get("excluded_techs") == ["can-imports", "electrolyzer"]
+    assert config_dicts["defaults"].get("excluded_techs") == [
+        "can-imports",
+        "electrolyzer",
+        "smr",
+        "smr_ccs",
+    ]
 
     data_store = DataStore.from_plugin_config(reeds_config, path=reeds_run_path)
     ctx = PluginContext(config=reeds_config, store=data_store)

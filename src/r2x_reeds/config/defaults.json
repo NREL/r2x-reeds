@@ -1,7 +1,9 @@
 {
   "excluded_techs": [
     "can-imports",
-    "electrolyzer"
+    "electrolyzer",
+    "smr",
+    "smr_ccs"
   ],
   "data_validation": {
     "max_capacity_mw": 100000.0,
