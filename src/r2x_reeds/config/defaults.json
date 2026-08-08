@@ -76,17 +76,27 @@
     },
     "hydro_dispatchable": {
       "prefixes": [
-        "hydED",
         "hydro-d"
       ],
-      "exact": []
+      "exact": [
+        "hydD",
+        "hydSD",
+        "hydUD",
+        "hydNPD",
+        "hydED"
+      ]
     },
     "hydro_nondispatchable": {
       "prefixes": [
-        "hydEND",
         "hydro-and"
       ],
-      "exact": []
+      "exact": [
+        "hydND",
+        "hydSND",
+        "hydUND",
+        "hydNPND",
+        "hydEND"
+      ]
     },
     "pumped_storage": {
       "prefixes": [
