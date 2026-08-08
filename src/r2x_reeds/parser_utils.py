@@ -806,6 +806,8 @@ def calculate_hydro_profiles_for_generator(
     *,
     hydro_data: pl.DataFrame,
     solve_years: list[int],
+    weather_year: int,
+    hydro_capacity_adjustment: pl.DataFrame | None = None,
 ) -> list:
     """Calculate hydro availability profiles for a generator across solve years."""
     from r2x_reeds.parser_types import HydroProfileResult
@@ -840,24 +842,36 @@ def calculate_hydro_profiles_for_generator(
             continue
 
         if generator.is_dispatchable:
-            name = "hydro_budget"
-            profile = monthly_profile
+            profiles = [("hydro_budget", monthly_profile)]
         else:
-            name = "max_active_power"
-            profile = [generator.capacity * cf for cf in monthly_profile]
+            profiles = [("max_active_power", [generator.capacity * cf for cf in monthly_profile])]
 
-        hourly_result = monthly_to_hourly_polars(year, profile)
-        if hourly_result.is_err():
-            logger.warning(
-                "Skipping hydro profile for {} in {}: {}",
-                generator.name,
-                year,
-                hourly_result.err(),
-            )
-            continue
+        if generator.is_dispatchable and hydro_capacity_adjustment is not None:
+            capacity_adjustment = hydro_capacity_adjustment.filter(
+                (pl.col("technology") == generator.technology) & (pl.col("region") == generator.region.name)
+            ).sort("month_num")
+            monthly_adjustment = capacity_adjustment["capacity_adjustment"].to_list()
+            if len(monthly_adjustment) == 12 and not any(value is None for value in monthly_adjustment):
+                profiles.append(
+                    (
+                        "max_active_power",
+                        [generator.capacity * adjustment for adjustment in monthly_adjustment],
+                    )
+                )
 
-        profile_array = np.asarray(hourly_result.ok(), dtype=np.float64)
-        results.append(HydroProfileResult(year=year, name=name, data=profile_array))
+        for name, profile in profiles:
+            hourly_result = monthly_to_hourly_polars(weather_year, profile)
+            if hourly_result.is_err():
+                logger.warning(
+                    "Skipping hydro profile for {} in {}: {}",
+                    generator.name,
+                    year,
+                    hourly_result.err(),
+                )
+                continue
+
+            profile_array = np.asarray(hourly_result.ok(), dtype=np.float64)
+            results.append(HydroProfileResult(year=year, name=name, data=profile_array))
 
     return results
 

@@ -240,6 +240,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         self._interface_cache: dict[str, ReEDSInterface] = {}
         self._reserve_region_cache: dict[str, ReEDSReserveRegion] = {}
         self._hydro_cf_prepared: pl.DataFrame | None = None
+        self._hydro_capacity_adjustment_prepared: pl.DataFrame | None = None
         self._reserve_percentages: dict[str, dict[str, float]] = {}
         self._reserve_costs: dict[str, dict[str, float]] = {}
         self._outputs_h5_fpath: Path | None = None
@@ -1707,6 +1708,8 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                 generator,
                 hydro_data=hydro_data,
                 solve_years=self.solve_years,
+                weather_year=self.config.primary_weather_year,
+                hydro_capacity_adjustment=self._hydro_capacity_adjustment_prepared,
             )
             for profile in profiles:
                 data = self._truncate_and_cast_time_series(profile.data)
@@ -1791,6 +1794,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         self._interface_cache = {}
         self._reserve_region_cache = {}
         self._hydro_cf_prepared = None
+        self._hydro_capacity_adjustment_prepared = None
         self._reserve_percentages = {}
         self._reserve_costs = {}
 
@@ -1926,7 +1930,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         return Ok(None)
 
     def _prepare_hydro_datasets(self) -> Result[None, str]:
-        """Prepare hydro capacity factor data for later budget attachment."""
+        """Prepare hydro profile data for later attachment."""
         hydro_cf = self.read_data_file("hydro_cf")
         if hydro_cf is None:
             self._hydro_cf_prepared = None
@@ -1945,6 +1949,26 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         hydro_cf_joined = hydro_cf.join(self.year_month_day_hours, on=["year", "month_num"], how="left")
         self._hydro_cf_prepared = hydro_cf_joined
         logger.trace("Hydro CF prepared rows: {}", hydro_cf_joined.height)
+
+        hydro_capacity_adjustment = self.read_data_file("hydro_capacity_adjustment")
+        if hydro_capacity_adjustment is None:
+            self._hydro_capacity_adjustment_prepared = None
+            logger.trace("No hydro capacity adjustment dataset available")
+            return Ok(None)
+
+        self._hydro_capacity_adjustment_prepared = (
+            hydro_capacity_adjustment.with_columns(
+                pl.col("month")
+                .map_elements(lambda x: self.month_map.get(x, x), return_dtype=pl.Int16)
+                .alias("month_num"),
+            )
+            .sort(["technology", "region", "month_num"])
+            .collect()
+        )
+        logger.trace(
+            "Hydro capacity adjustment prepared rows: {}",
+            self._hydro_capacity_adjustment_prepared.height,
+        )
         return Ok(None)
 
     def _prepare_reserve_datasets(self) -> Result[None, str]:
