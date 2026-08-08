@@ -1,4 +1,4 @@
-"""Tests for hydro budget and rating profile methods."""
+"""Tests for hydro availability profile methods."""
 
 import pytest
 
@@ -12,6 +12,6 @@ def test_hydro_time_series(example_system):
         ReEDSGenerator, filter_func=lambda comp: comp.technology == "hydro"
     ):
         ts = example_system.get_time_series(component)
-        assert ts.name == "hydro_budget"
+        assert ts.name == "max_active_power"
         assert ts.length == 8760
         assert sum(ts.data) != 0.0

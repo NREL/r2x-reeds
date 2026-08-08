@@ -391,10 +391,10 @@ def test_build_year_month_calendar_df_handles_empty_year_list():
     assert result.height == 0
 
 
-def test_calculate_hydro_budgets_for_generator_returns_budget_results(sample_region):
+def test_calculate_hydro_profiles_for_generator_returns_profile_results(sample_region):
     from r2x_reeds.models import ReEDSHydroGenerator
-    from r2x_reeds.parser_types import HydroBudgetResult
-    from r2x_reeds.parser_utils import calculate_hydro_budgets_for_generator
+    from r2x_reeds.parser_types import HydroProfileResult
+    from r2x_reeds.parser_utils import calculate_hydro_profiles_for_generator
 
     gen = ReEDSHydroGenerator(
         name="hyd_p1",
@@ -418,21 +418,22 @@ def test_calculate_hydro_budgets_for_generator_returns_budget_results(sample_reg
         }
     )
 
-    results = calculate_hydro_budgets_for_generator(
+    results = calculate_hydro_profiles_for_generator(
         gen,
         hydro_data=hydro_data,
         solve_years=[2024],
     )
 
     assert len(results) == 1
-    assert isinstance(results[0], HydroBudgetResult)
+    assert isinstance(results[0], HydroProfileResult)
     assert results[0].year == 2024
-    assert len(results[0].budget_array) == 366 * 24
+    assert results[0].name == "hydro_budget"
+    assert len(results[0].data) == 366 * 24
 
 
-def test_calculate_hydro_budgets_for_generator_skips_incomplete_months(sample_region):
+def test_calculate_hydro_profiles_for_generator_skips_incomplete_months(sample_region):
     from r2x_reeds.models import ReEDSHydroGenerator
-    from r2x_reeds.parser_utils import calculate_hydro_budgets_for_generator
+    from r2x_reeds.parser_utils import calculate_hydro_profiles_for_generator
 
     gen = ReEDSHydroGenerator(
         name="hyd_p1",
@@ -456,7 +457,7 @@ def test_calculate_hydro_budgets_for_generator_skips_incomplete_months(sample_re
         }
     )
 
-    results = calculate_hydro_budgets_for_generator(
+    results = calculate_hydro_profiles_for_generator(
         gen,
         hydro_data=hydro_data,
         solve_years=[2024],
@@ -465,9 +466,9 @@ def test_calculate_hydro_budgets_for_generator_skips_incomplete_months(sample_re
     assert len(results) == 0
 
 
-def test_calculate_hydro_budgets_for_generator_returns_empty_when_no_match(sample_region):
+def test_calculate_hydro_profiles_for_generator_returns_empty_when_no_match(sample_region):
     from r2x_reeds.models import ReEDSHydroGenerator
-    from r2x_reeds.parser_utils import calculate_hydro_budgets_for_generator
+    from r2x_reeds.parser_utils import calculate_hydro_profiles_for_generator
 
     gen = ReEDSHydroGenerator(
         name="hyd_p1",
@@ -491,7 +492,7 @@ def test_calculate_hydro_budgets_for_generator_returns_empty_when_no_match(sampl
         }
     )
 
-    results = calculate_hydro_budgets_for_generator(
+    results = calculate_hydro_profiles_for_generator(
         gen,
         hydro_data=hydro_data,
         solve_years=[2024],
@@ -500,9 +501,9 @@ def test_calculate_hydro_budgets_for_generator_returns_empty_when_no_match(sampl
     assert len(results) == 0
 
 
-def test_calculate_hydro_budgets_for_generator_uses_capacity_and_cf(sample_region):
+def test_calculate_hydro_profiles_for_generator_uses_normalized_dispatchable_cf(sample_region):
     from r2x_reeds.models import ReEDSHydroGenerator
-    from r2x_reeds.parser_utils import calculate_hydro_budgets_for_generator
+    from r2x_reeds.parser_utils import calculate_hydro_profiles_for_generator
 
     gen = ReEDSHydroGenerator(
         name="hyd_p1",
@@ -526,14 +527,50 @@ def test_calculate_hydro_budgets_for_generator_uses_capacity_and_cf(sample_regio
         }
     )
 
-    results = calculate_hydro_budgets_for_generator(
+    results = calculate_hydro_profiles_for_generator(
         gen,
         hydro_data=hydro_data,
         solve_years=[2023],
     )
 
-    jan_daily_budget = 100.0 * 1.0 * (31 * 24) / 31
-    assert results[0].budget_array[0] == pytest.approx(jan_daily_budget)
+    assert results[0].name == "hydro_budget"
+    assert results[0].data[0] == pytest.approx(1.0)
+
+
+def test_calculate_hydro_profiles_for_generator_scales_nondispatchable_power(sample_region):
+    from r2x_reeds.models import ReEDSHydroGenerator
+    from r2x_reeds.parser_utils import calculate_hydro_profiles_for_generator
+
+    gen = ReEDSHydroGenerator(
+        name="hyd_p1",
+        region=sample_region,
+        technology="hyd",
+        capacity=100.0,
+        vintage="2020",
+        is_dispatchable=False,
+    )
+
+    hydro_data = pl.DataFrame(
+        {
+            "technology": ["hyd"] * 12,
+            "region": [sample_region.name] * 12,
+            "vintage": ["2020"] * 12,
+            "year": [2023] * 12,
+            "month_num": list(range(1, 13)),
+            "hydro_cf": [0.5] * 12,
+            "days_in_month": [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
+            "hours_in_month": [d * 24 for d in [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]],
+        }
+    )
+
+    results = calculate_hydro_profiles_for_generator(
+        gen,
+        hydro_data=hydro_data,
+        solve_years=[2023],
+    )
+
+    assert results[0].name == "max_active_power"
+    assert results[0].data[0] == pytest.approx(50.0)
 
 
 def test_filter_generators_category_filter_with_none_tech_categories(sample_region):
@@ -555,11 +592,11 @@ def test_filter_generators_category_filter_with_none_tech_categories(sample_regi
     assert len(result) == 0
 
 
-def test_calculate_hydro_budgets_generator_no_vintage(sample_region):
+def test_calculate_hydro_profiles_generator_no_vintage(sample_region):
     """Generator without vintage should still work with matching data."""
     from r2x_reeds.models import ReEDSHydroGenerator
-    from r2x_reeds.parser_types import HydroBudgetResult
-    from r2x_reeds.parser_utils import calculate_hydro_budgets_for_generator
+    from r2x_reeds.parser_types import HydroProfileResult
+    from r2x_reeds.parser_utils import calculate_hydro_profiles_for_generator
 
     gen = ReEDSHydroGenerator(
         name="hyd_p1",
@@ -584,7 +621,7 @@ def test_calculate_hydro_budgets_generator_no_vintage(sample_region):
         }
     )
 
-    results = calculate_hydro_budgets_for_generator(
+    results = calculate_hydro_profiles_for_generator(
         gen,
         hydro_data=hydro_data,
         solve_years=[2024],
@@ -592,13 +629,13 @@ def test_calculate_hydro_budgets_generator_no_vintage(sample_region):
 
     # Should find match because generator has no vintage (no vintage filter applied)
     assert len(results) == 1
-    assert isinstance(results[0], HydroBudgetResult)
+    assert isinstance(results[0], HydroProfileResult)
 
 
-def test_calculate_hydro_budgets_none_cf_values(sample_region):
+def test_calculate_hydro_profiles_none_cf_values(sample_region):
     """Rows with None in hydro_cf should be skipped."""
     from r2x_reeds.models import ReEDSHydroGenerator
-    from r2x_reeds.parser_utils import calculate_hydro_budgets_for_generator
+    from r2x_reeds.parser_utils import calculate_hydro_profiles_for_generator
 
     gen = ReEDSHydroGenerator(
         name="hyd_p1",
@@ -623,7 +660,7 @@ def test_calculate_hydro_budgets_none_cf_values(sample_region):
         }
     )
 
-    results = calculate_hydro_budgets_for_generator(
+    results = calculate_hydro_profiles_for_generator(
         gen,
         hydro_data=hydro_data,
         solve_years=[2024],
@@ -633,10 +670,10 @@ def test_calculate_hydro_budgets_none_cf_values(sample_region):
     assert len(results) == 0
 
 
-def test_calculate_hydro_budgets_multiple_years_partial_data(sample_region):
+def test_calculate_hydro_profiles_multiple_years_partial_data(sample_region):
     """Only years with complete 12 months should return results."""
     from r2x_reeds.models import ReEDSHydroGenerator
-    from r2x_reeds.parser_utils import calculate_hydro_budgets_for_generator
+    from r2x_reeds.parser_utils import calculate_hydro_profiles_for_generator
 
     gen = ReEDSHydroGenerator(
         name="hyd_p1",
@@ -674,7 +711,7 @@ def test_calculate_hydro_budgets_multiple_years_partial_data(sample_region):
     )
     hydro_data = pl.concat([hydro_data_2024, hydro_data_2025])
 
-    results = calculate_hydro_budgets_for_generator(
+    results = calculate_hydro_profiles_for_generator(
         gen,
         hydro_data=hydro_data,
         solve_years=[2024, 2025],
