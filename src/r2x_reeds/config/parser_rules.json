@@ -414,7 +414,10 @@
     "field_map": {
       "category": "trtype",
       "line_type": "trtype",
-      "losses": "losses"
+      "distance_miles": "distance_miles",
+      "line_cost_per_mw_mile": "line_cost_per_mw_mile",
+      "losses": "losses",
+      "hurdle_rate": "cost_hurdle_rate"
     },
     "getters": {
       "name": "build_transmission_line_name",
@@ -423,8 +426,11 @@
     },
     "defaults": {
       "category": null,
+      "distance_miles": null,
       "line_type": null,
+      "line_cost_per_mw_mile": null,
       "losses": null,
+      "hurdle_rate": null,
       "reverse_capacity": null
     }
   }

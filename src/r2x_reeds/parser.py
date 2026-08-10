@@ -580,6 +580,8 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if hour_map_result.is_err():
             return Err(f"Weather year(s): {hour_map_result.err()}")
         hour_map_df = hour_map_result.ok()
+        if hour_map_df is None:
+            return Err("Weather year(s): hour_map validation returned no data")
 
         available_weather_years = {
             int(val)
@@ -956,6 +958,126 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                         how="left",
                     )
                     logger.trace("Joined transmission losses into trancap, columns: {}", trancap.columns)
+
+        hurdle_rate_data = self.read_data_file("cost_hurdle_rate")
+        if hurdle_rate_data is not None:
+            hurdle_rate = hurdle_rate_data.collect()
+            if not hurdle_rate.is_empty():
+                rename_map = {}
+                if "r" in hurdle_rate.columns and "from_region" not in hurdle_rate.columns:
+                    rename_map["r"] = "from_region"
+                if "rr" in hurdle_rate.columns and "to_region" not in hurdle_rate.columns:
+                    rename_map["rr"] = "to_region"
+                if "allt" in hurdle_rate.columns and "year" not in hurdle_rate.columns:
+                    rename_map["allt"] = "year"
+                if "value" in hurdle_rate.columns and "cost_hurdle_rate" not in hurdle_rate.columns:
+                    rename_map["value"] = "cost_hurdle_rate"
+                if rename_map:
+                    hurdle_rate = hurdle_rate.rename(rename_map)
+
+                required_hurdle_cols = {"from_region", "to_region", "year", "cost_hurdle_rate"}
+                missing = required_hurdle_cols - set(hurdle_rate.columns)
+                if missing:
+                    logger.warning(
+                        "Transmission hurdle-rate data missing expected columns {}; skipping hurdle-rate join",
+                        missing,
+                    )
+                else:
+                    trancap = trancap.join(
+                        hurdle_rate.select(["from_region", "to_region", "year", "cost_hurdle_rate"]),
+                        on=["from_region", "to_region", "year"],
+                        how="left",
+                    )
+                    logger.trace(
+                        "Joined transmission hurdle rates into trancap, columns: {}",
+                        trancap.columns,
+                    )
+
+        distance_data = self.read_data_file("transmission_distance_cost_dc")
+        if distance_data is not None:
+            distance_df = distance_data.collect()
+            if not distance_df.is_empty():
+                rename_map = {}
+                if "r" in distance_df.columns and "from_region" not in distance_df.columns:
+                    rename_map["r"] = "from_region"
+                if "rr" in distance_df.columns and "to_region" not in distance_df.columns:
+                    rename_map["rr"] = "to_region"
+                if "distance_mi" in distance_df.columns and "distance_miles" not in distance_df.columns:
+                    rename_map["distance_mi"] = "distance_miles"
+                if rename_map:
+                    distance_df = distance_df.rename(rename_map)
+
+                required_distance_cols = {"from_region", "to_region", "distance_miles"}
+                missing = required_distance_cols - set(distance_df.columns)
+                if missing:
+                    logger.warning(
+                        "Transmission distance data missing expected columns {}; skipping distance join",
+                        missing,
+                    )
+                else:
+                    distance_df = distance_df.unique(
+                        subset=["from_region", "to_region"],
+                        keep="first",
+                        maintain_order=True,
+                    )
+                    trancap = trancap.join(
+                        distance_df.select(["from_region", "to_region", "distance_miles"]),
+                        on=["from_region", "to_region"],
+                        how="left",
+                    )
+                    logger.trace(
+                        "Joined transmission distances into trancap, columns: {}",
+                        trancap.columns,
+                    )
+
+        cost_data = self.read_data_file("transmission_distance_cost_ac")
+        if cost_data is not None:
+            cost_df = cost_data.collect()
+            if not cost_df.is_empty():
+                rename_map = {}
+                if "r" in cost_df.columns and "from_region" not in cost_df.columns:
+                    rename_map["r"] = "from_region"
+                if "rr" in cost_df.columns and "to_region" not in cost_df.columns:
+                    rename_map["rr"] = "to_region"
+                if rename_map:
+                    cost_df = cost_df.rename(rename_map)
+
+                required_cost_cols = {"from_region", "to_region", "cost_usd_per_mw_forward"}
+                missing = required_cost_cols - set(cost_df.columns)
+                if missing:
+                    logger.warning(
+                        "Transmission cost data missing expected columns {}; skipping cost join",
+                        missing,
+                    )
+                else:
+                    if "cost_bin" in cost_df.columns:
+                        cost_df = cost_df.sort(["from_region", "to_region", "cost_bin"])
+                    cost_df = cost_df.unique(
+                        subset=["from_region", "to_region"],
+                        keep="first",
+                        maintain_order=True,
+                    )
+                    trancap = trancap.join(
+                        cost_df.select(["from_region", "to_region", "cost_usd_per_mw_forward"]),
+                        on=["from_region", "to_region"],
+                        how="left",
+                    )
+                    logger.trace(
+                        "Joined transmission costs into trancap, columns: {}",
+                        trancap.columns,
+                    )
+
+        if "distance_miles" in trancap.columns and "cost_usd_per_mw_forward" in trancap.columns:
+            trancap = trancap.with_columns(
+                pl.when(
+                    pl.col("distance_miles").is_not_null()
+                    & (pl.col("distance_miles") != 0)
+                    & pl.col("cost_usd_per_mw_forward").is_not_null()
+                )
+                .then(pl.col("cost_usd_per_mw_forward") / pl.col("distance_miles"))
+                .otherwise(pl.lit(None, dtype=pl.Float64))
+                .alias("line_cost_per_mw_mile")
+            )
 
         # Join reverse capacity from the same trancap table
         # reverse row: swap from_region/to_region and use its capacity as reverse_capacity

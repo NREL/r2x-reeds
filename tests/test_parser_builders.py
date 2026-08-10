@@ -345,3 +345,267 @@ def test_build_transmission_missing_losses_data(
             assert line.losses is None or line.losses == pytest.approx(0.0), (
                 f"Lines without losses data should have None or 0.0, got {line.losses}"
             )
+
+
+@pytest.mark.unit
+def test_build_transmission_hurdle_rates_attached_to_lines(
+    fresh_parser: ReEDSParser,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify that transmission hurdle rates are attached to ReEDSTransmissionLine components."""
+    from r2x_core import System
+    from r2x_reeds.models.components import ReEDSTransmissionLine
+
+    parser = fresh_parser
+    system = System(name="transmission-hurdle-rate-test")
+
+    parser.ctx.system = system
+    assert parser._build_regions(system).is_ok(), "_build_regions failed"
+
+    existing_regions = list(parser._region_cache.keys())
+    assert len(existing_regions) >= 2, (
+        f"Need at least 2 regions after _build_regions, found: {existing_regions}"
+    )
+    r1, r2 = existing_regions[0], existing_regions[1]
+
+    original_read = parser.read_data_file
+
+    def fake_read(name: str):
+        if name == "transmission_capacity":
+            return pl.DataFrame(
+                {
+                    "from_region": [r1],
+                    "to_region": [r2],
+                    "trtype": ["ac"],
+                    "year": [parser.config.solve_year],
+                    "capacity": [100.0],
+                }
+            ).lazy()
+        if name == "cost_hurdle_rate":
+            return pl.DataFrame(
+                {
+                    "from_region": [r1],
+                    "to_region": [r2],
+                    "year": [parser.config.solve_year],
+                    "cost_hurdle_rate": [1.25],
+                }
+            ).lazy()
+        return original_read(name)
+
+    monkeypatch.setattr(parser, "read_data_file", fake_read)
+
+    result = parser._build_transmission(system)
+    assert result.is_ok(), f"_build_transmission failed: {result}"
+
+    lines = list(system.get_components(ReEDSTransmissionLine))
+    assert len(lines) > 0, "Expected at least one ReEDSTransmissionLine to be created"
+
+    lines_with_hurdle_rate = [ln for ln in lines if getattr(ln, "hurdle_rate", None) == pytest.approx(1.25)]
+    assert len(lines_with_hurdle_rate) > 0, (
+        "Expected at least one line with hurdle_rate=1.25; "
+        f"actual hurdle_rate values: {[getattr(ln, 'hurdle_rate', None) for ln in lines]}"
+    )
+
+
+@pytest.mark.unit
+def test_build_transmission_distance_and_cost_attached_to_lines(
+    fresh_parser: ReEDSParser,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify that transmission distance and derived per-MW-mile cost are attached to lines."""
+    from r2x_core import System
+    from r2x_reeds.models.components import ReEDSTransmissionLine
+
+    parser = fresh_parser
+    system = System(name="transmission-distance-cost-test")
+
+    parser.ctx.system = system
+    assert parser._build_regions(system).is_ok(), "_build_regions failed"
+
+    existing_regions = list(parser._region_cache.keys())
+    assert len(existing_regions) >= 2, (
+        f"Need at least 2 regions after _build_regions, found: {existing_regions}"
+    )
+    r1, r2 = existing_regions[0], existing_regions[1]
+
+    original_read = parser.read_data_file
+
+    def fake_read(name: str):
+        if name == "transmission_capacity":
+            return pl.DataFrame(
+                {
+                    "from_region": [r1],
+                    "to_region": [r2],
+                    "trtype": ["ac"],
+                    "year": [parser.config.solve_year],
+                    "capacity": [100.0],
+                }
+            ).lazy()
+        if name == "transmission_distance_cost_dc":
+            return pl.DataFrame(
+                {
+                    "from_region": [r1],
+                    "to_region": [r2],
+                    "distance_mi": [250.0],
+                }
+            ).lazy()
+        if name == "transmission_distance_cost_ac":
+            return pl.DataFrame(
+                {
+                    "from_region": [r1],
+                    "to_region": [r2],
+                    "cost_bin": ["t0"],
+                    "cost_usd_per_mw_forward": [250000.0],
+                }
+            ).lazy()
+        return original_read(name)
+
+    monkeypatch.setattr(parser, "read_data_file", fake_read)
+
+    result = parser._build_transmission(system)
+    assert result.is_ok(), f"_build_transmission failed: {result}"
+
+    lines = list(system.get_components(ReEDSTransmissionLine))
+    assert len(lines) > 0, "Expected at least one ReEDSTransmissionLine to be created"
+
+    target_lines = [
+        ln
+        for ln in lines
+        if getattr(ln, "distance_miles", None) == pytest.approx(250.0)
+        and getattr(ln, "line_cost_per_mw_mile", None) == pytest.approx(1000.0)
+    ]
+    assert len(target_lines) > 0, (
+        "Expected at least one line with distance_miles=250.0 and line_cost_per_mw_mile=1000.0; "
+        f"actual pairs: {[(getattr(ln, 'distance_miles', None), getattr(ln, 'line_cost_per_mw_mile', None)) for ln in lines]}"
+    )
+
+
+@pytest.mark.unit
+def test_build_transmission_legacy_column_aliases_are_supported(
+    fresh_parser: ReEDSParser,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify legacy transmission column aliases are renamed and consumed correctly."""
+    from r2x_core import System
+    from r2x_reeds.models.components import ReEDSTransmissionLine
+
+    parser = fresh_parser
+    system = System(name="transmission-legacy-aliases-test")
+
+    parser.ctx.system = system
+    assert parser._build_regions(system).is_ok(), "_build_regions failed"
+
+    existing_regions = list(parser._region_cache.keys())
+    assert len(existing_regions) >= 2, (
+        f"Need at least 2 regions after _build_regions, found: {existing_regions}"
+    )
+    r1, r2 = existing_regions[0], existing_regions[1]
+
+    original_read = parser.read_data_file
+
+    def fake_read(name: str):
+        if name == "transmission_capacity":
+            return pl.DataFrame(
+                {
+                    "from_region": [r1],
+                    "to_region": [r2],
+                    "trtype": ["ac"],
+                    "year": [parser.config.solve_year],
+                    "capacity": [120.0],
+                }
+            ).lazy()
+        if name == "transmission_losses":
+            return pl.DataFrame(
+                {
+                    "r": [r1],
+                    "to_region": [r2],
+                    "trtype": ["ac"],
+                    "value": [0.03],
+                }
+            ).lazy()
+        if name == "cost_hurdle_rate":
+            return pl.DataFrame(
+                {
+                    "r": [r1],
+                    "rr": [r2],
+                    "allt": [parser.config.solve_year],
+                    "value": [2.5],
+                }
+            ).lazy()
+        if name == "transmission_distance_cost_dc":
+            return pl.DataFrame(
+                {
+                    "r": [r1],
+                    "rr": [r2],
+                    "distance_mi": [200.0],
+                }
+            ).lazy()
+        if name == "transmission_distance_cost_ac":
+            return pl.DataFrame(
+                {
+                    "r": [r1],
+                    "rr": [r2],
+                    "cost_bin": ["t0"],
+                    "cost_usd_per_mw_forward": [100000.0],
+                }
+            ).lazy()
+        return original_read(name)
+
+    monkeypatch.setattr(parser, "read_data_file", fake_read)
+
+    result = parser._build_transmission(system)
+    assert result.is_ok(), f"_build_transmission failed: {result}"
+
+    lines = list(system.get_components(ReEDSTransmissionLine))
+    assert len(lines) > 0, "Expected at least one ReEDSTransmissionLine to be created"
+
+    matching = [
+        ln
+        for ln in lines
+        if getattr(ln, "losses", None) == pytest.approx(0.03)
+        and getattr(ln, "hurdle_rate", None) == pytest.approx(2.5)
+        and getattr(ln, "distance_miles", None) == pytest.approx(200.0)
+        and getattr(ln, "line_cost_per_mw_mile", None) == pytest.approx(500.0)
+    ]
+    assert matching, "Expected one line with legacy-column-mapped losses/hurdle/distance/cost"
+
+
+@pytest.mark.unit
+def test_build_transmission_returns_err_when_interface_builder_returns_none(
+    fresh_parser: ReEDSParser,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify _build_transmission surfaces an error when interface builder returns Ok(None)."""
+    from rust_ok import Ok
+
+    parser = fresh_parser
+    parser.ctx.system = System(name="transmission-interface-none")
+
+    monkeypatch.setattr(parser, "_build_transmission_interfaces", lambda *_args, **_kwargs: Ok(None))
+
+    result = parser._build_transmission(parser.ctx.system)
+    assert result.is_err()
+    assert "unexpectedly None" in str(result.err())
+
+
+@pytest.mark.unit
+def test_build_transmission_returns_err_when_line_builder_reports_creation_errors(
+    fresh_parser: ReEDSParser,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify _build_transmission returns Err when line creation errors are reported."""
+    from rust_ok import Ok
+
+    parser = fresh_parser
+    parser.ctx.system = System(name="transmission-line-errors")
+
+    monkeypatch.setattr(
+        parser,
+        "_build_transmission_interfaces",
+        lambda *_args, **_kwargs: Ok((1, ["iface failed"])),
+    )
+    monkeypatch.setattr(parser, "_build_transmission_lines", lambda *_args, **_kwargs: Ok((1, [])))
+
+    result = parser._build_transmission(parser.ctx.system)
+    assert result.is_err()
+    assert "Failed to create transmission components" in str(result.err())
