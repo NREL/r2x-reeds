@@ -44,6 +44,7 @@ from .models.components import (
     ReEDSDemand,
     ReEDSEmission,
     ReEDSGenerator,
+    ReEDSHydroGenerator,
     ReEDSInterface,
     ReEDSRegion,
     ReEDSReserve,
@@ -55,12 +56,12 @@ from .parser_checks import check_dataset_non_empty, check_required_values_in_col
 from .parser_utils import (
     _collect_component_kwargs_from_rule,
     _resolve_generator_rule_from_row,
+    calculate_hydro_profiles_for_generator,
     calculate_reserve_requirement,
     get_generator_class,
     get_rule_for_target,
     get_rules_by_target,
     merge_lazy_frames,
-    monthly_to_hourly_polars,
     prepare_generator_inputs,
     tech_matches_category,
 )
@@ -145,7 +146,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
        - Parser context with configuration and defaults
        - Time indices and calendar mappings for the weather year
        - Generator datasets separated into variable and non-variable groups
-       - Hydro capacity factor data for budget calculations
+       - Hydro capacity factor data for availability profiles
        - Reserve requirement configuration and costs
 
     3. **Building** (:meth:`on_build`):
@@ -155,7 +156,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
        - Loads with peak demand by region
        - Reserves by transmission region and type
        - Emissions as supplemental attributes on generators
-       - Time series data (load profiles, capacity factors, reserve requirements, hydro budgets)
+       - Time series data (load profiles, capacity factors, reserve requirements, hydro profiles)
        - System metadata and description
 
     Key Implementation Details
@@ -239,6 +240,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         self._interface_cache: dict[str, ReEDSInterface] = {}
         self._reserve_region_cache: dict[str, ReEDSReserveRegion] = {}
         self._hydro_cf_prepared: pl.DataFrame | None = None
+        self._hydro_capacity_adjustment_prepared: pl.DataFrame | None = None
         self._reserve_percentages: dict[str, dict[str, float]] = {}
         self._reserve_costs: dict[str, dict[str, float]] = {}
         self._outputs_h5_fpath: Path | None = None
@@ -730,7 +732,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if reserve_ts_result.is_err():
             return Err(str(reserve_ts_result.err()))
 
-        hydro_ts_result = self._attach_hydro_budgets(system)
+        hydro_ts_result = self._attach_hydro_profiles(system)
         if hydro_ts_result.is_err():
             return Err(str(hydro_ts_result.err()))
 
@@ -1661,28 +1663,20 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         logger.info("Attached {} reserve membership links", attached_memberships)
         return Ok(None)
 
-    def _attach_hydro_budgets(self, system: System) -> Result[None, str]:
-        """Attach daily energy budgets to hydro dispatch generators.
+    def _attach_hydro_profiles(self, system: System) -> Result[None, str]:
+        """Attach dispatchable budgets or nondispatchable power profiles to hydro generators."""
+        logger.info("Starting hydro profile attachment")
+        attached_profiles = 0
 
-        Creates daily energy constraints based on monthly capacity factors.
-        Budget = capacity * monthly_cf * hours_in_month
-        """
-        logger.info("Starting hydro budget attachment")
-        attached_budgets = 0
-
-        hydro_generators = [
-            gen
-            for gen_name, gen in self._generator_cache.items()
-            if tech_matches_category(gen.technology, "hydro", self._tech_categories)
-        ]
+        hydro_generators = list(system.get_components(ReEDSHydroGenerator))
         logger.trace("Hydro generators detected: {}", len(hydro_generators))
 
         if not hydro_generators:
-            logger.warning("No hydro generators found, skipping hydro budgets")
+            logger.warning("No hydro generators found, skipping hydro profiles")
             return Ok(None)
 
         if self._hydro_cf_prepared is None:
-            logger.warning("Hydro CF data not prepared, skipping hydro budgets")
+            logger.warning("Hydro CF data not prepared, skipping hydro profiles")
             return Ok(None)
         logger.trace("Hydro CF prepared rows: {}", self._hydro_cf_prepared.height)
 
@@ -1709,56 +1703,27 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             )
         hydro_data = hydro_data.filter(pl.col("hydro_cf").is_not_null())
 
-        hydro_data = hydro_data.with_columns(
-            (
-                pl.col("hydro_cf") * pl.col("hours_in_month") * pl.col("capacity") / pl.col("days_in_month")
-            ).alias("daily_energy_budget")
-        )
-
         for generator in hydro_generators:
-            tech_region_filter = (
-                (pl.col("technology") == generator.technology)
-                & (pl.col("region") == generator.region.name)
-                & (pl.col("vintage") == generator.vintage)
+            profiles = calculate_hydro_profiles_for_generator(
+                generator,
+                hydro_data=hydro_data,
+                solve_years=self.solve_years,
+                weather_year=self.config.primary_weather_year,
+                hydro_capacity_adjustment=self._hydro_capacity_adjustment_prepared,
             )
-            for row, month_budget_by_vintage in hydro_data.filter(tech_region_filter).group_by(
-                ["year", "vintage"]
-            ):
-                year = row[0]
-                monthly_profile = month_budget_by_vintage["daily_energy_budget"].to_list()
-                if len(monthly_profile) != 12 or any(value is None for value in monthly_profile):
-                    logger.warning(
-                        "Skipping hydro budget for {} in {} because monthly profile length {}",
-                        generator.name,
-                        year,
-                        len(monthly_profile),
-                    )
-                    continue
-                hourly_budget_result = monthly_to_hourly_polars(year, monthly_profile)
-                if hourly_budget_result.is_err():
-                    logger.warning(
-                        "Skipping hydro budget for {} in {}: {}",
-                        generator.name,
-                        year,
-                        hourly_budget_result.err(),
-                    )
-                    continue
-                hourly_budget_arr = hourly_budget_result.ok()
-                if hourly_budget_arr is None:
-                    logger.warning("Skipping hydro budget for {} in {}: empty result", generator.name, year)
-                    continue
-                hourly_budget = self._truncate_and_cast_time_series(hourly_budget_arr)
+            for profile in profiles:
+                data = self._truncate_and_cast_time_series(profile.data)
                 ts = SingleTimeSeries.from_array(
-                    data=hourly_budget,
-                    name="hydro_budget",
+                    data=data,
+                    name=profile.name,
                     initial_timestamp=self.initial_timestamp,
                     resolution=timedelta(hours=1),
                 )
 
-                system.add_time_series(ts, generator, solve_year=year)
-                logger.trace("Adding hydro budget to {}", generator.label)
-                attached_budgets += 1
-        logger.info("Attached {} hydro budget profiles", attached_budgets)
+                system.add_time_series(ts, generator, solve_year=profile.year)
+                logger.trace("Adding {} profile to {}", profile.name, generator.label)
+                attached_profiles += 1
+        logger.info("Attached {} hydro profiles", attached_profiles)
         return Ok(None)
 
     def _postprocess_system(self, system: System) -> None:
@@ -1829,6 +1794,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         self._interface_cache = {}
         self._reserve_region_cache = {}
         self._hydro_cf_prepared = None
+        self._hydro_capacity_adjustment_prepared = None
         self._reserve_percentages = {}
         self._reserve_costs = {}
 
@@ -1964,7 +1930,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         return Ok(None)
 
     def _prepare_hydro_datasets(self) -> Result[None, str]:
-        """Prepare hydro capacity factor data for later budget attachment."""
+        """Prepare hydro profile data for later attachment."""
         hydro_cf = self.read_data_file("hydro_cf")
         if hydro_cf is None:
             self._hydro_cf_prepared = None
@@ -1983,6 +1949,26 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         hydro_cf_joined = hydro_cf.join(self.year_month_day_hours, on=["year", "month_num"], how="left")
         self._hydro_cf_prepared = hydro_cf_joined
         logger.trace("Hydro CF prepared rows: {}", hydro_cf_joined.height)
+
+        hydro_capacity_adjustment = self.read_data_file("hydro_capacity_adjustment")
+        if hydro_capacity_adjustment is None:
+            self._hydro_capacity_adjustment_prepared = None
+            logger.trace("No hydro capacity adjustment dataset available")
+            return Ok(None)
+
+        self._hydro_capacity_adjustment_prepared = (
+            hydro_capacity_adjustment.with_columns(
+                pl.col("month")
+                .map_elements(lambda x: self.month_map.get(x, x), return_dtype=pl.Int16)
+                .alias("month_num"),
+            )
+            .sort(["technology", "region", "month_num"])
+            .collect()
+        )
+        logger.trace(
+            "Hydro capacity adjustment prepared rows: {}",
+            self._hydro_capacity_adjustment_prepared.height,
+        )
         return Ok(None)
 
     def _prepare_reserve_datasets(self) -> Result[None, str]:

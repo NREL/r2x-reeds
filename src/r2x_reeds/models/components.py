@@ -202,7 +202,7 @@ class ReEDSStorage(ReEDSGenerator):
 
 
 class ReEDSHydroGenerator(ReEDSGenerator):
-    """Hydroelectric generators with monthly/daily energy budgets."""
+    """Hydroelectric generators with monthly availability profiles."""
 
     is_dispatchable: Annotated[bool, Field(description="Whether hydro is dispatchable")]
     flow_range: Annotated[MinMax | None, Unit("MW"), Field(description="Flow range")] = None

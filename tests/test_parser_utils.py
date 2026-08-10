@@ -131,6 +131,22 @@ def test_get_generator_class_hydrogen_combustion_defaults(reeds_config) -> None:
         assert result.unwrap() is ReEDSThermalGenerator
 
 
+def test_hydro_operating_mode_defaults(reeds_config) -> None:
+    """Hydro technologies use their ReEDS operating mode."""
+    from r2x_reeds import parser_utils
+
+    defaults = reeds_config.load_config()["defaults"]
+    technology_categories = defaults["tech_categories"]
+
+    for technology in ("hydD", "hydSD", "hydUD", "hydNPD", "hydED"):
+        categories = parser_utils.get_technology_categories(technology, technology_categories)
+        assert categories.unwrap() == ["hydro", "hydro_dispatchable"]
+
+    for technology in ("hydND", "hydSND", "hydUND", "hydNPND", "hydEND"):
+        categories = parser_utils.get_technology_categories(technology, technology_categories)
+        assert categories.unwrap() == ["hydro", "hydro_nondispatchable"]
+
+
 def _create_capacity_lazy_frame():
     import polars as pl
 

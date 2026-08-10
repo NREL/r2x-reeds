@@ -19,7 +19,7 @@ from r2x_reeds.models.components import ReEDSDemand, ReEDSRegion
 
 if TYPE_CHECKING:
     from r2x_core.rules import Rule
-    from r2x_reeds.models import ReEDSGenerator
+    from r2x_reeds.models import ReEDSGenerator, ReEDSHydroGenerator
 
 # Columns that can be aggregated from the model.
 AGG_COLUMNS = [
@@ -801,16 +801,18 @@ def build_year_month_calendar_df(years: list[int]) -> pl.DataFrame:
     )
 
 
-def calculate_hydro_budgets_for_generator(
-    generator: ReEDSGenerator,
+def calculate_hydro_profiles_for_generator(
+    generator: ReEDSHydroGenerator,
     *,
     hydro_data: pl.DataFrame,
     solve_years: list[int],
+    weather_year: int,
+    hydro_capacity_adjustment: pl.DataFrame | None = None,
 ) -> list:
-    """Calculate hydro budget time series for a generator across solve years."""
-    from r2x_reeds.parser_types import HydroBudgetResult
+    """Calculate hydro availability profiles for a generator across solve years."""
+    from r2x_reeds.parser_types import HydroProfileResult
 
-    results: list[HydroBudgetResult] = []
+    results: list[HydroProfileResult] = []
 
     tech_region_filter = (pl.col("technology") == generator.technology) & (
         pl.col("region") == generator.region.name
@@ -825,27 +827,51 @@ def calculate_hydro_budgets_for_generator(
     for year in solve_years:
         year_data = filtered_data.filter(pl.col("year") == year)
         if year_data.height != 12:
+            logger.warning(
+                "Skipping hydro profile for {} in {} because monthly profile length {}",
+                generator.name,
+                year,
+                year_data.height,
+            )
             continue
 
         year_data = year_data.sort("month_num")
         monthly_profile = year_data["hydro_cf"].to_list()
-        days_in_month = year_data["days_in_month"].to_list()
-        hours_in_month = year_data["hours_in_month"].to_list()
 
-        if any(v is None for v in monthly_profile):
+        if any(value is None for value in monthly_profile):
             continue
 
-        daily_budgets = [
-            generator.capacity * cf * hours / days
-            for cf, hours, days in zip(monthly_profile, hours_in_month, days_in_month, strict=True)
-        ]
+        if generator.is_dispatchable:
+            profiles = [("hydro_budget", monthly_profile)]
+        else:
+            profiles = [("max_active_power", [generator.capacity * cf for cf in monthly_profile])]
 
-        hourly_result = monthly_to_hourly_polars(year, daily_budgets)
-        if hourly_result.is_err():
-            continue
+        if generator.is_dispatchable and hydro_capacity_adjustment is not None:
+            capacity_adjustment = hydro_capacity_adjustment.filter(
+                (pl.col("technology") == generator.technology) & (pl.col("region") == generator.region.name)
+            ).sort("month_num")
+            monthly_adjustment = capacity_adjustment["capacity_adjustment"].to_list()
+            if len(monthly_adjustment) == 12 and not any(value is None for value in monthly_adjustment):
+                profiles.append(
+                    (
+                        "max_active_power",
+                        [generator.capacity * adjustment for adjustment in monthly_adjustment],
+                    )
+                )
 
-        budget_array = np.asarray(hourly_result.ok(), dtype=np.float64)
-        results.append(HydroBudgetResult(year=year, budget_array=budget_array))
+        for name, profile in profiles:
+            hourly_result = monthly_to_hourly_polars(weather_year, profile)
+            if hourly_result.is_err():
+                logger.warning(
+                    "Skipping hydro profile for {} in {}: {}",
+                    generator.name,
+                    year,
+                    hourly_result.err(),
+                )
+                continue
+
+            profile_array = np.asarray(hourly_result.ok(), dtype=np.float64)
+            results.append(HydroProfileResult(year=year, name=name, data=profile_array))
 
     return results
 

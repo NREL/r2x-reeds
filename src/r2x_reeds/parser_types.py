@@ -16,8 +16,9 @@ class ComponentBuildResult:
 
 
 @dataclass
-class HydroBudgetResult:
-    """Hydro budget calculation for a single year."""
+class HydroProfileResult:
+    """Hydro profile calculation for a single year."""
 
     year: int
-    budget_array: np.ndarray
+    name: str
+    data: np.ndarray

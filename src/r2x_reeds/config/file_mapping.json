@@ -783,6 +783,24 @@
     }
   },
   {
+    "name": "hydro_capacity_adjustment",
+    "fpath": "inputs_case/hydcapadj.csv",
+    "info": {
+      "description": "Monthly maximum capacity adjustment for dispatchable hydro technologies.",
+      "is_input": true,
+      "is_optional": true,
+      "units": "fraction"
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "*i": "technology",
+        "month": "month",
+        "r": "region",
+        "value": "capacity_adjustment"
+      }
+    }
+  },
+  {
     "name": "ramprate",
     "fpath": "inputs_case/ramprate.csv",
     "info": {
