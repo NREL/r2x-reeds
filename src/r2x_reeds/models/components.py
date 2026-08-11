@@ -181,7 +181,7 @@ class ReEDSStorage(ReEDSGenerator):
 
 
 class ReEDSHydroGenerator(ReEDSGenerator):
-    """Hydroelectric generators with monthly/daily energy budgets."""
+    """Hydroelectric generators with monthly availability profiles."""
 
     is_dispatchable: Annotated[bool, Field(description="Whether hydro is dispatchable")]
     flow_range: Annotated[MinMax | None, Unit("MW"), Field(description="Flow range")] = None
@@ -213,6 +213,16 @@ class ReEDSConsumingTechnology(HasUnits, ReEDSComponent):
 
 class ReEDSElectrolyzerDemand(ReEDSConsumingTechnology):
     """Electricity demand from electrolyzers."""
+
+    region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
+    max_active_power: Annotated[
+        float | None,
+        Field(description="Maximum active power demand in MW"),
+    ] = None
+
+
+class ReEDSSteamMethaneReformingDemand(ReEDSConsumingTechnology):
+    """Electricity demand from steam methane reforming."""
 
     region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
     max_active_power: Annotated[

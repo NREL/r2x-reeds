@@ -82,10 +82,10 @@ res = add_purchaser_load(
 		solve_year=2032,
 		weather_year=2012,
 		hour_map_myr_fpath=run_path / "inputs_case/rep/hmap_myr.csv",
-		electrolyzer_capacity_fpath=run_path / "outputs/cap.csv",
+		hydrogen_production_capacity_fpath=run_path / "outputs/cap.csv",
 		consume_characteristics_fpath=run_path / "inputs_case/consume_char.csv",
-		electrolyzer_prod_load_fpath=run_path / "outputs/prod_load.csv",
-		electrolyzer_prod_load_ann_fpath=run_path / "outputs/prod_load_ann.csv",
+		hydrogen_production_load_fpath=run_path / "outputs/prod_load.csv",
+		hydrogen_production_annual_load_fpath=run_path / "outputs/prod_load_ann.csv",
 		loadsite_op_fpath=run_path / "rep" / "outputs/loadsite_op.csv",
 	),
 )

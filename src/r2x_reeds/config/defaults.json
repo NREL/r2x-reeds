@@ -1,7 +1,9 @@
 {
   "excluded_techs": [
     "can-imports",
-    "electrolyzer"
+    "electrolyzer",
+    "smr",
+    "smr_ccs"
   ],
   "data_validation": {
     "max_capacity_mw": 100000.0,
@@ -60,7 +62,9 @@
         "nuclear",
         "o-g-s",
         "biopower",
-        "beccs"
+        "beccs",
+        "h2-ct",
+        "h2-cc"
       ],
       "exact": []
     },
@@ -72,17 +76,27 @@
     },
     "hydro_dispatchable": {
       "prefixes": [
-        "hydED",
         "hydro-d"
       ],
-      "exact": []
+      "exact": [
+        "hydD",
+        "hydSD",
+        "hydUD",
+        "hydNPD",
+        "hydED"
+      ]
     },
     "hydro_nondispatchable": {
       "prefixes": [
-        "hydEND",
         "hydro-and"
       ],
-      "exact": []
+      "exact": [
+        "hydND",
+        "hydSND",
+        "hydUND",
+        "hydNPND",
+        "hydEND"
+      ]
     },
     "pumped_storage": {
       "prefixes": [
@@ -105,9 +119,7 @@
     },
     "hydrogen": {
       "prefixes": [
-        "smr",
-        "h2-ct",
-        "h2-cc"
+        "smr"
       ],
       "exact": [
         "electrolyzer"

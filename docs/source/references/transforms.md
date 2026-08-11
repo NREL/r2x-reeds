@@ -23,12 +23,12 @@ Function: `add_purchaser_load(system, config)`
 
 Purpose:
 
-- Adds/updates electrolyzer and data center purchaser-load components
+- Adds/updates electrolyzer, steam methane reforming and data center purchaser-load components
 - Attaches hourly load profiles for those components
 
 Important behavior:
 
-- If electrolyzer-demand components already exist, cap-based electrolyzer creation is skipped to avoid double counting.
+- If the demand component for one of the ReEDS electricity-consuming technologies handled here (`electrolyzer`, `smr` or `smr_ccs`) already exists, capacity-based creation of that component is skipped to avoid double counting.
 
 Config model: `PurchaserLoadConfig`
 
@@ -37,10 +37,10 @@ Main fields:
 - `solve_year`
 - `weather_year`
 - `hour_map_myr_fpath`
-- `electrolyzer_capacity_fpath`
+- `hydrogen_production_capacity_fpath`
 - `consume_characteristics_fpath`
-- `electrolyzer_prod_load_fpath`
-- `electrolyzer_prod_load_ann_fpath`
+- `hydrogen_production_load_fpath`
+- `hydrogen_production_annual_load_fpath`
 - `loadsite_op_fpath`
 
 ## Legacy Electrolyzer Transform

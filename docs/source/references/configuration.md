@@ -54,9 +54,9 @@ Output bundle behavior:
 
 Examples of purchaser-load related datasets:
 
-- `electrolyzer_capacity`
-- `electrolyzer_prod_load`
-- `electrolyzer_prod_load_ann`
+- `hydrogen_production_capacity`
+- `hydrogen_production_load`
+- `hydrogen_production_annual_load`
 - `loadsite_op`
 - `hour_map_myr`
 

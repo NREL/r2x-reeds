@@ -57,10 +57,10 @@
     }
   },
   {
-    "name": "electrolyzer_capacity",
+    "name": "hydrogen_production_capacity",
     "fpath": "outputs/outputs.h5",
     "info": {
-      "description": "Electrolyzer installed capacity by region and model year",
+      "description": "Hydrogen-production installed capacity by region and model year",
       "is_input": false,
       "is_optional": true,
       "units": "MW"
@@ -78,10 +78,10 @@
     }
   },
   {
-    "name": "electrolyzer_prod_load_ann",
+    "name": "hydrogen_production_annual_load",
     "fpath": "outputs/outputs.h5",
     "info": {
-      "description": "Annual electrolyzer electricity demand by region",
+      "description": "Annual hydrogen-production electricity demand by region",
       "is_input": false,
       "is_optional": true,
       "units": "MWh"
@@ -99,10 +99,10 @@
     }
   },
   {
-    "name": "electrolyzer_prod_load",
+    "name": "hydrogen_production_load",
     "fpath": "outputs/outputs.h5",
     "info": {
-      "description": "Representative-period electrolyzer electricity demand",
+      "description": "Representative-period hydrogen-production electricity demand",
       "is_input": false,
       "is_optional": true,
       "units": "MW"
@@ -1051,6 +1051,24 @@
       },
       "filter_by": {
         "year": "{solve_year}"
+      }
+    }
+  },
+  {
+    "name": "hydro_capacity_adjustment",
+    "fpath": "inputs_case/hydcapadj.csv",
+    "info": {
+      "description": "Monthly maximum capacity adjustment for dispatchable hydro technologies.",
+      "is_input": true,
+      "is_optional": true,
+      "units": "fraction"
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "*i": "technology",
+        "month": "month",
+        "r": "region",
+        "value": "capacity_adjustment"
       }
     }
   },
