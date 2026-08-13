@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+import math
 from importlib.resources import files
 from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import polars as pl
 from infrasys.supplemental_attribute import SupplementalAttribute
 from loguru import logger
 from pydantic import Field
@@ -16,7 +18,7 @@ from rust_ok import Err, Ok, Result
 from r2x_core import DataStore, PluginConfig, expose_plugin
 from r2x_reeds.models import ReEDSGenerator
 
-from .utils import _coerce_path, _deduplicate_records
+from .utils import _coerce_path
 
 if TYPE_CHECKING:
     from r2x_core import System
@@ -270,9 +272,6 @@ def _load_reference_units(
     if path_value is None:
         return Err(RuntimeError("Failed to load reference units"))
 
-    if not isinstance(reference_data, (list, dict)):
-        return Err(TypeError("reference_technologies must be a dict or JSON array of dicts"))
-
     return _normalize_reference_data(reference_data, dedup_key, path_value)
 
 
@@ -280,6 +279,12 @@ def _normalize_reference_data(
     reference_data: Any, dedup_key: str, source: Path | str | PathLike
 ) -> Result[dict[str, dict[str, Any]], Exception]:
     """Convert raw reference data into a keyed dict with helpful errors."""
+    if isinstance(reference_data, pl.LazyFrame):
+        reference_data = reference_data.collect()
+
+    if isinstance(reference_data, pl.DataFrame):
+        reference_data = reference_data.to_dicts()
+
     if isinstance(reference_data, dict):
         normalized_input: list[dict[str, Any]] = []
         for key, record in reference_data.items():
@@ -293,19 +298,60 @@ def _normalize_reference_data(
 
     if isinstance(reference_data, list):
         reference_units: dict[str, dict[str, Any]] = {}
-        for record in _deduplicate_records(reference_data, key=dedup_key):
+        for record in reference_data:
             if not isinstance(record, dict):
                 logger.warning("Skipping non-dict reference record: {}", record)
                 continue
-            key_value = record.get(dedup_key)
-            if key_value is None:
+
+            normalized_record = dict(record)
+            if dedup_key == "name" and dedup_key not in normalized_record and "tech" in normalized_record:
+                normalized_record[dedup_key] = normalized_record["tech"]
+            if "capacity_MW" not in normalized_record and "MW" in normalized_record:
+                normalized_record["capacity_MW"] = normalized_record["MW"]
+
+            key_value = normalized_record.get(dedup_key)
+            if key_value is None or not str(key_value).strip():
+                return Err(ValueError(f"Reference record is missing key '{dedup_key}' in {source}"))
+
+            capacity_value = normalized_record.get("capacity_MW")
+            if capacity_value is None:
+                return Err(ValueError(f"Reference record '{key_value}' is missing 'capacity_MW' in {source}"))
+
+            try:
+                capacity = float(capacity_value)
+            except (TypeError, ValueError):
+                return Err(
+                    ValueError(
+                        f"Reference record '{key_value}' has invalid capacity_MW={capacity_value!r} in {source}"
+                    )
+                )
+
+            if not math.isfinite(capacity) or capacity <= 0:
+                return Err(
+                    ValueError(
+                        f"Reference record '{key_value}' must have a finite positive capacity_MW in {source}"
+                    )
+                )
+
+            key = str(key_value).strip()
+            normalized_record[dedup_key] = key
+            normalized_record["capacity_MW"] = capacity
+
+            if existing_record := reference_units.get(key):
+                if existing_record["capacity_MW"] != capacity:
+                    return Err(
+                        ValueError(
+                            f"Conflicting capacity_MW values for reference technology '{key}' in {source}"
+                        )
+                    )
                 logger.warning(
-                    "Skipping reference record missing key '{}' in {}",
-                    dedup_key,
+                    "Duplicate reference technology '{}' found in {}. Keeping first occurrence.",
+                    key,
                     source,
                 )
                 continue
-            reference_units[str(key_value)] = record
+
+            reference_units[key] = normalized_record
 
         if reference_units:
             return Ok(reference_units)
@@ -316,5 +362,8 @@ def _normalize_reference_data(
         )
         return Err(ValueError(msg))
 
-    msg = f"reference_technologies must be a dict or JSON array of dicts, got {type(reference_data).__name__}"
+    msg = (
+        "reference_technologies must be a dict or tabular collection of records, "
+        f"got {type(reference_data).__name__}"
+    )
     return Err(TypeError(msg))

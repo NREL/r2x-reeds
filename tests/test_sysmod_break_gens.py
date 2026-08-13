@@ -46,9 +46,8 @@ def test_break_generator_fails_with_missing_file(tmp_path: Path):
     assert "Reference technologies file not found" in result.unwrap_err()
 
 
-def test_break_generator_warns_on_duplicate_reference(tmp_path: Path, caplog):
-    """Ensure duplicate entries in reference files log a warning but do not crash."""
-    import json
+def test_break_generator_rejects_conflicting_duplicate_reference(tmp_path: Path):
+    """Ensure conflicting reference sizes return an error."""
 
     class DummySystem:
         def get_components(self, *_args, **_kwargs):
@@ -67,9 +66,33 @@ def test_break_generator_warns_on_duplicate_reference(tmp_path: Path, caplog):
     )
 
     result = break_generators(cast(Any, sys), BreakGensConfig(reference_units=reference_path))
+    assert result.is_err()
+    assert "Conflicting capacity_MW values" in result.unwrap_err()
+
+
+def test_break_generator_warns_on_identical_duplicate_reference(tmp_path: Path, caplog):
+    """Ensure duplicate entries with the same size warn without failing."""
+
+    class DummySystem:
+        def get_components(self, *_args, **_kwargs):
+            return []
+
+    sys = DummySystem()
+    reference_path = tmp_path / "pcm_defaults.json"
+    reference_path.write_text(
+        json.dumps(
+            [
+                {"name": "battery", "capacity_MW": 10},
+                {"name": "battery", "capacity_MW": 10},
+                {"name": "wind", "capacity_MW": 50},
+            ]
+        )
+    )
+
+    result = break_generators(cast(Any, sys), BreakGensConfig(reference_units=reference_path))
     assert result.is_ok()
 
-    assert "Duplicate entries found for key 'name'" in caplog.text
+    assert "Duplicate reference technology 'battery'" in caplog.text
 
 
 def test_break_generators_splits_and_preserves_data(system_with_region) -> None:
@@ -190,6 +213,26 @@ def test_break_gens_reads_file(tmp_path: Path, system_with_region) -> None:
     assert sorted(gen.capacity for gen in generators) == [10.0, 30.0, 30.0]
 
 
+def test_break_gens_reads_reeds_unitsize_file(tmp_path: Path, system_with_region) -> None:
+    """Test native ReEDS unit-size columns."""
+    reference_path = tmp_path / "unitsize.csv"
+    reference_path.write_text("tech,MW,source\nwind,30,ReEDS source\n")
+    system, region = system_with_region
+    generator = ReEDSGenerator(
+        name="gen",
+        region=region,
+        technology="wind",
+        capacity=70.0,
+        category="wind",
+    )
+    system.add_component(generator)
+
+    _run_break(system, reference_units=reference_path)
+
+    generators = list(system.get_components(ReEDSGenerator))
+    assert sorted(gen.capacity for gen in generators) == [10.0, 30.0, 30.0]
+
+
 def test_break_generators_skips_missing_category(system_with_region) -> None:
     """Test that generators with missing category are skipped."""
     system, region = system_with_region
@@ -226,8 +269,8 @@ def test_break_generators_missing_reference(system_with_region) -> None:
     assert list(system.get_components(ReEDSGenerator)) == [generator]
 
 
-def test_break_generators_missing_avg_capacity(system_with_region, caplog) -> None:
-    """Test that break_generators handles missing avg_capacity in reference."""
+def test_break_generators_missing_reference_capacity(system_with_region) -> None:
+    """Test that break_generators rejects missing reference capacity."""
     system, region = system_with_region
     generator = ReEDSGenerator(
         name="gen",
@@ -239,10 +282,11 @@ def test_break_generators_missing_avg_capacity(system_with_region, caplog) -> No
     system.add_component(generator)
     reference = {"wind": {}}
 
-    _run_break(system, reference_units=reference)
+    result = break_generators(system, BreakGensConfig(reference_units=reference))
 
+    assert result.is_err()
+    assert "missing 'capacity_MW'" in result.unwrap_err()
     assert list(system.get_components(ReEDSGenerator)) == [generator]
-    assert "`capacity_MW` not found on reference_tech" in caplog.text
 
 
 def test_break_generators_small_capacity_not_split(system_with_region) -> None:
@@ -303,15 +347,27 @@ def test_normalize_reference_data_skips_invalid_records(caplog) -> None:
     assert "No reference technologies" in str(result.unwrap_err())
 
 
-def test_normalize_reference_data_missing_keys(caplog) -> None:
-    """Ensure entries missing dedup key are skipped and reported."""
+def test_normalize_reference_data_missing_keys() -> None:
+    """Ensure entries missing the reference key return an error."""
     from r2x_reeds.sysmod.break_gens import _normalize_reference_data
 
-    caplog.set_level("WARNING")
     data = [{"capacity_MW": 50}, {"name": None}]
     result = _normalize_reference_data(data, "name", "<source>")
     assert result.is_err()
-    assert "Skipping reference record missing key 'name'" in caplog.text
+    assert "missing key 'name'" in str(result.unwrap_err())
+
+
+def test_normalize_reference_data_rejects_invalid_capacities() -> None:
+    """Ensure reference capacities are finite positive numbers."""
+    from r2x_reeds.sysmod.break_gens import _normalize_reference_data
+
+    for invalid_capacity in (0, -1, "invalid", float("nan"), float("inf")):
+        result = _normalize_reference_data(
+            [{"name": "wind", "capacity_MW": invalid_capacity}],
+            "name",
+            "<source>",
+        )
+        assert result.is_err()
 
 
 def test_normalize_reference_data_invalid_type() -> None:
@@ -872,8 +928,7 @@ def test_normalize_reference_data_list_with_mixed_types(caplog) -> None:
 
     assert result.is_ok()
     assert len(result.unwrap()) == 2
-    # The warning comes from _deduplicate_records in utils.py
-    assert "Skipping non-dict record during deduplication" in caplog.text
+    assert "Skipping non-dict reference record" in caplog.text
 
 
 def test_load_reference_units_from_json_file(tmp_path: Path) -> None:
