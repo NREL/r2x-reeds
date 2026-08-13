@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.7.0](https://github.com/NatLabRockies/r2x-reeds/compare/v0.6.0...v0.7.0) (2026-08-13)
+
+
+### 🚀 Features
+
+* attach missing hurdle rate to line dataframe ([#94](https://github.com/NatLabRockies/r2x-reeds/issues/94)) ([5c830e9](https://github.com/NatLabRockies/r2x-reeds/commit/5c830e9c262a50f47a60015277d048bba710e476))
+
+
+### 🐛 Bug Fixes
+
+* h2_cc and h2_ct mapping ([#91](https://github.com/NatLabRockies/r2x-reeds/issues/91)) ([6c9d4aa](https://github.com/NatLabRockies/r2x-reeds/commit/6c9d4aabd9bd69586fc9c1529c6144ef88f073fc))
+* Model ReEDS smr and smr_ccs technologies as purchaser demand ([#90](https://github.com/NatLabRockies/r2x-reeds/issues/90)) ([7ddbbef](https://github.com/NatLabRockies/r2x-reeds/commit/7ddbbefc127a9c66ac9964448707594956e1307a))
+* Represent ReEDS hydro operating modes and profiles ([#93](https://github.com/NatLabRockies/r2x-reeds/issues/93)) ([4a3d578](https://github.com/NatLabRockies/r2x-reeds/commit/4a3d57865d1370d45a6f96130364ed0c06b2ecb9))
+
+
+### 📦 Build
+
+* **deps:** bump actions/checkout from 6.0.2 to 7.0.0 ([#79](https://github.com/NatLabRockies/r2x-reeds/issues/79)) ([f78e33f](https://github.com/NatLabRockies/r2x-reeds/commit/f78e33fc0708829fc837cbfab3476f87651d5421))
+* **deps:** bump actions/checkout from 7.0.0 to 7.0.1 ([#86](https://github.com/NatLabRockies/r2x-reeds/issues/86)) ([2cb3807](https://github.com/NatLabRockies/r2x-reeds/commit/2cb38074cf2f88e207be9c4b6b15c49caa742932))
+* **deps:** bump actions/labeler from 6.1.0 to 7.0.0 ([#87](https://github.com/NatLabRockies/r2x-reeds/issues/87)) ([a12110e](https://github.com/NatLabRockies/r2x-reeds/commit/a12110eb4f3f8268824a72d8b570e3ff924bd057))
+* **deps:** bump actions/setup-python from 6.2.0 to 6.3.0 ([#80](https://github.com/NatLabRockies/r2x-reeds/issues/80)) ([303bacf](https://github.com/NatLabRockies/r2x-reeds/commit/303bacf483b3b04ccc96325abc7a3e2be33f9cec))
+* **deps:** bump actions/setup-python from 6.3.0 to 7.0.0 ([#88](https://github.com/NatLabRockies/r2x-reeds/issues/88)) ([0b97163](https://github.com/NatLabRockies/r2x-reeds/commit/0b971632e0535df6b9da50d02709b32e305273c2))
+* **deps:** bump codecov/codecov-action from 6.0.1 to 7.0.0 ([#78](https://github.com/NatLabRockies/r2x-reeds/issues/78)) ([f00011a](https://github.com/NatLabRockies/r2x-reeds/commit/f00011aaa25c7a6fea03afabdb7243b7c7212f5f))
+* **deps:** bump googleapis/release-please-action from 4.4.0 to 5.0.0 ([#77](https://github.com/NatLabRockies/r2x-reeds/issues/77)) ([8c3d6c8](https://github.com/NatLabRockies/r2x-reeds/commit/8c3d6c8965274709aa1c4e92977398874129d262))
+* **deps:** bump pypa/gh-action-pypi-publish from 1.14.0 to 1.14.2 ([#92](https://github.com/NatLabRockies/r2x-reeds/issues/92)) ([91685c7](https://github.com/NatLabRockies/r2x-reeds/commit/91685c77fd33cd3b85c969c382af0fd8a96dfa11))
+
 ## [0.6.0](https://github.com/NatLabRockies/r2x-reeds/compare/v0.5.0...v0.6.0) (2026-06-24)
 
 
