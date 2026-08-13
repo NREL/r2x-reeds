@@ -16,7 +16,7 @@ from pydantic import Field
 from rust_ok import Err, Ok, Result
 
 from r2x_core import DataStore, PluginConfig, expose_plugin
-from r2x_reeds.models import ReEDSGenerator
+from r2x_reeds.models import ReEDSGenerator, ReEDSThermalGenerator
 
 from .utils import _coerce_path
 
@@ -41,6 +41,10 @@ class BreakGensConfig(PluginConfig):
     break_category: str = Field(
         default="category",
         description="Field name used to look up reference units.",
+    )
+    thermal_only: bool = Field(
+        default=False,
+        description="Only split thermal generators.",
     )
     include_regions: list[str] | None = Field(
         default=None,
@@ -74,6 +78,7 @@ def break_generators(
         capacity_threshold=config.drop_capacity_threshold,
         skip_categories=config.skip_categories,
         break_category=config.break_category,
+        thermal_only=config.thermal_only,
         include_regions=config.include_regions,
         include_generators=config.include_generators,
         include_technologies=config.include_technologies,
@@ -88,6 +93,7 @@ def _break_system_generators(
     capacity_threshold: float,
     skip_categories: list[str] | None = None,
     break_category: str = "category",
+    thermal_only: bool = False,
     include_regions: list[str] | None = None,
     include_generators: list[str] | None = None,
     include_technologies: list[str] | None = None,
@@ -106,9 +112,10 @@ def _break_system_generators(
         for include_set in (include_region_set, include_generator_set, include_technology_set)
     )
 
+    component_type: type[ReEDSGenerator] = ReEDSThermalGenerator if thermal_only else ReEDSGenerator
     capacity_dropped = 0
     for component in system.get_components(
-        ReEDSGenerator, filter_func=lambda comp: getattr(comp, break_category, None)
+        component_type, filter_func=lambda comp: getattr(comp, break_category, None)
     ):
         region_match = (
             include_region_set is not None and component.region.name.casefold() in include_region_set

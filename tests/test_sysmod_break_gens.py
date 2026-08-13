@@ -607,6 +607,23 @@ def test_break_generators_with_custom_break_category(system_with_region) -> None
     assert {gen.name for gen in generators} == {"gen_01", "gen_02", "gen_03"}
 
 
+def test_break_generators_thermal_only(system_with_region, thermal_generator, renewable_generator) -> None:
+    """Only thermal generators are disaggregated when requested."""
+    system, _ = system_with_region
+    system.add_component(thermal_generator)
+    system.add_component(renewable_generator)
+
+    _run_break(
+        system,
+        reference_units={"gas-cc": {"capacity_MW": 250}, "upv": {"capacity_MW": 100}},
+        break_category="technology",
+        thermal_only=True,
+    )
+
+    names = {generator.name for generator in system.get_components(ReEDSGenerator)}
+    assert names == {"gas-cc_init-1_p1_01", "gas-cc_init-1_p1_02", "upv_p1"}
+
+
 def test_break_generators_include_regions_filter() -> None:
     """Only generators in selected balancing areas are disaggregated."""
     sys = System(name="Test", auto_add_composed_components=True)
