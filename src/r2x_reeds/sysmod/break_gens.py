@@ -31,8 +31,10 @@ class BreakGensConfig(PluginConfig):
         default=None,
         description="Reference unit definitions as a path or mapping.",
     )
-    drop_capacity_threshold: int = Field(
-        default=5, ge=0, description="Threshold of capacity in MW to drop of remainder exist."
+    remainder_merge_threshold: float = Field(
+        default=5.0,
+        ge=0,
+        description="Maximum remainder in MW to merge into the final full-sized unit.",
     )
     skip_categories: list[str] | None = Field(
         default=None,
@@ -72,17 +74,21 @@ def break_generators(
         logger.error("Failed to load reference units: {}", error)
         return Err(str(error) if error else "Failed to load reference units")
 
-    system = _break_system_generators(
-        system=system,
-        reference_units=reference_result.unwrap(),
-        capacity_threshold=config.drop_capacity_threshold,
-        skip_categories=config.skip_categories,
-        break_category=config.break_category,
-        thermal_only=config.thermal_only,
-        include_regions=config.include_regions,
-        include_generators=config.include_generators,
-        include_technologies=config.include_technologies,
-    )
+    try:
+        system = _break_system_generators(
+            system=system,
+            reference_units=reference_result.unwrap(),
+            remainder_merge_threshold=config.remainder_merge_threshold,
+            skip_categories=config.skip_categories,
+            break_category=config.break_category,
+            thermal_only=config.thermal_only,
+            include_regions=config.include_regions,
+            include_generators=config.include_generators,
+            include_technologies=config.include_technologies,
+        )
+    except ValueError as error:
+        logger.error("Failed to split generators: {}", error)
+        return Err(str(error))
 
     return Ok(system)
 
@@ -90,7 +96,7 @@ def break_generators(
 def _break_system_generators(
     system: System,
     reference_units: dict[str, dict[str, Any]],
-    capacity_threshold: float,
+    remainder_merge_threshold: float,
     skip_categories: list[str] | None = None,
     break_category: str = "category",
     thermal_only: bool = False,
@@ -113,7 +119,7 @@ def _break_system_generators(
     )
 
     component_type: type[ReEDSGenerator] = ReEDSThermalGenerator if thermal_only else ReEDSGenerator
-    capacity_dropped = 0
+    split_plans: list[tuple[ReEDSGenerator, list[float]]] = []
     for component in system.get_components(
         component_type, filter_func=lambda comp: getattr(comp, break_category, None)
     ):
@@ -159,39 +165,83 @@ def _break_system_generators(
             logger.info("`capacity_MW` not found on reference_tech")
             continue
 
-        # Use `.capacity` field directly (float in MW)
-        reference_base_power = component.capacity
-        no_splits = int(reference_base_power // capacity)
-        remainder = reference_base_power % capacity
-
-        if no_splits <= 1:
-            logger.trace("Number of splits <= 1. Skipping.")
+        split_capacities = _calculate_split_capacities(
+            total_capacity=component.capacity,
+            reference_capacity=float(capacity),
+            remainder_merge_threshold=remainder_merge_threshold,
+        )
+        if len(split_capacities) == 1:
+            logger.trace("Component {} does not require splitting.", component.name)
             continue
 
-        split_no = 1
         logger.trace(
-            f"Breaking generator {component.name} with capacity {reference_base_power} "
-            f"into {no_splits} generators of {capacity} capacity"
+            "Breaking generator {} with capacity {} into units with capacities {}",
+            component.name,
+            component.capacity,
+            split_capacities,
+        )
+        split_plans.append((component, split_capacities))
+
+    if not split_plans:
+        logger.info("No generator found that requires splitting. Skipping plugin.")
+        return system
+
+    for component, split_capacities in split_plans:
+        for split_no, split_capacity in enumerate(split_capacities, start=1):
+            component_name = component.name + f"_{split_no:02}"
+            _create_split_generator(
+                system,
+                component,
+                new_name=component_name,
+                new_capacity=split_capacity,
+            )
+        system.remove_component(component)
+
+    return system
+
+
+def _calculate_split_capacities(
+    total_capacity: float,
+    reference_capacity: float,
+    remainder_merge_threshold: float,
+) -> list[float]:
+    """Calculate child capacities without changing aggregate capacity."""
+    if remainder_merge_threshold >= reference_capacity:
+        raise ValueError(
+            "remainder_merge_threshold must be smaller than the matched reference capacity "
+            f"({remainder_merge_threshold} >= {reference_capacity})"
         )
 
-        for _ in range(no_splits):
-            component_name = component.name + f"_{split_no:02}"
-            _create_split_generator(system, component, new_name=component_name, new_capacity=capacity)
-            split_no += 1
+    full_unit_count = math.floor(total_capacity / reference_capacity)
+    remainder = total_capacity - full_unit_count * reference_capacity
 
-        if remainder > capacity_threshold:
-            component_name = component.name + f"_{split_no:02}"
-            _create_split_generator(system, component, new_name=component_name, new_capacity=remainder)
+    if math.isclose(remainder, reference_capacity, rel_tol=1e-9, abs_tol=1e-9):
+        full_unit_count += 1
+        remainder = 0.0
+    elif math.isclose(remainder, 0.0, rel_tol=0.0, abs_tol=1e-9):
+        remainder = 0.0
+
+    if full_unit_count == 0:
+        return [total_capacity]
+
+    merge_remainder = remainder < remainder_merge_threshold or math.isclose(
+        remainder,
+        remainder_merge_threshold,
+        rel_tol=1e-9,
+        abs_tol=1e-9,
+    )
+    if full_unit_count == 1 and (remainder == 0.0 or merge_remainder):
+        return [total_capacity]
+
+    split_capacities = [reference_capacity] * full_unit_count
+    if remainder > 0.0:
+        if merge_remainder:
+            split_capacities[-1] += remainder
         else:
-            capacity_dropped += remainder
-            logger.debug(f"Dropped {remainder} capacity for {component.name}")
+            split_capacities.append(remainder)
 
-        system.remove_component(component)
-    else:
-        logger.info("No generator found that match the category. Skipping plugin.")
-
-    logger.debug(f"Total capacity dropped {capacity_dropped} MW")
-    return system
+    split_capacities[-1] += total_capacity - math.fsum(split_capacities)
+    return split_capacities
 
 
 def _create_split_generator(

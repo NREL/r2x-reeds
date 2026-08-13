@@ -134,8 +134,8 @@ def test_break_generators_splits_and_preserves_data(system_with_region) -> None:
         assert attrs[0].rate == pytest.approx(1.0)
 
 
-def test_break_generators_drops_small_remainder(system_with_region) -> None:
-    """Test that generators below capacity_threshold are not split."""
+def test_break_generators_merges_small_remainder(system_with_region) -> None:
+    """Test that a small remainder is merged without dropping capacity."""
     system, region = system_with_region
     generator = ReEDSGenerator(
         name="gen",
@@ -151,7 +151,7 @@ def test_break_generators_drops_small_remainder(system_with_region) -> None:
 
     generators = list(system.get_components(ReEDSGenerator))
     assert {gen.name for gen in generators} == {"gen_01", "gen_02"}
-    assert sorted(gen.capacity for gen in generators) == [50.0, 50.0]
+    assert sorted(gen.capacity for gen in generators) == [50.0, 51.0]
 
 
 def test_break_generators_respects_non_break_list(system_with_region) -> None:
@@ -308,8 +308,8 @@ def test_break_generators_small_capacity_not_split(system_with_region) -> None:
 
 
 @pytest.mark.slow
-def test_break_generators_respects_drop_threshold(system_with_region) -> None:
-    """Ensure remainder above/below threshold controls final split count."""
+def test_break_generators_respects_remainder_merge_threshold(system_with_region) -> None:
+    """Ensure a remainder below the threshold is merged into the final unit."""
     system, region = system_with_region
     generator = ReEDSGenerator(
         name="gen",
@@ -321,11 +321,60 @@ def test_break_generators_respects_drop_threshold(system_with_region) -> None:
     system.add_component(generator)
     reference = {"wind": {"capacity_MW": 50}}
 
-    _run_break(system, reference_units=reference, drop_capacity_threshold=40)
+    _run_break(system, reference_units=reference, remainder_merge_threshold=40)
 
     generators = list(system.get_components(ReEDSGenerator))
     assert len(generators) == 2
-    assert sorted(gen.capacity for gen in generators) == [50.0, 50.0]
+    assert sorted(gen.capacity for gen in generators) == [50.0, 82.0]
+
+
+def test_calculate_split_capacities_preserves_capacity() -> None:
+    """Cover remainder boundaries and floating-point values."""
+    from r2x_reeds.sysmod.break_gens import _calculate_split_capacities
+
+    cases = [
+        (40.0, 50.0, 5.0, [40.0]),
+        (52.0, 50.0, 5.0, [52.0]),
+        (55.0, 50.0, 5.0, [55.0]),
+        (56.0, 50.0, 5.0, [50.0, 6.0]),
+        (100.0, 50.0, 5.0, [50.0, 50.0]),
+        (101.0, 50.0, 5.0, [50.0, 51.0]),
+        (106.0, 50.0, 5.0, [50.0, 50.0, 6.0]),
+        (201.0, 50.0, 5.0, [50.0, 50.0, 50.0, 51.0]),
+        (101.0, 50.0, 0.0, [50.0, 50.0, 1.0]),
+        (99.999999999, 50.0, 5.0, [50.0, 49.999999999]),
+        (100.000000001, 50.0, 5.0, [50.0, 50.000000001]),
+    ]
+
+    for total_capacity, reference_capacity, threshold, expected in cases:
+        capacities = _calculate_split_capacities(total_capacity, reference_capacity, threshold)
+        assert capacities == pytest.approx(expected)
+        assert sum(capacities) == pytest.approx(total_capacity)
+
+
+def test_break_generators_rejects_merge_threshold_at_reference_size(system_with_region) -> None:
+    """Reject an invalid threshold before changing the system."""
+    system, region = system_with_region
+    generator = ReEDSGenerator(
+        name="gen",
+        region=region,
+        technology="wind",
+        capacity=120.0,
+        category="wind",
+    )
+    system.add_component(generator)
+
+    result = break_generators(
+        system,
+        BreakGensConfig(
+            reference_units={"wind": {"capacity_MW": 50}},
+            remainder_merge_threshold=50,
+        ),
+    )
+
+    assert result.is_err()
+    assert "must be smaller than the matched reference capacity" in result.unwrap_err()
+    assert list(system.get_components(ReEDSGenerator)) == [generator]
 
 
 def test_load_reference_units(caplog):
@@ -390,7 +439,7 @@ def test_break_generators_return_same_type(system_with_region: tuple[System, Any
 
     reference = {"thermal": {"capacity_MW": 50}}
 
-    _run_break(sys, reference_units=reference, drop_capacity_threshold=40)
+    _run_break(sys, reference_units=reference, remainder_merge_threshold=40)
 
     assert len(list(sys.get_components(ReEDSThermalGenerator))) == 2
     assert next(iter(sys.get_components(ReEDSThermalGenerator))).capacity == 50
@@ -486,7 +535,7 @@ def test_break_system_generators_no_matching_components(system_with_region) -> N
     sys.add_component(generator)
     reference = {"solar": {"capacity_MW": 50}}
 
-    _break_system_generators(sys, reference, capacity_threshold=5, skip_categories=None)
+    _break_system_generators(sys, reference, remainder_merge_threshold=5, skip_categories=None)
 
     generators = list(sys.get_components(ReEDSGenerator))
     assert generators == [generator]
@@ -507,7 +556,7 @@ def test_break_system_generators_empty_skip_categories(system_with_region) -> No
     sys.add_component(generator)
     reference = {"wind": {"capacity_MW": 50}}
 
-    _break_system_generators(sys, reference, capacity_threshold=5, skip_categories=[])
+    _break_system_generators(sys, reference, remainder_merge_threshold=5, skip_categories=[])
 
     generators = list(sys.get_components(ReEDSGenerator))
     assert len(generators) == 3
@@ -546,7 +595,7 @@ def test_break_generators_with_remainder_above_threshold(system_with_region) -> 
     sys.add_component(generator)
     reference = {"wind": {"capacity_MW": 50}}
 
-    _run_break(sys, reference_units=reference, drop_capacity_threshold=5)
+    _run_break(sys, reference_units=reference, remainder_merge_threshold=5)
 
     generators = list(sys.get_components(ReEDSGenerator))
     # 156 / 50 = 3 splits with 6 MW remainder, remainder > 5 so it's included
@@ -923,7 +972,7 @@ def test_break_generators_fractional_splits(system_with_region) -> None:
     sys.add_component(generator)
     reference = {"wind": {"capacity_MW": 50}}
 
-    _run_break(sys, reference_units=reference, drop_capacity_threshold=5)
+    _run_break(sys, reference_units=reference, remainder_merge_threshold=5)
 
     generators = list(sys.get_components(ReEDSGenerator))
     capacities = sorted(gen.capacity for gen in generators)
