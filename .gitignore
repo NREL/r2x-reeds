@@ -399,6 +399,9 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
+# Agent friction notes
+PAPERCUTS.md
+
 ### VisualStudioCode ###
 .vscode/*
 !.vscode/settings.json

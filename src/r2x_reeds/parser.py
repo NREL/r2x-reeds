@@ -50,7 +50,16 @@ from .models.components import (
     ReEDSReserveRegion,
     ReEDSTransmissionLine,
 )
-from .models.enums import ReserveType
+from .models.enums import EmissionType, ReserveType
+from .models.planning import (
+    ReEDSCapacityExpansionInputs,
+    ReEDSInitialCapacity,
+    ReEDSPlanningPeriod,
+    ReEDSPlantCharacteristics,
+    ReEDSRepresentativeTimepoint,
+    ReEDSStorageDuration,
+    ReEDSStorageDurationOverride,
+)
 from .parser_checks import check_dataset_non_empty, check_required_values_in_column
 from .parser_utils import (
     _collect_component_kwargs_from_rule,
@@ -67,6 +76,20 @@ from .parser_utils import (
 from .plugin_config import ReEDSConfig
 from .rules_helper import create_parser_context
 from .upgrader.data_upgrader import run_reeds_upgrades
+
+_REQUIRED_PLANT_CHARACTERISTIC_VARIABLES = frozenset(
+    {
+        "capcost",
+        "capcost_energy",
+        "fom",
+        "fom_energy",
+        "heatrate",
+        "rte",
+        "vom",
+    }
+)
+_OPTIONAL_PLANT_CHARACTERISTIC_VARIABLES = frozenset({"upgradecost"})
+
 
 OUTPUTS_H5_DATASET_KEYS: dict[str, str] = {
     "online_capacity": "cap_ivrt",
@@ -376,6 +399,532 @@ class ReEDSParser(Plugin[ReEDSConfig]):
 
         return self.store.read_data(name, placeholders=placeholders)
 
+    def read_capacity_expansion_inputs(self) -> ReEDSCapacityExpansionInputs:
+        """Read the canonical ReEDS inputs needed for capacity-expansion data.
+
+        The result preserves technology-year characteristics separately from
+        regional non-resource initial capacity. It does not infer regional
+        investment candidates because ReEDS source inputs do not provide one complete
+        feasibility relation for them.
+
+        Raises
+        ------
+        ValueError
+            If a required input is absent, malformed, or internally inconsistent.
+        """
+        modeled_years = self._read_planning_input_frame("modeled_years")
+        present_value_factors = self._read_planning_input_frame("planning_present_value_factors")
+        switches = self._read_planning_input_frame("planning_switches")
+        representative_timepoints = self._read_planning_input_frame("planning_representative_timepoints")
+        plant_characteristics = self._read_planning_input_frame("planning_plant_characteristics")
+        initial_power_capacity = self._read_planning_input_frame("existing_capacity")
+        initial_energy_capacity = self._read_planning_input_frame("existing_energy_capacity", required=False)
+        storage_durations = self._read_planning_input_frame("planning_storage_durations", required=False)
+
+        if modeled_years is None or present_value_factors is None or switches is None:
+            raise ValueError("required capacity-expansion input data is unavailable")
+        if (
+            representative_timepoints is None
+            or plant_characteristics is None
+            or initial_power_capacity is None
+        ):
+            raise ValueError("required capacity-expansion input data is unavailable")
+
+        self._require_planning_columns(
+            modeled_years,
+            dataset="modeled_years",
+            columns={"modeled_years"},
+        )
+        planning_years = tuple(
+            self._source_year(value, dataset="modeled_years", column="modeled_years")
+            for value in modeled_years.get_column("modeled_years").to_list()
+        )
+        if not planning_years:
+            raise ValueError("modeled_years contains no planning years")
+
+        present_value_factor_by_year = self._values_by_year(
+            present_value_factors,
+            dataset="planning_present_value_factors",
+            value_column="present_value_factor",
+        )
+        emission_type = self._annual_cap_emission_type(switches)
+        emission_cap_by_year: dict[int, float] = {}
+        if emission_type is not None:
+            co2_cap = self._read_planning_input_frame("co2_cap", required=False)
+            if co2_cap is not None:
+                emission_cap_by_year = self._values_by_year(
+                    co2_cap,
+                    dataset="co2_cap",
+                    value_column="value",
+                )
+        missing_factor_years = [year for year in planning_years if year not in present_value_factor_by_year]
+        if missing_factor_years:
+            raise ValueError(
+                f"planning_present_value_factors is missing modeled years {missing_factor_years}"
+            )
+        if emission_type is not None:
+            missing_cap_years = [year for year in planning_years if year not in emission_cap_by_year]
+            if missing_cap_years:
+                raise ValueError(f"co2_cap is missing modeled years {missing_cap_years}")
+
+        storage_enabled = self._storage_enabled(switches)
+        pumped_storage_supply_curve_duration = (
+            self._read_planning_input_frame("planning_pumped_storage_supply_curve_duration", required=False)
+            if storage_enabled
+            else None
+        )
+        storage_duration_overrides_enabled = self._storage_duration_overrides_enabled(switches)
+        use_storage_duration_overrides = storage_enabled and storage_duration_overrides_enabled
+        storage_duration_override_data = (
+            self._read_planning_input_frame("planning_storage_duration_overrides", required=False)
+            if use_storage_duration_overrides
+            else None
+        )
+        planning_periods = tuple(
+            ReEDSPlanningPeriod(
+                year=year,
+                present_value_factor=present_value_factor_by_year[year],
+                emission_cap=emission_cap_by_year.get(year) if emission_type is not None else None,
+            )
+            for year in planning_years
+        )
+        return ReEDSCapacityExpansionInputs(
+            planning_periods=planning_periods,
+            representative_timepoints=self._build_representative_timepoints(representative_timepoints),
+            emission_type=emission_type,
+            plant_characteristics=self._build_plant_characteristics(
+                plant_characteristics,
+                planning_years=set(planning_years),
+            ),
+            initial_capacities=self._build_initial_capacities(
+                initial_power_capacity,
+                initial_energy_capacity,
+            ),
+            storage_durations=self._build_storage_durations(storage_durations),
+            pumped_storage_supply_curve_duration=self._build_pumped_storage_supply_curve_duration(
+                pumped_storage_supply_curve_duration
+            ),
+            storage_duration_overrides=self._build_storage_duration_overrides(storage_duration_override_data),
+        )
+
+    def _read_planning_input_frame(self, name: str, *, required: bool = True) -> pl.DataFrame | None:
+        """Collect one planning input frame and give missing inputs a consistent error."""
+        try:
+            data = self.read_data_file(name)
+        except FileNotFoundError as exc:
+            if required:
+                raise ValueError(f"required capacity-expansion input '{name}' is missing") from exc
+            return None
+
+        if data is None:
+            if required:
+                raise ValueError(f"required capacity-expansion input '{name}' is missing")
+            return None
+        if isinstance(data, pl.LazyFrame):
+            frame = data.collect()
+        elif isinstance(data, pl.DataFrame):
+            frame = data
+        else:
+            raise ValueError(
+                f"capacity-expansion input '{name}' must be a Polars DataFrame, got {type(data).__name__}"
+            )
+        if required and frame.is_empty():
+            raise ValueError(f"required capacity-expansion input '{name}' is empty")
+        return frame
+
+    @staticmethod
+    def _require_planning_columns(frame: pl.DataFrame, *, dataset: str, columns: set[str]) -> None:
+        """Require source columns before interpreting a planning input frame."""
+        missing = columns - set(frame.columns)
+        if missing:
+            raise ValueError(f"{dataset} is missing required columns {sorted(missing)}")
+
+    @staticmethod
+    def _source_identifier(value: Any, *, dataset: str, column: str) -> str:
+        """Return a non-empty source identifier without coercing nulls to text."""
+        if value is None:
+            raise ValueError(f"{dataset} has an empty {column}")
+        identifier = str(value).strip()
+        if not identifier:
+            raise ValueError(f"{dataset} has an empty {column}")
+        return identifier
+
+    @staticmethod
+    def _source_year(value: Any, *, dataset: str, column: str) -> int:
+        """Return an integral source year with a dataset-specific error."""
+        try:
+            numeric_year = float(value)
+            year = int(numeric_year)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError(f"{dataset} has a non-integral {column}") from exc
+        if numeric_year != year:
+            raise ValueError(f"{dataset} has a non-integral {column}")
+        return year
+
+    @staticmethod
+    def _source_float(value: Any, *, dataset: str, column: str) -> float:
+        """Return a numeric source value with a dataset-specific error."""
+        try:
+            return float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{dataset} has a non-numeric {column}") from exc
+
+    @classmethod
+    def _values_by_year(
+        cls,
+        frame: pl.DataFrame,
+        *,
+        dataset: str,
+        value_column: str,
+    ) -> dict[int, float]:
+        """Return a unique numeric value for each year in a source input table."""
+        cls._require_planning_columns(frame, dataset=dataset, columns={"year", value_column})
+        values: dict[int, float] = {}
+        for row in frame.iter_rows(named=True):
+            year = cls._source_year(row["year"], dataset=dataset, column="year")
+            value = cls._source_float(row[value_column], dataset=dataset, column=value_column)
+            if year in values:
+                raise ValueError(f"{dataset} has duplicate values for year {year}")
+            values[year] = value
+        return values
+
+    @classmethod
+    def _switch_value(cls, switches: pl.DataFrame, *, name: str) -> Any:
+        """Return one required ReEDS switch value."""
+        cls._require_planning_columns(
+            switches,
+            dataset="planning_switches",
+            columns={"switch", "value"},
+        )
+        values = [
+            row["value"] for row in switches.iter_rows(named=True) if str(row["switch"]).strip() == name
+        ]
+        if len(values) != 1:
+            raise ValueError(f"planning_switches must contain exactly one {name} value")
+        return values[0]
+
+    @classmethod
+    def _annual_cap_emission_type(cls, switches: pl.DataFrame) -> EmissionType | None:
+        """Map ReEDS ``GSw_AnnualCap`` modes to the represented emission type."""
+        annual_cap_value = cls._source_float(
+            cls._switch_value(switches, name="GSw_AnnualCap"),
+            dataset="planning_switches",
+            column="GSw_AnnualCap",
+        )
+        if annual_cap_value not in {0.0, 1.0, 2.0, 3.0}:
+            raise ValueError("GSw_AnnualCap must be 0, 1, 2, or 3")
+        annual_cap_mode = int(annual_cap_value)
+        if annual_cap_mode == 0:
+            return None
+        if annual_cap_mode == 1:
+            return EmissionType.CO2
+        return EmissionType.CO2E
+
+    @classmethod
+    def _storage_enabled(cls, switches: pl.DataFrame) -> bool:
+        """Return whether ReEDS enables standalone storage."""
+        value = cls._source_float(
+            cls._switch_value(switches, name="GSw_Storage"),
+            dataset="planning_switches",
+            column="GSw_Storage",
+        )
+        if value not in {0.0, 1.0}:
+            raise ValueError("GSw_Storage must be 0 or 1")
+        return bool(value)
+
+    @classmethod
+    def _storage_duration_overrides_enabled(cls, switches: pl.DataFrame) -> bool:
+        """Return whether ReEDS applies ``storage_duration_pshdata.csv`` overrides."""
+        value = cls._source_float(
+            cls._switch_value(switches, name="GSw_HydroPSHDurData"),
+            dataset="planning_switches",
+            column="GSw_HydroPSHDurData",
+        )
+        if value not in {0.0, 1.0}:
+            raise ValueError("GSw_HydroPSHDurData must be 0 or 1")
+        return bool(value)
+
+    @classmethod
+    def _build_representative_timepoints(
+        cls,
+        frame: pl.DataFrame,
+    ) -> tuple[ReEDSRepresentativeTimepoint, ...]:
+        """Build ordered representative timepoints from ``rep/numhours.csv``."""
+        cls._require_planning_columns(
+            frame,
+            dataset="planning_representative_timepoints",
+            columns={"label", "weight"},
+        )
+        return tuple(
+            ReEDSRepresentativeTimepoint(
+                label=cls._source_identifier(
+                    row["label"],
+                    dataset="planning_representative_timepoints",
+                    column="label",
+                ),
+                position=position,
+                weight=cls._source_float(
+                    row["weight"],
+                    dataset="planning_representative_timepoints",
+                    column="weight",
+                ),
+            )
+            for position, row in enumerate(frame.iter_rows(named=True))
+        )
+
+    @classmethod
+    def _build_plant_characteristics(
+        cls,
+        frame: pl.DataFrame,
+        *,
+        planning_years: set[int],
+    ) -> tuple[ReEDSPlantCharacteristics, ...]:
+        """Pivot canonical long-form ``plantcharout.csv`` rows into typed records."""
+        cls._require_planning_columns(
+            frame,
+            dataset="planning_plant_characteristics",
+            columns={"technology", "year", "variable", "value"},
+        )
+        values_by_technology_year: dict[tuple[str, int], dict[str, float]] = {}
+        supported_variables = (
+            _REQUIRED_PLANT_CHARACTERISTIC_VARIABLES | _OPTIONAL_PLANT_CHARACTERISTIC_VARIABLES
+        )
+        for row in frame.iter_rows(named=True):
+            technology = cls._source_identifier(
+                row["technology"],
+                dataset="planning_plant_characteristics",
+                column="technology",
+            )
+            year = cls._source_year(
+                row["year"],
+                dataset="planning_plant_characteristics",
+                column="year",
+            )
+            variable = cls._source_identifier(
+                row["variable"],
+                dataset="planning_plant_characteristics",
+                column="variable",
+            )
+            value = cls._source_float(
+                row["value"],
+                dataset="planning_plant_characteristics",
+                column="value",
+            )
+            if year not in planning_years:
+                continue
+            if variable not in supported_variables:
+                raise ValueError(f"planning_plant_characteristics has unsupported variable '{variable}'")
+            key = (technology, year)
+            values = values_by_technology_year.setdefault(key, {})
+            if variable in values:
+                raise ValueError(
+                    "planning_plant_characteristics has duplicate values for "
+                    f"technology '{technology}', year {year}, variable '{variable}'"
+                )
+            values[variable] = value
+
+        records: list[ReEDSPlantCharacteristics] = []
+        for (technology, year), values in sorted(values_by_technology_year.items()):
+            missing = _REQUIRED_PLANT_CHARACTERISTIC_VARIABLES - set(values)
+            if missing:
+                raise ValueError(
+                    "planning_plant_characteristics is missing variables "
+                    f"{sorted(missing)} for technology '{technology}', year {year}"
+                )
+            heat_rate = values["heatrate"]
+            round_trip_efficiency = values["rte"]
+            records.append(
+                ReEDSPlantCharacteristics(
+                    technology=technology,
+                    year=year,
+                    capital_cost=values["capcost"],
+                    capital_cost_energy=values["capcost_energy"],
+                    fom_cost=values["fom"],
+                    fom_cost_energy=values["fom_energy"],
+                    vom_cost=values["vom"],
+                    heat_rate=None if heat_rate == 0 else heat_rate,
+                    round_trip_efficiency=(None if round_trip_efficiency == 0 else round_trip_efficiency),
+                    upgrade_cost=values.get("upgradecost"),
+                )
+            )
+        if not records:
+            raise ValueError("planning_plant_characteristics has no records for modeled years")
+        return tuple(records)
+
+    @classmethod
+    def _build_initial_capacities(
+        cls,
+        power_frame: pl.DataFrame,
+        energy_frame: pl.DataFrame | None,
+    ) -> tuple[ReEDSInitialCapacity, ...]:
+        """Join initial power and storage-energy capacity without manufacturing records."""
+        cls._require_planning_columns(
+            power_frame,
+            dataset="existing_capacity",
+            columns={"technology", "region", "capacity"},
+        )
+        power_by_key: dict[tuple[str, str], float] = {}
+        for row in power_frame.iter_rows(named=True):
+            key = (
+                cls._source_identifier(row["technology"], dataset="existing_capacity", column="technology"),
+                cls._source_identifier(row["region"], dataset="existing_capacity", column="region"),
+            )
+            capacity = cls._source_float(row["capacity"], dataset="existing_capacity", column="capacity")
+            if key in power_by_key:
+                raise ValueError(f"existing_capacity has duplicate capacity for {key}")
+            power_by_key[key] = capacity
+
+        energy_by_key: dict[tuple[str, str], float] = {}
+        if energy_frame is not None and not energy_frame.is_empty():
+            cls._require_planning_columns(
+                energy_frame,
+                dataset="existing_energy_capacity",
+                columns={"technology", "region", "energy_capacity"},
+            )
+            for row in energy_frame.iter_rows(named=True):
+                key = (
+                    cls._source_identifier(
+                        row["technology"],
+                        dataset="existing_energy_capacity",
+                        column="technology",
+                    ),
+                    cls._source_identifier(
+                        row["region"],
+                        dataset="existing_energy_capacity",
+                        column="region",
+                    ),
+                )
+                capacity = cls._source_float(
+                    row["energy_capacity"],
+                    dataset="existing_energy_capacity",
+                    column="energy_capacity",
+                )
+                if key not in power_by_key:
+                    raise ValueError(f"existing_energy_capacity has no matching power capacity for {key}")
+                if key in energy_by_key:
+                    raise ValueError(f"existing_energy_capacity has duplicate capacity for {key}")
+                energy_by_key[key] = capacity
+
+        return tuple(
+            ReEDSInitialCapacity(
+                technology=technology,
+                region=region,
+                initial_power_capacity=capacity,
+                initial_energy_capacity=energy_by_key.get((technology, region)),
+            )
+            for (technology, region), capacity in sorted(power_by_key.items())
+        )
+
+    @classmethod
+    def _build_storage_durations(
+        cls,
+        frame: pl.DataFrame | None,
+    ) -> tuple[ReEDSStorageDuration, ...]:
+        """Build technology-level durations only where ReEDS supplies a fixed value."""
+        if frame is None or frame.is_empty():
+            return ()
+        cls._require_planning_columns(
+            frame,
+            dataset="planning_storage_durations",
+            columns={"technology", "duration"},
+        )
+        durations: dict[str, float] = {}
+        for row in frame.iter_rows(named=True):
+            technology = cls._source_identifier(
+                row["technology"],
+                dataset="planning_storage_durations",
+                column="technology",
+            )
+            duration = cls._source_float(
+                row["duration"],
+                dataset="planning_storage_durations",
+                column="duration",
+            )
+            if technology in durations:
+                raise ValueError(f"planning_storage_durations has duplicate duration for '{technology}'")
+            durations[technology] = duration
+        return tuple(
+            ReEDSStorageDuration(technology=technology, duration=duration)
+            for technology, duration in sorted(durations.items())
+        )
+
+    @classmethod
+    def _build_pumped_storage_supply_curve_duration(
+        cls,
+        frame: pl.DataFrame | None,
+    ) -> float | None:
+        """Read the one selected supply-curve duration for pumped storage."""
+        if frame is None or frame.is_empty():
+            return None
+        cls._require_planning_columns(
+            frame,
+            dataset="planning_pumped_storage_supply_curve_duration",
+            columns={"duration"},
+        )
+        values = [
+            cls._source_float(
+                row["duration"],
+                dataset="planning_pumped_storage_supply_curve_duration",
+                column="duration",
+            )
+            for row in frame.iter_rows(named=True)
+        ]
+        if len(values) != 1:
+            raise ValueError(
+                "planning_pumped_storage_supply_curve_duration must contain exactly one duration"
+            )
+        return values[0]
+
+    @classmethod
+    def _build_storage_duration_overrides(
+        cls,
+        frame: pl.DataFrame | None,
+    ) -> tuple[ReEDSStorageDurationOverride, ...]:
+        """Build regional and vintage-specific duration overrides when ReEDS supplies them."""
+        if frame is None or frame.is_empty():
+            return ()
+        cls._require_planning_columns(
+            frame,
+            dataset="planning_storage_duration_overrides",
+            columns={"technology", "vintage", "region", "duration"},
+        )
+        overrides: dict[tuple[str, str, str], float] = {}
+        for row in frame.iter_rows(named=True):
+            key = (
+                cls._source_identifier(
+                    row["technology"],
+                    dataset="planning_storage_duration_overrides",
+                    column="technology",
+                ),
+                cls._source_identifier(
+                    row["vintage"],
+                    dataset="planning_storage_duration_overrides",
+                    column="vintage",
+                ),
+                cls._source_identifier(
+                    row["region"],
+                    dataset="planning_storage_duration_overrides",
+                    column="region",
+                ),
+            )
+            duration = cls._source_float(
+                row["duration"],
+                dataset="planning_storage_duration_overrides",
+                column="duration",
+            )
+            if key in overrides:
+                raise ValueError(f"planning_storage_duration_overrides has duplicate duration for {key}")
+            overrides[key] = duration
+        return tuple(
+            ReEDSStorageDurationOverride(
+                technology=technology,
+                vintage=vintage,
+                region=region,
+                duration=duration,
+            )
+            for (technology, vintage, region), duration in sorted(overrides.items())
+        )
+
     def _is_outputs_h5_mapped(self, name: str) -> bool:
         """Return True if a dataset is configured to read from outputs/outputs.h5."""
         data_file = self.store[name]
@@ -580,6 +1129,8 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if hour_map_result.is_err():
             return Err(f"Weather year(s): {hour_map_result.err()}")
         hour_map_df = hour_map_result.ok()
+        if hour_map_df is None:
+            return Err("Weather year(s): hour_map returned no data")
 
         available_weather_years = {
             int(val)

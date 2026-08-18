@@ -21,7 +21,7 @@
     "name": "existing_capacity",
     "fpath": "inputs_case/capnonrsc.csv",
     "info": {
-      "description": "Existing non-renewable capacity by technology and region",
+      "description": "Existing non-resource power capacity by technology and region",
       "is_input": true,
       "is_optional": false,
       "units": "MW"
@@ -31,6 +31,23 @@
         "i": "technology",
         "r": "region",
         "value": "capacity"
+      }
+    }
+  },
+  {
+    "name": "existing_energy_capacity",
+    "fpath": "inputs_case/capnonrsc_energy.csv",
+    "info": {
+      "description": "Existing storage energy capacity by technology and region",
+      "is_input": true,
+      "is_optional": true,
+      "units": "MWh"
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "i": "technology",
+        "r": "region",
+        "value": "energy_capacity"
       }
     }
   },
@@ -540,6 +557,38 @@
     }
   },
   {
+    "name": "planning_present_value_factors",
+    "fpath": "inputs_case/pvf_cap.csv",
+    "info": {
+      "description": "Present-value factors for capacity-expansion capital costs",
+      "is_input": true,
+      "is_optional": true,
+      "units": "fraction"
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "*t": "year",
+        "pvf_capital": "present_value_factor"
+      }
+    }
+  },
+  {
+    "name": "planning_switches",
+    "fpath": "inputs_case/switches.csv",
+    "info": {
+      "description": "ReEDS switches needed to interpret planning inputs",
+      "is_input": true,
+      "is_optional": true
+    },
+    "reader": {
+      "kwargs": {
+        "has_header": false,
+        "new_columns": ["switch", "value"]
+      },
+      "function": null
+    }
+  },
+  {
     "name": "hour_map",
     "fpath": "inputs_case/rep/hmap_allyrs.csv",
     "info": {
@@ -552,6 +601,22 @@
         "*timestamp": "time_index",
         "h": "hour_period",
         "season": "season"
+      }
+    }
+  },
+  {
+    "name": "planning_representative_timepoints",
+    "fpath": "inputs_case/rep/numhours.csv",
+    "info": {
+      "description": "Representative timepoints and their calendar-hour weights",
+      "is_input": true,
+      "is_optional": true,
+      "units": "hours"
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "*h": "label",
+        "numhours": "weight"
       }
     }
   },
@@ -574,18 +639,95 @@
     "name": "co2_cap",
     "fpath": "inputs_case/co2_cap.csv",
     "info": {
-      "description": "CO2 emissions cap by year",
+      "description": "Annual emissions cap by year",
       "is_input": true,
       "is_optional": true,
       "units": "tonne"
     },
     "proc_spec": {
       "column_mapping": {
-        "t": "year",
+        "*t": "year",
         "tonne_per_year": "value"
+      }
+    }
+  },
+  {
+    "name": "planning_plant_characteristics",
+    "fpath": "inputs_case/plantcharout.csv",
+    "info": {
+      "description": "Canonical technology-year plant characteristics for capacity expansion",
+      "is_input": true,
+      "is_optional": true
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "*i": "technology",
+        "t": "year",
+        "variable": "variable",
+        "value": "value"
+      }
+    }
+  },
+  {
+    "name": "planning_storage_durations",
+    "fpath": "inputs_case/storage_duration.csv",
+    "info": {
+      "description": "Technology-level storage-duration defaults",
+      "is_input": true,
+      "is_optional": true,
+      "units": "hours"
+    },
+    "reader": {
+      "kwargs": {
+        "has_header": false,
+        "new_columns": ["technology", "duration"]
       },
-      "filter_by": {
-        "year": "{solve_year}"
+      "function": null
+    },
+    "proc_spec": {
+      "column_schema": {
+        "technology": "string",
+        "duration": "float"
+      }
+    }
+  },
+  {
+    "name": "planning_pumped_storage_supply_curve_duration",
+    "fpath": "inputs_case/psh_sc_duration.csv",
+    "info": {
+      "description": "Selected supply-curve duration for pumped storage when storage is enabled",
+      "is_input": true,
+      "is_optional": true,
+      "units": "hours"
+    },
+    "reader": {
+      "kwargs": {
+        "has_header": false,
+        "new_columns": ["duration"]
+      },
+      "function": null
+    },
+    "proc_spec": {
+      "column_schema": {
+        "duration": "float"
+      }
+    }
+  },
+  {
+    "name": "planning_storage_duration_overrides",
+    "fpath": "inputs_case/storage_duration_pshdata.csv",
+    "info": {
+      "description": "Regional and vintage-specific storage duration overrides when storage is enabled",
+      "is_input": true,
+      "is_optional": true,
+      "units": "hours"
+    },
+    "proc_spec": {
+      "column_mapping": {
+        "*i": "technology",
+        "v": "vintage",
+        "r": "region",
+        "hours": "duration"
       }
     }
   },

@@ -76,6 +76,18 @@ def test_valid_years_pass_validation(reeds_run_path):
     assert result.is_ok()
 
 
+def test_validation_returns_an_error_for_an_empty_hour_map_result(parser, monkeypatch) -> None:
+    """Validation must not dereference an unexpectedly empty successful result."""
+    from rust_ok import Ok
+
+    monkeypatch.setattr(parser, "_get_hour_map_for_validation", lambda placeholders: Ok(None))
+
+    result = parser.on_validate()
+
+    assert result.is_err()
+    assert "hour_map" in str(result.err())
+
+
 def test_missing_deprecated_agglevels_file_still_validates(tmp_path: Path, reeds_run_path: Path) -> None:
     """Parser validation should allow runs without deprecated agglevels.csv."""
     from typing import cast
