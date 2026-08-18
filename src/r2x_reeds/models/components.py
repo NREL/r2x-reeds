@@ -79,43 +79,22 @@ class ReEDSReserve(ReEDSComponent):
         PositiveFloat | None,
         Field(description="Time over which the required response must be maintained in seconds"),
     ] = None
-    or_load_percentage: Annotated[
+    max_active_power: Annotated[
         float | None,
-        Field(description="Proportion of load that contributes to the reserve requirement"),
+        Field(description="Maximum active power of reserve in MW"),
     ] = None
-    or_wind_percentage: Annotated[
-        float | None,
-        Field(description="Proportion of wind generation that contributes to the reserve requirement"),
-    ] = None
-    or_pv_percentage: Annotated[
-        float | None,
-        Field(description="Proportion of solar generation that contributes to the reserve requirement"),
-    ] = None
-    season: Annotated[
-        str | None,
-        Field(description="Seasonal identifier for reserve requirement variations (summ/fall/wint/spri)"),
-    ] = None
-    reg_cost: Annotated[
-        float | None,
-        Field(description="Regulation reserve cost in $/MW from cost_opres files"),
-    ] = None
-    flex_cost: Annotated[
-        float | None,
-        Field(description="Flexibility reserve cost in $/MW from cost_opres files"),
-    ] = None
-    spin_cost: Annotated[
-        float | None,
-        Field(description="Spinning reserve cost in $/MW from cost_opres files"),
-    ] = None
-    reserve_type: Annotated[ReserveType, Field(description="Type of reserve")]
-    direction: Annotated[ReserveDirection, Field(description="Direction of reserve provision")]
+    direction: Annotated[ReserveDirection, Field(description="Reserve direction")]
+    reserve_type: Annotated[ReserveType, Field(description="Reserve type")]
+    or_load_percentage: Annotated[float | None, Field(description="Operating reserve load percentage")] = None
+    or_wind_percentage: Annotated[float | None, Field(description="Operating reserve wind percentage")] = None
+    or_pv_percentage: Annotated[float | None, Field(description="Operating reserve solar percentage")] = None
+    spin_cost: Annotated[float | None, Field(description="Spinning reserve cost")] = None
+    reg_cost: Annotated[float | None, Field(description="Regulation reserve cost")] = None
+    flex_cost: Annotated[float | None, Field(description="Flexible reserve cost")] = None
 
 
 class ReEDSInterface(ReEDSComponent):
-    """ReEDS region interface.
-
-    Represents the connection between two regions for power transfer.
-    """
+    """ReEDS transmission interface component."""
 
     from_region: Annotated[ReEDSRegion, Field(description="Origin region")]
     to_region: Annotated[ReEDSRegion, Field(description="Destination region")]
@@ -350,3 +329,72 @@ class ReEDSResourceClass(ReEDSComponent):
         float | None,
         Field(description="Variable O&M per MWh"),
     ] = None
+
+
+class ReEDSResourceSite(HasUnits, ReEDSComponent):
+    """Candidate reV/supply-curve resource site component."""
+
+    technology: Annotated[str, Field(description="Technology type (e.g., 'upv', 'wind-ons')")]
+    region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
+    sc_point_gid: Annotated[int, Field(description="Supply-curve site identifier")]
+    resource_class: Annotated[str, Field(description="Resource class identifier")]
+    capacity: Annotated[float | None, Unit("MW"), Field(description="Site capacity")] = None
+    available_capacity: Annotated[
+        float | None,
+        Unit("MW"),
+        Field(description="Available capacity"),
+    ] = None
+    capacity_factor: Annotated[
+        float | None,
+        Field(description="Average capacity factor"),
+    ] = None
+    sc_gid: Annotated[int | None, Field(description="Supply-curve group identifier")] = None
+    bin: Annotated[int | None, Field(description="Supply-curve bin identifier")] = None
+    supply_curve_cost: Annotated[
+        float | None,
+        Unit("$/MW"),
+        Field(description="Supply-curve cost"),
+    ] = None
+    existing_capacity: Annotated[
+        float | None,
+        Unit("MW"),
+        Field(description="Existing capacity"),
+    ] = None
+    online_year: Annotated[int | None, Field(description="Online year")] = None
+    retire_year: Annotated[int | None, Field(description="Retire year")] = None
+
+
+class ReEDSResourceBuild(HasUnits, ReEDSComponent):
+    """Selected/built reV resource result row component."""
+
+    technology: Annotated[str, Field(description="Technology type (e.g., 'upv', 'wind-ons')")]
+    region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
+    sc_point_gid: Annotated[int, Field(description="Supply-curve site identifier")]
+    resource_class: Annotated[str, Field(description="Resource class identifier")]
+    year: Annotated[int, Field(description="Model year")]
+    built_capacity: Annotated[float, Unit("MW"), Field(description="Built capacity", ge=0)]
+    investment_bool: Annotated[bool, Field(description="Investment indicator")]
+    capacity: Annotated[float | None, Unit("MW"), Field(description="Site capacity")] = None
+    available_capacity: Annotated[
+        float | None,
+        Unit("MW"),
+        Field(description="Available capacity"),
+    ] = None
+    capacity_factor: Annotated[
+        float | None,
+        Field(description="Average capacity factor"),
+    ] = None
+    sc_gid: Annotated[int | None, Field(description="Supply-curve group identifier")] = None
+    bin: Annotated[int | None, Field(description="Supply-curve bin identifier")] = None
+    supply_curve_cost: Annotated[
+        float | None,
+        Unit("$/MW"),
+        Field(description="Supply-curve cost"),
+    ] = None
+    existing_capacity: Annotated[
+        float | None,
+        Unit("MW"),
+        Field(description="Existing capacity"),
+    ] = None
+    online_year: Annotated[int | None, Field(description="Online year")] = None
+    retire_year: Annotated[int | None, Field(description="Retire year")] = None

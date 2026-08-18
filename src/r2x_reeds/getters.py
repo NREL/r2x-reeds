@@ -144,6 +144,15 @@ def build_generator_name(row: Any, *, context: PluginContext) -> Result[str, Exc
         return Err(e)
 
 
+def build_resource_name(technology: str, resource_class: Any, sc_point_gid: int, year: Any) -> str:
+    """Build a stable name for resource site and build components."""
+
+    resource_class_name = str(resource_class)
+    if year is None:
+        return f"{technology}_{resource_class_name}_{sc_point_gid}"
+    return f"{technology}_{resource_class_name}_{year}_{sc_point_gid}"
+
+
 @_reeds_getter
 def build_load_name(row: Any, *, context: PluginContext) -> Result[str, Exception]:
     """Build canonical load name from region."""
