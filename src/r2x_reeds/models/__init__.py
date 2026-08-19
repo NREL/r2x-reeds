@@ -36,20 +36,22 @@ from .components import (
     ReEDSVariableGenerator,
 )
 from .enums import (
+    AnnualCapMode,
     EmissionSource,
     EmissionType,
     FuelType,
+    ReEDSBinarySwitch,
     ReserveDirection,
     ReserveType,
     TransmissionLineType,
 )
 from .planning import (
     ReEDSCapacityExpansion,
-    ReEDSCapacityExpansionInputs,
     ReEDSCapacityExpansionResource,
     ReEDSDispatchableCapacityExpansionResource,
     ReEDSInitialCapacity,
     ReEDSPlanningPeriod,
+    ReEDSPlanningSwitches,
     ReEDSPlantCharacteristics,
     ReEDSRepresentativeTimepoint,
     ReEDSStorageCapacityExpansionResource,
@@ -60,6 +62,7 @@ from .planning import (
 from .types import EmissionRate, Fraction, NonEmptyText, NonNegativeFloat, Percentage
 
 __all__ = [
+    "AnnualCapMode",
     "EmissionRate",
     "EmissionSource",
     "EmissionType",
@@ -72,8 +75,8 @@ __all__ = [
     "NonNegativeFloat",
     "NonNegativeRange",
     "Percentage",
+    "ReEDSBinarySwitch",
     "ReEDSCapacityExpansion",
-    "ReEDSCapacityExpansionInputs",
     "ReEDSCapacityExpansionResource",
     "ReEDSComponent",
     "ReEDSConsumingTechnology",
@@ -96,6 +99,7 @@ __all__ = [
     "ReEDSInitialCapacity",
     "ReEDSInterface",
     "ReEDSPlanningPeriod",
+    "ReEDSPlanningSwitches",
     "ReEDSPlantCharacteristics",
     "ReEDSRegion",
     "ReEDSRepresentativeTimepoint",

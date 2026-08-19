@@ -94,13 +94,13 @@ def _build_parser(case_path: Path) -> ReEDSParser:
     return cast(ReEDSParser, ReEDSParser.from_context(context))
 
 
-def test_read_capacity_expansion_inputs_reads_canonical_reeds_tables(
+def test_build_capacity_expansion_reads_canonical_reeds_tables(
     tmp_path: Path, reeds_run_path: Path
 ) -> None:
     """The parser reads technology-year, chronology, and initial-capacity inputs."""
     case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
 
-    inputs = _build_parser(case_path).read_capacity_expansion_inputs()
+    inputs = _build_parser(case_path).build_capacity_expansion()
 
     assert [period.year for period in inputs.planning_periods] == [2030, 2035]
     assert [period.present_value_factor for period in inputs.planning_periods] == [1.0, 0.7]
@@ -135,7 +135,25 @@ def test_read_capacity_expansion_inputs_reads_canonical_reeds_tables(
     ] == [("pumped-hydro", "init-1", "r1", 10.0)]
 
 
-def test_read_capacity_expansion_inputs_ignores_inactive_co2_cap(
+def test_parser_attaches_capacity_expansion_to_system(
+    tmp_path: Path, reeds_run_path: Path
+) -> None:
+    """The parser attaches capacity-expansion data as a system component."""
+    from r2x_core import System
+    from r2x_reeds import ReEDSCapacityExpansion
+
+    case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
+    parser = _build_parser(case_path)
+    system = System(name="planning-inputs")
+
+    result = parser._build_capacity_expansion(system)
+
+    assert result.is_ok()
+    expansion = system.get_component(ReEDSCapacityExpansion, "capacity_expansion")
+    assert [period.year for period in expansion.planning_periods] == [2030, 2035]
+
+
+def test_build_capacity_expansion_ignores_inactive_co2_cap(
     tmp_path: Path, reeds_run_path: Path
 ) -> None:
     """GSw_AnnualCap=0 makes cap data irrelevant to planning inputs."""
@@ -145,13 +163,13 @@ def test_read_capacity_expansion_inputs_ignores_inactive_co2_cap(
     )
     (case_path / "inputs_case" / "co2_cap.csv").write_text("*t,tonne_per_year\n2030,not-a-number\n")
 
-    inputs = _build_parser(case_path).read_capacity_expansion_inputs()
+    inputs = _build_parser(case_path).build_capacity_expansion()
 
     assert inputs.emission_type is None
     assert [period.emission_cap for period in inputs.planning_periods] == [None, None]
 
 
-def test_read_capacity_expansion_inputs_ignores_disabled_storage_duration_overrides(
+def test_build_capacity_expansion_ignores_disabled_storage_duration_overrides(
     tmp_path: Path, reeds_run_path: Path
 ) -> None:
     """GSw_HydroPSHDurData controls whether PSH duration input rows are applied."""
@@ -161,12 +179,12 @@ def test_read_capacity_expansion_inputs_ignores_disabled_storage_duration_overri
     )
     (case_path / "inputs_case" / "storage_duration_pshdata.csv").write_text("not-a-duration\n")
 
-    inputs = _build_parser(case_path).read_capacity_expansion_inputs()
+    inputs = _build_parser(case_path).build_capacity_expansion()
 
     assert inputs.storage_duration_overrides == ()
 
 
-def test_read_capacity_expansion_inputs_ignores_psh_duration_data_when_storage_is_disabled(
+def test_build_capacity_expansion_ignores_psh_duration_data_when_storage_is_disabled(
     tmp_path: Path, reeds_run_path: Path
 ) -> None:
     """GSw_Storage disables both selected and regional PSH duration data."""
@@ -177,13 +195,13 @@ def test_read_capacity_expansion_inputs_ignores_psh_duration_data_when_storage_i
     (case_path / "inputs_case" / "psh_sc_duration.csv").write_text("not-a-duration\n")
     (case_path / "inputs_case" / "storage_duration_pshdata.csv").write_text("not-a-duration\n")
 
-    inputs = _build_parser(case_path).read_capacity_expansion_inputs()
+    inputs = _build_parser(case_path).build_capacity_expansion()
 
     assert inputs.pumped_storage_supply_curve_duration is None
     assert inputs.storage_duration_overrides == ()
 
 
-def test_read_capacity_expansion_inputs_rejects_invalid_storage_switch(
+def test_build_capacity_expansion_rejects_invalid_storage_switch(
     tmp_path: Path, reeds_run_path: Path
 ) -> None:
     """GSw_Storage accepts only the source model's enabled/disabled values."""
@@ -192,11 +210,11 @@ def test_read_capacity_expansion_inputs_rejects_invalid_storage_switch(
         "GSw_AnnualCap,1\nGSw_Storage,2\nGSw_HydroPSHDurData,1\n"
     )
 
-    with pytest.raises(ValueError, match="GSw_Storage must be 0 or 1"):
-        _build_parser(case_path).read_capacity_expansion_inputs()
+    with pytest.raises(ValueError, match="Input should be 0 or 1"):
+        _build_parser(case_path).build_capacity_expansion()
 
 
-def test_read_capacity_expansion_inputs_rejects_invalid_psh_duration_switch(
+def test_build_capacity_expansion_rejects_invalid_psh_duration_switch(
     tmp_path: Path, reeds_run_path: Path
 ) -> None:
     """GSw_HydroPSHDurData accepts only the source model's enabled/disabled values."""
@@ -205,11 +223,11 @@ def test_read_capacity_expansion_inputs_rejects_invalid_psh_duration_switch(
         "GSw_AnnualCap,1\nGSw_Storage,1\nGSw_HydroPSHDurData,2\n"
     )
 
-    with pytest.raises(ValueError, match="GSw_HydroPSHDurData must be 0 or 1"):
-        _build_parser(case_path).read_capacity_expansion_inputs()
+    with pytest.raises(ValueError, match="Input should be 0 or 1"):
+        _build_parser(case_path).build_capacity_expansion()
 
 
-def test_read_capacity_expansion_inputs_rejects_invalid_psh_duration_switch_when_storage_is_disabled(
+def test_build_capacity_expansion_rejects_invalid_psh_duration_switch_when_storage_is_disabled(
     tmp_path: Path, reeds_run_path: Path
 ) -> None:
     """GSw_HydroPSHDurData remains a binary source switch when storage is disabled."""
@@ -218,11 +236,11 @@ def test_read_capacity_expansion_inputs_rejects_invalid_psh_duration_switch_when
         "GSw_AnnualCap,1\nGSw_Storage,0\nGSw_HydroPSHDurData,2\n"
     )
 
-    with pytest.raises(ValueError, match="GSw_HydroPSHDurData must be 0 or 1"):
-        _build_parser(case_path).read_capacity_expansion_inputs()
+    with pytest.raises(ValueError, match="Input should be 0 or 1"):
+        _build_parser(case_path).build_capacity_expansion()
 
 
-def test_read_capacity_expansion_inputs_rejects_multiple_psh_supply_curve_durations(
+def test_build_capacity_expansion_rejects_multiple_psh_supply_curve_durations(
     tmp_path: Path, reeds_run_path: Path
 ) -> None:
     """The selected PSH supply curve contributes one scalar duration."""
@@ -230,11 +248,11 @@ def test_read_capacity_expansion_inputs_rejects_multiple_psh_supply_curve_durati
     (case_path / "inputs_case" / "psh_sc_duration.csv").write_text("8\n10\n")
 
     with pytest.raises(ValueError, match="must contain exactly one duration"):
-        _build_parser(case_path).read_capacity_expansion_inputs()
+        _build_parser(case_path).build_capacity_expansion()
 
 
 @pytest.mark.parametrize("annual_cap_mode", [2, 3])
-def test_read_capacity_expansion_inputs_maps_co2e_annual_caps(
+def test_build_capacity_expansion_maps_co2e_annual_caps(
     tmp_path: Path, reeds_run_path: Path, annual_cap_mode: int
 ) -> None:
     """CO2e annual-cap modes, including hydrogen leakage, use the CO2e cap data."""
@@ -243,13 +261,13 @@ def test_read_capacity_expansion_inputs_maps_co2e_annual_caps(
         f"GSw_AnnualCap,{annual_cap_mode}\nGSw_Storage,1\nGSw_HydroPSHDurData,1\n"
     )
 
-    inputs = _build_parser(case_path).read_capacity_expansion_inputs()
+    inputs = _build_parser(case_path).build_capacity_expansion()
 
     assert inputs.emission_type is EmissionType.CO2E
     assert [period.emission_cap for period in inputs.planning_periods] == [1_000_000.0, 900_000.0]
 
 
-def test_read_capacity_expansion_inputs_rejects_an_active_cap_missing_a_modeled_year(
+def test_build_capacity_expansion_rejects_an_active_cap_missing_a_modeled_year(
     tmp_path: Path, reeds_run_path: Path
 ) -> None:
     """An active annual constraint needs a cap for every modeled year."""
@@ -257,10 +275,10 @@ def test_read_capacity_expansion_inputs_rejects_an_active_cap_missing_a_modeled_
     (case_path / "inputs_case" / "co2_cap.csv").write_text("*t,tonne_per_year\n2030,1000000\n")
 
     with pytest.raises(ValueError, match="co2_cap is missing modeled years"):
-        _build_parser(case_path).read_capacity_expansion_inputs()
+        _build_parser(case_path).build_capacity_expansion()
 
 
-def test_read_capacity_expansion_inputs_rejects_an_unknown_plant_characteristic(
+def test_build_capacity_expansion_rejects_an_unknown_plant_characteristic(
     tmp_path: Path, reeds_run_path: Path
 ) -> None:
     """A source-schema change cannot silently drop a plant characteristic."""
@@ -274,10 +292,10 @@ def test_read_capacity_expansion_inputs_rejects_an_unknown_plant_characteristic(
     )
 
     with pytest.raises(ValueError, match="unsupported variable 'unknown'"):
-        _build_parser(case_path).read_capacity_expansion_inputs()
+        _build_parser(case_path).build_capacity_expansion()
 
 
-def test_read_capacity_expansion_inputs_rejects_orphan_energy_capacity(
+def test_build_capacity_expansion_rejects_orphan_energy_capacity(
     tmp_path: Path, reeds_run_path: Path
 ) -> None:
     """Storage energy capacity must have a matching regional power capacity."""
@@ -285,10 +303,10 @@ def test_read_capacity_expansion_inputs_rejects_orphan_energy_capacity(
     (case_path / "inputs_case" / "capnonrsc_energy.csv").write_text("i,r,value\nbattery_li,r2,4\n")
 
     with pytest.raises(ValueError, match="no matching power capacity"):
-        _build_parser(case_path).read_capacity_expansion_inputs()
+        _build_parser(case_path).build_capacity_expansion()
 
 
-def test_read_capacity_expansion_inputs_requires_present_value_factors(
+def test_build_capacity_expansion_requires_present_value_factors(
     tmp_path: Path, reeds_run_path: Path
 ) -> None:
     """Capital-cost present values are required for every planning input case."""
@@ -296,10 +314,10 @@ def test_read_capacity_expansion_inputs_requires_present_value_factors(
     (case_path / "inputs_case" / "pvf_cap.csv").unlink()
 
     with pytest.raises(ValueError, match=r"planning_present_value_factors.*missing"):
-        _build_parser(case_path).read_capacity_expansion_inputs()
+        _build_parser(case_path).build_capacity_expansion()
 
 
-def test_read_capacity_expansion_inputs_rejects_duplicate_storage_durations(
+def test_build_capacity_expansion_rejects_duplicate_storage_durations(
     tmp_path: Path, reeds_run_path: Path
 ) -> None:
     """A fixed-duration technology can have only one source duration."""
@@ -307,10 +325,10 @@ def test_read_capacity_expansion_inputs_rejects_duplicate_storage_durations(
     (case_path / "inputs_case" / "storage_duration.csv").write_text("caes,12\ncaes,24\n")
 
     with pytest.raises(ValueError, match="duplicate duration"):
-        _build_parser(case_path).read_capacity_expansion_inputs()
+        _build_parser(case_path).build_capacity_expansion()
 
 
-def test_read_capacity_expansion_inputs_rejects_incomplete_plant_characteristics(
+def test_build_capacity_expansion_rejects_incomplete_plant_characteristics(
     tmp_path: Path, reeds_run_path: Path
 ) -> None:
     """Every technology-year record must retain all required plant characteristics."""
@@ -326,4 +344,4 @@ def test_read_capacity_expansion_inputs_rejects_incomplete_plant_characteristics
     )
 
     with pytest.raises(ValueError, match=r"missing variables .*rte"):
-        _build_parser(case_path).read_capacity_expansion_inputs()
+        _build_parser(case_path).build_capacity_expansion()

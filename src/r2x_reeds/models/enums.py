@@ -2,7 +2,32 @@
 
 from __future__ import annotations
 
-from enum import StrEnum
+from enum import IntEnum, StrEnum
+
+
+class ReEDSBinarySwitch(IntEnum):
+    """Binary ReEDS switch values."""
+
+    OFF = 0
+    ON = 1
+
+
+class AnnualCapMode(IntEnum):
+    """ReEDS annual-emissions-cap switch modes."""
+
+    DISABLED = 0
+    CO2 = 1
+    CO2E = 2
+    CO2E_WITH_HYDROGEN = 3
+
+    @property
+    def emission_type(self) -> EmissionType | None:
+        """Return the emission type represented by this annual-cap mode."""
+        if self is AnnualCapMode.DISABLED:
+            return None
+        if self is AnnualCapMode.CO2:
+            return EmissionType.CO2
+        return EmissionType.CO2E
 
 
 class EmissionType(StrEnum):

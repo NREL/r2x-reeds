@@ -76,11 +76,11 @@ def test_valid_years_pass_validation(reeds_run_path):
     assert result.is_ok()
 
 
-def test_validation_returns_an_error_for_an_empty_hour_map_result(parser, monkeypatch) -> None:
-    """Validation must not dereference an unexpectedly empty successful result."""
-    from rust_ok import Ok
+def test_validation_returns_an_error_for_an_empty_hour_map(parser, monkeypatch) -> None:
+    """Validation rejects an existing empty hour map."""
+    import polars as pl
 
-    monkeypatch.setattr(parser, "_get_hour_map_for_validation", lambda placeholders: Ok(None))
+    monkeypatch.setattr(parser, "read_data_file", lambda name: pl.DataFrame())
 
     result = parser.on_validate()
 

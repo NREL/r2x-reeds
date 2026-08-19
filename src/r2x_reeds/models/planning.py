@@ -5,13 +5,13 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 from infrasys.models import InfraSysBaseModel
-from pydantic import Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from r2x_core.units import HasUnits, Unit
 
 from .base import ReEDSComponent
 from .components import ReEDSRegion
-from .enums import EmissionType
+from .enums import AnnualCapMode, EmissionType, ReEDSBinarySwitch
 from .types import (
     AvailableYears,
     InitialCapacities,
@@ -26,6 +26,43 @@ from .types import (
     StorageDurations,
     UnitFloat,
 )
+
+
+class ReEDSPlanningSwitches(InfraSysBaseModel):
+    """Switches that control the capacity-expansion input interpretation."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    annual_cap: Annotated[
+        AnnualCapMode,
+        Field(validation_alias="GSw_AnnualCap", description="Annual emissions-cap mode"),
+    ] = AnnualCapMode.DISABLED
+    storage: Annotated[
+        ReEDSBinarySwitch,
+        Field(validation_alias="GSw_Storage", description="Whether standalone storage is enabled"),
+    ] = ReEDSBinarySwitch.OFF
+    hydro_psh_duration_data: Annotated[
+        ReEDSBinarySwitch,
+        Field(
+            validation_alias="GSw_HydroPSHDurData",
+            description="Whether pumped-storage duration overrides are enabled",
+        ),
+    ] = ReEDSBinarySwitch.OFF
+
+    @property
+    def emission_type(self) -> EmissionType | None:
+        """Return the emission type selected by ``annual_cap``."""
+        return self.annual_cap.emission_type
+
+    @property
+    def storage_enabled(self) -> bool:
+        """Return whether standalone storage is enabled."""
+        return self.storage is ReEDSBinarySwitch.ON
+
+    @property
+    def hydro_psh_duration_data_enabled(self) -> bool:
+        """Return whether pumped-storage duration overrides are enabled."""
+        return self.hydro_psh_duration_data is ReEDSBinarySwitch.ON
 
 
 class ReEDSPlanningPeriod(InfraSysBaseModel):
@@ -69,32 +106,54 @@ class ReEDSPlantCharacteristics(InfraSysBaseModel):
     efficiency values. Input readers represent those placeholders as ``None``.
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     technology: Annotated[str, Field(min_length=1, description="ReEDS technology identifier")]
     year: PlanningYear
     capital_cost: Annotated[
         float,
         Unit("$/MW"),
-        Field(ge=0.0, description="Overnight power-capacity capital cost"),
+        Field(
+            ge=0.0,
+            validation_alias="capcost",
+            description="Overnight power-capacity capital cost",
+        ),
     ]
     capital_cost_energy: Annotated[
         float,
         Unit("$/MWh"),
-        Field(ge=0.0, description="Overnight energy-capacity capital cost"),
+        Field(
+            ge=0.0,
+            validation_alias="capcost_energy",
+            description="Overnight energy-capacity capital cost",
+        ),
     ]
     fom_cost: Annotated[
         float,
         Unit("$/MW/year"),
-        Field(ge=0.0, description="Fixed power-capacity operation and maintenance cost"),
+        Field(
+            ge=0.0,
+            validation_alias="fom",
+            description="Fixed power-capacity operation and maintenance cost",
+        ),
     ]
     fom_cost_energy: Annotated[
         float,
         Unit("$/MWh/year"),
-        Field(ge=0.0, description="Fixed energy-capacity operation and maintenance cost"),
+        Field(
+            ge=0.0,
+            validation_alias="fom_energy",
+            description="Fixed energy-capacity operation and maintenance cost",
+        ),
     ]
     vom_cost: Annotated[
         float,
         Unit("$/MWh"),
-        Field(ge=0.0, description="Variable operation and maintenance cost"),
+        Field(
+            ge=0.0,
+            validation_alias="vom",
+            description="Variable operation and maintenance cost",
+        ),
     ]
     heat_rate: (
         Annotated[
@@ -103,9 +162,16 @@ class ReEDSPlantCharacteristics(InfraSysBaseModel):
             Field(gt=0.0, description="Thermal heat rate"),
         ]
         | None
-    ) = Field(default=None, description="None for non-combustion technologies")
+    ) = Field(
+        default=None,
+        validation_alias="heatrate",
+        json_schema_extra={"source_required": True},
+        description="None for non-combustion technologies",
+    )
     round_trip_efficiency: PositiveUnitFloat | None = Field(
         default=None,
+        validation_alias="rte",
+        json_schema_extra={"source_required": True},
         description="Storage round-trip efficiency when defined",
     )
     upgrade_cost: (
@@ -115,7 +181,11 @@ class ReEDSPlantCharacteristics(InfraSysBaseModel):
             Field(ge=0.0, description="Technology upgrade capital cost"),
         ]
         | None
-    ) = Field(default=None, description="None when no upgrade cost is defined")
+    ) = Field(
+        default=None,
+        validation_alias="upgradecost",
+        description="None when no upgrade cost is defined",
+    )
 
 
 class ReEDSInitialCapacity(InfraSysBaseModel):
@@ -162,13 +232,17 @@ class ReEDSStorageDurationOverride(InfraSysBaseModel):
     ]
 
 
-class ReEDSCapacityExpansionInputs(InfraSysBaseModel):
-    """Validated source data for a ReEDS capacity-expansion formulation."""
+class ReEDSCapacityExpansion(HasUnits, ReEDSComponent):
+    """Capacity-expansion data attached to a ReEDS system."""
 
     emission_type: Annotated[
         EmissionType | None,
         Field(description="Active annual-emissions constraint type, if enabled"),
     ] = None
+    switches: ReEDSPlanningSwitches = Field(
+        default_factory=ReEDSPlanningSwitches,
+        description="Capacity-expansion switches used to interpret the source inputs",
+    )
     planning_periods: Annotated[
         PlanningPeriods,
         Field(
@@ -183,13 +257,14 @@ class ReEDSCapacityExpansionInputs(InfraSysBaseModel):
             description="Unique labels with contiguous zero-based positions in the representative sequence.",
         ),
     ]
+    reserve_margin: Annotated[
+        UnitFloat,
+        Field(description="Planning reserve margin as a fraction of peak demand"),
+    ] = 0.0
     plant_characteristics: Annotated[
         PlantCharacteristics,
-        Field(
-            min_length=1,
-            description="Unique technology-year plant characteristics for modeled planning years.",
-        ),
-    ]
+        Field(description="Unique technology-year plant characteristics for modeled planning years."),
+    ] = ()
     initial_capacities: Annotated[
         InitialCapacities,
         Field(
@@ -215,32 +290,18 @@ class ReEDSCapacityExpansionInputs(InfraSysBaseModel):
         Field(description="Unique technology-vintage-region storage-duration overrides."),
     ] = ()
 
-
-class ReEDSCapacityExpansion(HasUnits, ReEDSComponent):
-    """Capacity-expansion chronology and policy shared by system resources."""
-
-    emission_type: Annotated[
-        EmissionType,
-        Field(description="Emission type constrained by planning-period caps"),
-    ]
-    planning_periods: Annotated[
-        PlanningPeriods,
-        Field(
-            min_length=1,
-            description="Unique ascending planning periods with an emission cap for emission_type.",
-        ),
-    ]
-    representative_timepoints: Annotated[
-        RepresentativeTimepoints,
-        Field(
-            min_length=1,
-            description="Unique labels with contiguous zero-based positions in the representative sequence.",
-        ),
-    ]
-    reserve_margin: Annotated[
-        UnitFloat,
-        Field(description="Planning reserve margin as a fraction of peak demand"),
-    ]
+    @model_validator(mode="before")
+    @classmethod
+    def derive_emission_type_from_switches(cls, data: Any) -> Any:
+        """Derive the active emission type from the source switches."""
+        if not isinstance(data, dict) or data.get("emission_type") is not None:
+            return data
+        switches = data.get("switches", ReEDSPlanningSwitches())
+        if not isinstance(switches, ReEDSPlanningSwitches):
+            switches = ReEDSPlanningSwitches.model_validate(switches)
+        updated = dict(data)
+        updated["emission_type"] = switches.emission_type
+        return updated
 
 
 class ReEDSCapacityExpansionResource(HasUnits, ReEDSComponent):

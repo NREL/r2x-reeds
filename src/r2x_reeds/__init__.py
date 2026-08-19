@@ -13,6 +13,7 @@ __version__ = version("r2x_reeds")
 # Import getters to register them with r2x-core
 from . import getters  # noqa: F401
 from .models import (
+    AnnualCapMode,
     EmissionRate,
     EmissionType,
     Fraction,
@@ -22,8 +23,8 @@ from .models import (
     NonNegativeFloat,
     NonNegativeRange,
     Percentage,
+    ReEDSBinarySwitch,
     ReEDSCapacityExpansion,
-    ReEDSCapacityExpansionInputs,
     ReEDSCapacityExpansionResource,
     ReEDSComponent,
     ReEDSConsumingTechnology,
@@ -46,6 +47,7 @@ from .models import (
     ReEDSInitialCapacity,
     ReEDSInterface,
     ReEDSPlanningPeriod,
+    ReEDSPlanningSwitches,
     ReEDSPlantCharacteristics,
     ReEDSRegion,
     ReEDSRepresentativeTimepoint,
@@ -73,6 +75,7 @@ logger.disable("r2x_reeds")
 latest_commit = "401c0bb15cbf93d2ff9696b14b799edad763247a"
 
 __all__ = [
+    "AnnualCapMode",
     "EmissionRate",
     "EmissionType",
     "Fraction",
@@ -82,8 +85,8 @@ __all__ = [
     "NonNegativeFloat",
     "NonNegativeRange",
     "Percentage",
+    "ReEDSBinarySwitch",
     "ReEDSCapacityExpansion",
-    "ReEDSCapacityExpansionInputs",
     "ReEDSCapacityExpansionResource",
     "ReEDSComponent",
     "ReEDSConfig",
@@ -108,6 +111,7 @@ __all__ = [
     "ReEDSInterface",
     "ReEDSParser",
     "ReEDSPlanningPeriod",
+    "ReEDSPlanningSwitches",
     "ReEDSPlantCharacteristics",
     "ReEDSRegion",
     "ReEDSRepresentativeTimepoint",

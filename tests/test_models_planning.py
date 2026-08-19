@@ -48,15 +48,47 @@ def test_capacity_expansion_records_periods_and_representative_timepoints():
 
 def test_capacity_expansion_schemas_document_collection_invariants():
     """Schema descriptions expose collection invariants enforced by annotations."""
-    from r2x_reeds import ReEDSCapacityExpansion, ReEDSCapacityExpansionInputs
+    from r2x_reeds import ReEDSCapacityExpansion
 
-    input_properties = ReEDSCapacityExpansionInputs.model_json_schema()["properties"]
     expansion_properties = ReEDSCapacityExpansion.model_json_schema()["properties"]
 
-    assert "unique ascending" in input_properties["planning_periods"]["description"].lower()
-    assert "unique labels" in input_properties["representative_timepoints"]["description"].lower()
-    assert "unique technology-year" in input_properties["plant_characteristics"]["description"].lower()
     assert "unique ascending" in expansion_properties["planning_periods"]["description"].lower()
+    assert "unique labels" in expansion_properties["representative_timepoints"]["description"].lower()
+    assert "unique technology-year" in expansion_properties["plant_characteristics"]["description"].lower()
+    assert "unique ascending" in expansion_properties["planning_periods"]["description"].lower()
+
+
+def test_planning_switches_use_source_defaults():
+    """Missing planning switches use the model's disabled defaults."""
+    from r2x_reeds import ReEDSPlanningSwitches
+
+    switches = ReEDSPlanningSwitches()
+
+    assert switches.emission_type is None
+    assert switches.storage_enabled is False
+    assert switches.hydro_psh_duration_data_enabled is False
+
+
+@pytest.mark.parametrize("annual_cap", [1, 2, 3])
+def test_planning_switches_map_annual_cap_modes_to_emission_type(annual_cap: int):
+    """Annual-cap enum modes derive the corresponding emission policy."""
+    from r2x_reeds import EmissionType, ReEDSPlanningSwitches
+
+    switches = ReEDSPlanningSwitches.model_validate({"GSw_AnnualCap": annual_cap})
+
+    expected = EmissionType.CO2 if annual_cap == 1 else EmissionType.CO2E
+    assert switches.emission_type is expected
+
+
+@pytest.mark.parametrize("switch_name", ["GSw_Storage", "GSw_HydroPSHDurData"])
+def test_planning_switches_reject_non_binary_values(switch_name: str):
+    """Binary planning switches reject values outside the source enum."""
+    from pydantic import ValidationError
+
+    from r2x_reeds import ReEDSPlanningSwitches
+
+    with pytest.raises(ValidationError, match="Input should be 0 or 1"):
+        ReEDSPlanningSwitches.model_validate({switch_name: 2})
 
 
 @pytest.mark.parametrize("weight", [0.0, -1.0])
@@ -102,20 +134,22 @@ def test_capacity_expansion_requires_caps_for_an_active_emission_policy():
         )
 
 
-def test_capacity_expansion_inputs_reject_emission_caps_without_emission_type():
+def test_capacity_expansion_reject_emission_caps_without_emission_type():
     """Source inputs reject emission caps when no emission type is active."""
     from pydantic import ValidationError
 
     from r2x_reeds import (
-        ReEDSCapacityExpansionInputs,
+        ReEDSCapacityExpansion,
         ReEDSPlanningPeriod,
         ReEDSPlantCharacteristics,
         ReEDSRepresentativeTimepoint,
     )
 
     with pytest.raises(ValidationError, match="emission caps require emission_type"):
-        ReEDSCapacityExpansionInputs(
+        ReEDSCapacityExpansion(
+            name="synthetic-case",
             emission_type=None,
+            reserve_margin=0.15,
             planning_periods=(
                 ReEDSPlanningPeriod(
                     year=2030,
@@ -139,21 +173,23 @@ def test_capacity_expansion_inputs_reject_emission_caps_without_emission_type():
         )
 
 
-def test_capacity_expansion_inputs_reject_missing_caps_for_active_emission_type():
+def test_capacity_expansion_reject_missing_caps_for_active_emission_type():
     """Source inputs require a cap for every period when emission constraints are active."""
     from pydantic import ValidationError
 
     from r2x_reeds import (
         EmissionType,
-        ReEDSCapacityExpansionInputs,
+        ReEDSCapacityExpansion,
         ReEDSPlanningPeriod,
         ReEDSPlantCharacteristics,
         ReEDSRepresentativeTimepoint,
     )
 
     with pytest.raises(ValidationError, match="active emission_type requires an emission cap"):
-        ReEDSCapacityExpansionInputs(
+        ReEDSCapacityExpansion(
+            name="synthetic-case",
             emission_type=EmissionType.CO2,
+            reserve_margin=0.15,
             planning_periods=(ReEDSPlanningPeriod(year=2030, present_value_factor=1.0),),
             representative_timepoints=(ReEDSRepresentativeTimepoint(label="h0", position=0, weight=8_760.0),),
             plant_characteristics=(
@@ -207,6 +243,9 @@ def _valid_capacity_expansion_input_kwargs():
     )
     return (
         {
+            "name": "synthetic-case",
+            "emission_type": None,
+            "reserve_margin": 0.15,
             "planning_periods": (ReEDSPlanningPeriod(year=2030, present_value_factor=1.0),),
             "representative_timepoints": (
                 ReEDSRepresentativeTimepoint(label="h0", position=0, weight=8_760.0),
@@ -223,57 +262,57 @@ def _valid_capacity_expansion_input_kwargs():
     )
 
 
-def test_capacity_expansion_inputs_reject_plant_characteristics_outside_modeled_years():
+def test_capacity_expansion_reject_plant_characteristics_outside_modeled_years():
     """Plant characteristics must use one of the modeled planning years."""
     from pydantic import ValidationError
 
-    from r2x_reeds import ReEDSCapacityExpansionInputs
+    from r2x_reeds import ReEDSCapacityExpansion
 
     common, characteristics, _, _, _ = _valid_capacity_expansion_input_kwargs()
 
     with pytest.raises(ValidationError, match="must use a modeled planning year") as exc_info:
-        ReEDSCapacityExpansionInputs(
+        ReEDSCapacityExpansion(
             **(common | {"plant_characteristics": (characteristics.model_copy(update={"year": 2035}),)})
         )
 
     assert exc_info.value.errors()[0]["loc"] == ("plant_characteristics",)
 
 
-def test_capacity_expansion_inputs_reject_duplicate_plant_characteristics():
+def test_capacity_expansion_reject_duplicate_plant_characteristics():
     """Plant characteristics must be unique by technology and year."""
     from pydantic import ValidationError
 
-    from r2x_reeds import ReEDSCapacityExpansionInputs
+    from r2x_reeds import ReEDSCapacityExpansion
 
     common, characteristics, _, _, _ = _valid_capacity_expansion_input_kwargs()
 
     with pytest.raises(ValidationError, match="unique by technology and year") as exc_info:
-        ReEDSCapacityExpansionInputs(
+        ReEDSCapacityExpansion(
             **(common | {"plant_characteristics": (characteristics, characteristics.model_copy())})
         )
 
     assert exc_info.value.errors()[0]["loc"] == ("plant_characteristics",)
 
 
-def test_capacity_expansion_inputs_reject_duplicate_initial_capacities():
+def test_capacity_expansion_reject_duplicate_initial_capacities():
     """Initial capacities must be unique by technology and region."""
     from pydantic import ValidationError
 
-    from r2x_reeds import ReEDSCapacityExpansionInputs
+    from r2x_reeds import ReEDSCapacityExpansion
 
     common, _, capacity, _, _ = _valid_capacity_expansion_input_kwargs()
 
     with pytest.raises(ValidationError, match="unique by technology and region") as exc_info:
-        ReEDSCapacityExpansionInputs(**(common | {"initial_capacities": (capacity, capacity.model_copy())}))
+        ReEDSCapacityExpansion(**(common | {"initial_capacities": (capacity, capacity.model_copy())}))
 
     assert exc_info.value.errors()[0]["loc"] == ("initial_capacities",)
 
 
-def test_capacity_expansion_inputs_reject_positive_energy_capacity_without_power_capacity():
+def test_capacity_expansion_reject_positive_energy_capacity_without_power_capacity():
     """Positive initial energy capacity requires positive initial power capacity."""
     from pydantic import ValidationError
 
-    from r2x_reeds import ReEDSCapacityExpansionInputs
+    from r2x_reeds import ReEDSCapacityExpansion
 
     common, _, capacity, _, _ = _valid_capacity_expansion_input_kwargs()
     invalid_capacity = capacity.model_copy(
@@ -281,35 +320,35 @@ def test_capacity_expansion_inputs_reject_positive_energy_capacity_without_power
     )
 
     with pytest.raises(ValidationError, match="requires positive initial_power_capacity") as exc_info:
-        ReEDSCapacityExpansionInputs(**(common | {"initial_capacities": (invalid_capacity,)}))
+        ReEDSCapacityExpansion(**(common | {"initial_capacities": (invalid_capacity,)}))
 
     assert exc_info.value.errors()[0]["loc"] == ("initial_capacities",)
 
 
-def test_capacity_expansion_inputs_reject_duplicate_storage_durations():
+def test_capacity_expansion_reject_duplicate_storage_durations():
     """Storage durations must be unique by technology."""
     from pydantic import ValidationError
 
-    from r2x_reeds import ReEDSCapacityExpansionInputs
+    from r2x_reeds import ReEDSCapacityExpansion
 
     common, _, _, duration, _ = _valid_capacity_expansion_input_kwargs()
 
     with pytest.raises(ValidationError, match="unique by technology") as exc_info:
-        ReEDSCapacityExpansionInputs(**(common | {"storage_durations": (duration, duration.model_copy())}))
+        ReEDSCapacityExpansion(**(common | {"storage_durations": (duration, duration.model_copy())}))
 
     assert exc_info.value.errors()[0]["loc"] == ("storage_durations",)
 
 
-def test_capacity_expansion_inputs_reject_duplicate_storage_duration_overrides():
+def test_capacity_expansion_reject_duplicate_storage_duration_overrides():
     """Storage-duration overrides must be unique by technology, vintage, and region."""
     from pydantic import ValidationError
 
-    from r2x_reeds import ReEDSCapacityExpansionInputs
+    from r2x_reeds import ReEDSCapacityExpansion
 
     common, _, _, _, duration_override = _valid_capacity_expansion_input_kwargs()
 
     with pytest.raises(ValidationError, match="unique by technology, vintage, and region") as exc_info:
-        ReEDSCapacityExpansionInputs(
+        ReEDSCapacityExpansion(
             **(
                 common
                 | {

@@ -21,6 +21,116 @@ if TYPE_CHECKING:
     from r2x_core.rules import Rule
     from r2x_reeds.models import ReEDSGenerator
 
+def build_synthetic_hour_map(weather_years: Iterable[int]) -> pl.DataFrame:
+    """Build a minimal in-memory hour map for runs without a source file."""
+    years = [int(year) for year in weather_years]
+    if not years:
+        raise ValueError("weather_years must contain at least one year")
+    return pl.DataFrame(
+        {
+            "year": years,
+            "time_index": [f"{year}-01-01 00:00:00" for year in years],
+            "hour_period": ["h1"] * len(years),
+            "season": ["annual"] * len(years),
+        }
+    )
+
+
+def truncate_and_cast_time_series(arr: np.ndarray | list[float]) -> np.ndarray:
+    """Truncate a time series to 8760 values and return float64 data."""
+    array = np.asarray(arr, dtype=np.float64)
+    return array[:8760] if array.shape[0] > 8760 else array
+
+
+def build_capacity_expansion_periods_frame(
+    modeled_years: pl.DataFrame,
+    present_value_factors: pl.DataFrame,
+    emission_caps: pl.DataFrame | None,
+) -> pl.DataFrame:
+    """Join canonical capacity-expansion period inputs into model-ready rows."""
+    periods = modeled_years.select(pl.col("modeled_years").cast(pl.Int64).alias("year"))
+    periods = periods.join(
+        present_value_factors.select("year", "present_value_factor"),
+        on="year",
+        how="left",
+    )
+    if emission_caps is None:
+        periods = periods.with_columns(pl.lit(None, dtype=pl.Float64).alias("emission_cap"))
+    else:
+        periods = periods.join(
+            emission_caps.select("year", pl.col("value").alias("emission_cap")),
+            on="year",
+            how="left",
+        )
+    if periods.is_empty():
+        raise ValueError("modeled_years contains no planning years")
+    return periods
+
+
+def build_capacity_expansion_representative_timepoints_frame(
+    representative_timepoints: pl.DataFrame,
+) -> pl.DataFrame:
+    """Add zero-based positions to mapped representative timepoints."""
+    result = representative_timepoints.select("label", "weight").with_row_index("position")
+    if result.is_empty():
+        raise ValueError("planning_representative_timepoints contains no rows")
+    return result
+
+
+def build_capacity_expansion_plant_characteristics_frame(
+    plant_characteristics: pl.DataFrame,
+    *,
+    planning_years: tuple[int, ...],
+) -> pl.DataFrame:
+    """Filter and pivot canonical long-form plant-characteristic rows."""
+    filtered = plant_characteristics.filter(pl.col("year").is_in(planning_years))
+    if filtered.is_empty():
+        raise ValueError("planning_plant_characteristics has no records for modeled years")
+    try:
+        pivoted = filtered.pivot(
+            on="variable",
+            index=["technology", "year"],
+            values="value",
+        )
+    except pl.exceptions.ComputeError as exc:
+        raise ValueError("planning_plant_characteristics has duplicate variable values") from exc
+
+    return pivoted
+
+
+def build_capacity_expansion_initial_capacity_frame(
+    power_capacity: pl.DataFrame,
+    energy_capacity: pl.DataFrame | None,
+) -> pl.DataFrame:
+    """Join mapped power and optional energy initial-capacity tables."""
+    power = power_capacity.select(
+        pl.col("technology").cast(pl.String).str.strip_chars().alias("technology"),
+        pl.col("region").cast(pl.String).str.strip_chars().alias("region"),
+        pl.col("capacity").alias("initial_power_capacity"),
+    )
+    if power.is_empty():
+        raise ValueError("existing_capacity contains no rows")
+    if energy_capacity is None or energy_capacity.is_empty():
+        result = power.with_columns(pl.lit(None, dtype=pl.Float64).alias("initial_energy_capacity"))
+        if result.is_empty():
+            raise ValueError("existing_capacity contains no rows")
+        return result
+
+    energy = energy_capacity.select(
+        pl.col("technology").cast(pl.String).str.strip_chars().alias("technology"),
+        pl.col("region").cast(pl.String).str.strip_chars().alias("region"),
+        pl.col("energy_capacity").alias("initial_energy_capacity"),
+    )
+    orphaned = energy.join(power.select("technology", "region").unique(), on=["technology", "region"], how="anti")
+    if not orphaned.is_empty():
+        key = orphaned.select("technology", "region").row(0)
+        raise ValueError(f"existing_energy_capacity has no matching power capacity for {key}")
+    result = power.join(energy, on=["technology", "region"], how="left")
+    if result.is_empty():
+        raise ValueError("existing_capacity contains no rows")
+    return result
+
+
 # Columns that can be aggregated from the model.
 AGG_COLUMNS = [
     "heat_rate",
