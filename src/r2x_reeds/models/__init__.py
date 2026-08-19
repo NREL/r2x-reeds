@@ -43,7 +43,7 @@ from .planning import (
     ReEDSStorageDurationOverride,
     ReEDSVariableCapacityExpansionResource,
 )
-from .units import EmissionRate, Percentage
+from .types import EmissionRate, Percentage
 
 __all__ = [
     "EmissionRate",

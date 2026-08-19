@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 from typing import Annotated
-from typing import Annotated as AnnotatedTyping
 
 from infrasys import Component
 from infrasys.models import InfraSysBaseModel
-from pydantic import Field, PositiveFloat, model_validator
+from pydantic import Field, PositiveFloat
 
-# Type alias for float constrained between 0 and 1 (inclusive)
-UnitFloat = AnnotatedTyping[float, Field(ge=0, le=1)]
+from .types import MaximumUnitFloat, NonNegativeFloat, UnitFloat
 
 
 class ReEDSComponent(Component):
@@ -46,8 +44,8 @@ class FromTo_ToFrom(InfraSysBaseModel):  # noqa: N801
     Used for transmission lines and interfaces in ReEDS models.
     """
 
-    from_to: Annotated[float, Field(description="Capacity from origin to destination in MW", ge=0)]
-    to_from: Annotated[float, Field(description="Capacity from destination to origin in MW", ge=0)]
+    from_to: Annotated[NonNegativeFloat, Field(description="Capacity from origin to destination in MW")]
+    to_from: Annotated[NonNegativeFloat, Field(description="Capacity from destination to origin in MW")]
 
 
 class UpDown(InfraSysBaseModel):
@@ -69,11 +67,4 @@ class MinMax(InfraSysBaseModel):
     """
 
     min: UnitFloat
-    max: UnitFloat
-
-    @model_validator(mode="after")
-    def check_min_less_than_max(self):
-        """Ensure the minimum does not exceed the maximum."""
-        if self.min > self.max:
-            raise ValueError("min must be <= max")
-        return self
+    max: MaximumUnitFloat

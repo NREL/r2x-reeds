@@ -46,6 +46,30 @@ def test_capacity_expansion_records_periods_and_representative_timepoints():
     assert expansion.model_dump(mode="json")["emission_type"] == "CO2"
 
 
+def test_capacity_expansion_schemas_document_collection_invariants():
+    """Schema descriptions expose collection invariants enforced by annotations."""
+    from r2x_reeds import ReEDSCapacityExpansion, ReEDSCapacityExpansionInputs
+
+    input_properties = ReEDSCapacityExpansionInputs.model_json_schema()["properties"]
+    expansion_properties = ReEDSCapacityExpansion.model_json_schema()["properties"]
+
+    assert "unique ascending" in input_properties["planning_periods"]["description"].lower()
+    assert "unique labels" in input_properties["representative_timepoints"]["description"].lower()
+    assert "unique technology-year" in input_properties["plant_characteristics"]["description"].lower()
+    assert "unique ascending" in expansion_properties["planning_periods"]["description"].lower()
+
+
+@pytest.mark.parametrize("weight", [0.0, -1.0])
+def test_representative_timepoint_rejects_nonpositive_weight(weight: float):
+    """A representative timepoint must represent a positive number of hours."""
+    from pydantic import ValidationError
+
+    from r2x_reeds import ReEDSRepresentativeTimepoint
+
+    with pytest.raises(ValidationError):
+        ReEDSRepresentativeTimepoint(label="h0", position=0, weight=weight)
+
+
 @pytest.mark.parametrize("emission_cap", [-1.0, -0.01])
 def test_planning_period_rejects_negative_emission_cap(emission_cap: float):
     """An emissions cap cannot be negative."""
@@ -78,37 +102,25 @@ def test_capacity_expansion_requires_caps_for_an_active_emission_policy():
         )
 
 
-@pytest.mark.parametrize(
-    ("emission_type", "emission_cap", "match"),
-    [
-        (None, 1_000_000.0, "emission caps require emission_type"),
-        ("CO2", None, "active emission_type requires an emission cap"),
-    ],
-)
-def test_capacity_expansion_inputs_require_consistent_emission_policy(
-    emission_type: str | None,
-    emission_cap: float | None,
-    match: str,
-):
-    """Source policy must not describe an inactive or incomplete emissions constraint."""
+def test_capacity_expansion_inputs_reject_emission_caps_without_emission_type():
+    """Source inputs reject emission caps when no emission type is active."""
     from pydantic import ValidationError
 
     from r2x_reeds import (
-        EmissionType,
         ReEDSCapacityExpansionInputs,
         ReEDSPlanningPeriod,
         ReEDSPlantCharacteristics,
         ReEDSRepresentativeTimepoint,
     )
 
-    with pytest.raises(ValidationError, match=match):
+    with pytest.raises(ValidationError, match="emission caps require emission_type"):
         ReEDSCapacityExpansionInputs(
-            emission_type=EmissionType(emission_type) if emission_type is not None else None,
+            emission_type=None,
             planning_periods=(
                 ReEDSPlanningPeriod(
                     year=2030,
                     present_value_factor=1.0,
-                    emission_cap=emission_cap,
+                    emission_cap=1_000_000.0,
                 ),
             ),
             representative_timepoints=(ReEDSRepresentativeTimepoint(label="h0", position=0, weight=8_760.0),),
@@ -127,12 +139,41 @@ def test_capacity_expansion_inputs_require_consistent_emission_policy(
         )
 
 
-def test_capacity_expansion_inputs_reject_duplicate_and_inconsistent_source_keys():
-    """Input-table records have one unambiguous source key and dimensional relation."""
+def test_capacity_expansion_inputs_reject_missing_caps_for_active_emission_type():
+    """Source inputs require a cap for every period when emission constraints are active."""
     from pydantic import ValidationError
 
     from r2x_reeds import (
+        EmissionType,
         ReEDSCapacityExpansionInputs,
+        ReEDSPlanningPeriod,
+        ReEDSPlantCharacteristics,
+        ReEDSRepresentativeTimepoint,
+    )
+
+    with pytest.raises(ValidationError, match="active emission_type requires an emission cap"):
+        ReEDSCapacityExpansionInputs(
+            emission_type=EmissionType.CO2,
+            planning_periods=(ReEDSPlanningPeriod(year=2030, present_value_factor=1.0),),
+            representative_timepoints=(ReEDSRepresentativeTimepoint(label="h0", position=0, weight=8_760.0),),
+            plant_characteristics=(
+                ReEDSPlantCharacteristics(
+                    technology="battery_li",
+                    year=2030,
+                    capital_cost=1.0,
+                    capital_cost_energy=1.0,
+                    fom_cost=1.0,
+                    fom_cost_energy=1.0,
+                    vom_cost=0.0,
+                    round_trip_efficiency=0.85,
+                ),
+            ),
+        )
+
+
+def _valid_capacity_expansion_input_kwargs():
+    """Return valid shared data for source-input validation tests."""
+    from r2x_reeds import (
         ReEDSInitialCapacity,
         ReEDSPlanningPeriod,
         ReEDSPlantCharacteristics,
@@ -141,8 +182,6 @@ def test_capacity_expansion_inputs_reject_duplicate_and_inconsistent_source_keys
         ReEDSStorageDurationOverride,
     )
 
-    planning_period = ReEDSPlanningPeriod(year=2030, present_value_factor=1.0)
-    timepoint = ReEDSRepresentativeTimepoint(label="h0", position=0, weight=8_760.0)
     characteristics = ReEDSPlantCharacteristics(
         technology="battery_li",
         year=2030,
@@ -166,32 +205,121 @@ def test_capacity_expansion_inputs_reject_duplicate_and_inconsistent_source_keys
         region="r1",
         duration=10.0,
     )
-    common = {
-        "planning_periods": (planning_period,),
-        "representative_timepoints": (timepoint,),
+    return {
+        "planning_periods": (ReEDSPlanningPeriod(year=2030, present_value_factor=1.0),),
+        "representative_timepoints": (
+            ReEDSRepresentativeTimepoint(label="h0", position=0, weight=8_760.0),
+        ),
         "plant_characteristics": (characteristics,),
         "initial_capacities": (capacity,),
         "storage_durations": (duration,),
         "storage_duration_overrides": (duration_override,),
-    }
+    }, characteristics, capacity, duration, duration_override
 
-    invalid_cases = [
-        {"plant_characteristics": (characteristics.model_copy(update={"year": 2035}),)},
-        {"plant_characteristics": (characteristics, characteristics.model_copy())},
-        {"initial_capacities": (capacity, capacity.model_copy())},
-        {
-            "initial_capacities": (
-                capacity.model_copy(update={"initial_power_capacity": 0.0, "initial_energy_capacity": 4.0}),
+
+def test_capacity_expansion_inputs_reject_plant_characteristics_outside_modeled_years():
+    """Plant characteristics must use one of the modeled planning years."""
+    from pydantic import ValidationError
+
+    from r2x_reeds import ReEDSCapacityExpansionInputs
+
+    common, characteristics, _, _, _ = _valid_capacity_expansion_input_kwargs()
+
+    with pytest.raises(ValidationError, match="must use a modeled planning year") as exc_info:
+        ReEDSCapacityExpansionInputs(
+            **(common | {"plant_characteristics": (characteristics.model_copy(update={"year": 2035}),)})
+        )
+
+    assert exc_info.value.errors()[0]["loc"] == ("plant_characteristics",)
+
+
+def test_capacity_expansion_inputs_reject_duplicate_plant_characteristics():
+    """Plant characteristics must be unique by technology and year."""
+    from pydantic import ValidationError
+
+    from r2x_reeds import ReEDSCapacityExpansionInputs
+
+    common, characteristics, _, _, _ = _valid_capacity_expansion_input_kwargs()
+
+    with pytest.raises(ValidationError, match="unique by technology and year") as exc_info:
+        ReEDSCapacityExpansionInputs(
+            **(common | {"plant_characteristics": (characteristics, characteristics.model_copy())})
+        )
+
+    assert exc_info.value.errors()[0]["loc"] == ("plant_characteristics",)
+
+
+def test_capacity_expansion_inputs_reject_duplicate_initial_capacities():
+    """Initial capacities must be unique by technology and region."""
+    from pydantic import ValidationError
+
+    from r2x_reeds import ReEDSCapacityExpansionInputs
+
+    common, _, capacity, _, _ = _valid_capacity_expansion_input_kwargs()
+
+    with pytest.raises(ValidationError, match="unique by technology and region") as exc_info:
+        ReEDSCapacityExpansionInputs(
+            **(common | {"initial_capacities": (capacity, capacity.model_copy())})
+        )
+
+    assert exc_info.value.errors()[0]["loc"] == ("initial_capacities",)
+
+
+def test_capacity_expansion_inputs_reject_positive_energy_capacity_without_power_capacity():
+    """Positive initial energy capacity requires positive initial power capacity."""
+    from pydantic import ValidationError
+
+    from r2x_reeds import ReEDSCapacityExpansionInputs
+
+    common, _, capacity, _, _ = _valid_capacity_expansion_input_kwargs()
+    invalid_capacity = capacity.model_copy(
+        update={"initial_power_capacity": 0.0, "initial_energy_capacity": 4.0}
+    )
+
+    with pytest.raises(ValidationError, match="requires positive initial_power_capacity") as exc_info:
+        ReEDSCapacityExpansionInputs(**(common | {"initial_capacities": (invalid_capacity,)}))
+
+    assert exc_info.value.errors()[0]["loc"] == ("initial_capacities",)
+
+
+def test_capacity_expansion_inputs_reject_duplicate_storage_durations():
+    """Storage durations must be unique by technology."""
+    from pydantic import ValidationError
+
+    from r2x_reeds import ReEDSCapacityExpansionInputs
+
+    common, _, _, duration, _ = _valid_capacity_expansion_input_kwargs()
+
+    with pytest.raises(ValidationError, match="unique by technology") as exc_info:
+        ReEDSCapacityExpansionInputs(
+            **(common | {"storage_durations": (duration, duration.model_copy())})
+        )
+
+    assert exc_info.value.errors()[0]["loc"] == ("storage_durations",)
+
+
+def test_capacity_expansion_inputs_reject_duplicate_storage_duration_overrides():
+    """Storage-duration overrides must be unique by technology, vintage, and region."""
+    from pydantic import ValidationError
+
+    from r2x_reeds import ReEDSCapacityExpansionInputs
+
+    common, _, _, _, duration_override = _valid_capacity_expansion_input_kwargs()
+
+    with pytest.raises(ValidationError, match="unique by technology, vintage, and region") as exc_info:
+        ReEDSCapacityExpansionInputs(
+            **(
+                common
+                | {
+                    "storage_duration_overrides": (
+                        duration_override,
+                        duration_override.model_copy(),
+                    )
+                }
             )
-        },
-        {"storage_durations": (duration, duration.model_copy())},
-        {"storage_duration_overrides": (duration_override, duration_override.model_copy())},
-    ]
+        )
 
-    for invalid_case in invalid_cases:
-        with pytest.raises(ValidationError):
-            ReEDSCapacityExpansionInputs(**(common | invalid_case))
-
+    assert exc_info.value.errors()[0]["loc"] == ("storage_duration_overrides",)
 
 def test_capacity_expansion_rejects_unordered_planning_periods():
     """Planning periods must have one chronological interpretation."""
@@ -204,20 +332,22 @@ def test_capacity_expansion_rejects_unordered_planning_periods():
         ReEDSRepresentativeTimepoint,
     )
 
-    with pytest.raises(ValidationError, match="unique ascending years"):
+    with pytest.raises(ValidationError, match="unique ascending years") as exc_info:
         ReEDSCapacityExpansion(
             name="synthetic-case",
             emission_type=EmissionType.CO2,
             reserve_margin=0.15,
             planning_periods=(
-                ReEDSPlanningPeriod(year=2035, present_value_factor=0.71),
-                ReEDSPlanningPeriod(year=2030, present_value_factor=1.0),
+                ReEDSPlanningPeriod(year=2035, present_value_factor=0.71, emission_cap=900_000.0),
+                ReEDSPlanningPeriod(year=2030, present_value_factor=1.0, emission_cap=1_000_000.0),
             ),
             representative_timepoints=(
                 ReEDSRepresentativeTimepoint(label="h0", position=0, weight=4_380.0),
                 ReEDSRepresentativeTimepoint(label="h1", position=1, weight=4_380.0),
             ),
         )
+
+    assert exc_info.value.errors()[0]["loc"] == ("planning_periods",)
 
 
 def test_capacity_expansion_rejects_duplicate_timepoint_labels():
@@ -231,17 +361,21 @@ def test_capacity_expansion_rejects_duplicate_timepoint_labels():
         ReEDSRepresentativeTimepoint,
     )
 
-    with pytest.raises(ValidationError, match="unique labels"):
+    with pytest.raises(ValidationError, match="unique labels") as exc_info:
         ReEDSCapacityExpansion(
             name="synthetic-case",
             emission_type=EmissionType.CO2,
             reserve_margin=0.15,
-            planning_periods=(ReEDSPlanningPeriod(year=2030, present_value_factor=1.0),),
+            planning_periods=(
+                ReEDSPlanningPeriod(year=2030, present_value_factor=1.0, emission_cap=1_000_000.0),
+            ),
             representative_timepoints=(
                 ReEDSRepresentativeTimepoint(label="h0", position=0, weight=4_380.0),
                 ReEDSRepresentativeTimepoint(label="h0", position=1, weight=4_380.0),
             ),
         )
+
+    assert exc_info.value.errors()[0]["loc"] == ("representative_timepoints",)
 
 
 def test_capacity_expansion_rejects_noncontiguous_timepoints():
@@ -255,17 +389,21 @@ def test_capacity_expansion_rejects_noncontiguous_timepoints():
         ReEDSRepresentativeTimepoint,
     )
 
-    with pytest.raises(ValidationError, match="contiguous positions"):
+    with pytest.raises(ValidationError, match="contiguous positions") as exc_info:
         ReEDSCapacityExpansion(
             name="synthetic-case",
             emission_type=EmissionType.CO2,
             reserve_margin=0.15,
-            planning_periods=(ReEDSPlanningPeriod(year=2030, present_value_factor=1.0),),
+            planning_periods=(
+                ReEDSPlanningPeriod(year=2030, present_value_factor=1.0, emission_cap=1_000_000.0),
+            ),
             representative_timepoints=(
                 ReEDSRepresentativeTimepoint(label="h0", position=0, weight=4_380.0),
                 ReEDSRepresentativeTimepoint(label="h2", position=2, weight=4_380.0),
             ),
         )
+
+    assert exc_info.value.errors()[0]["loc"] == ("representative_timepoints",)
 
 
 def test_capacity_expansion_resource_variants_allow_unbuilt_candidates():
@@ -317,24 +455,13 @@ def test_capacity_expansion_resource_variants_allow_unbuilt_candidates():
     assert storage.round_trip_efficiency == 0.92
 
 
-@pytest.mark.parametrize(
-    ("minimum_generation_fraction", "minimum_capacity_factor", "match"),
-    [
-        (0.51, 0.0, "minimum_generation_fraction must not exceed capacity_factor"),
-        (0.0, 0.51, "minimum_capacity_factor must not exceed capacity_factor"),
-    ],
-)
-def test_dispatchable_capacity_expansion_resource_rejects_infeasible_capacity_factors(
-    minimum_generation_fraction: float,
-    minimum_capacity_factor: float,
-    match: str,
-):
-    """Operating minimums cannot exceed the resource's maximum availability."""
+def test_dispatchable_capacity_expansion_resource_rejects_minimum_generation_fraction_above_capacity_factor():
+    """The minimum generation fraction must not exceed capacity factor."""
     from pydantic import ValidationError
 
     from r2x_reeds import ReEDSDispatchableCapacityExpansionResource, ReEDSRegion
 
-    with pytest.raises(ValidationError, match=match):
+    with pytest.raises(ValidationError, match="minimum_generation_fraction must not exceed capacity_factor"):
         ReEDSDispatchableCapacityExpansionResource(
             name="gas_cc_r01",
             region=ReEDSRegion(name="r01"),
@@ -344,8 +471,29 @@ def test_dispatchable_capacity_expansion_resource_rejects_infeasible_capacity_fa
             investment_cost=800_000.0,
             variable_cost=30.0,
             capacity_factor=0.5,
-            minimum_generation_fraction=minimum_generation_fraction,
-            minimum_capacity_factor=minimum_capacity_factor,
+            minimum_generation_fraction=0.51,
+            minimum_capacity_factor=0.0,
+        )
+
+
+def test_dispatchable_capacity_expansion_resource_rejects_minimum_capacity_factor_above_capacity_factor():
+    """The minimum annual capacity factor must not exceed capacity factor."""
+    from pydantic import ValidationError
+
+    from r2x_reeds import ReEDSDispatchableCapacityExpansionResource, ReEDSRegion
+
+    with pytest.raises(ValidationError, match="minimum_capacity_factor must not exceed capacity_factor"):
+        ReEDSDispatchableCapacityExpansionResource(
+            name="gas_cc_r01",
+            region=ReEDSRegion(name="r01"),
+            technology="gas_cc",
+            available_years=(2030,),
+            initial_capacity=0.0,
+            investment_cost=800_000.0,
+            variable_cost=30.0,
+            capacity_factor=0.5,
+            minimum_generation_fraction=0.0,
+            minimum_capacity_factor=0.51,
         )
 
 
@@ -367,31 +515,44 @@ def test_capacity_expansion_resource_requires_a_concrete_operational_subtype():
         )
 
 
-@pytest.mark.parametrize(
-    ("available_years", "match"),
-    [
-        ((2035, 2030), "unique and ascending"),
-        ((2030, 2030), "unique and ascending"),
-    ],
-)
-def test_capacity_expansion_resource_rejects_ambiguous_availability(
-    available_years: tuple[int, ...], match: str
-):
-    """Candidate availability must identify one chronological set of planning years."""
+def test_capacity_expansion_resource_rejects_descending_available_years():
+    """Candidate availability years must be ascending."""
     from pydantic import ValidationError
 
     from r2x_reeds import ReEDSRegion, ReEDSVariableCapacityExpansionResource
 
-    with pytest.raises(ValidationError, match=match):
+    with pytest.raises(ValidationError, match="unique and ascending") as exc_info:
         ReEDSVariableCapacityExpansionResource(
             name="wind_r01",
             region=ReEDSRegion(name="r01"),
             technology="wind",
-            available_years=available_years,
+            available_years=(2035, 2030),
             initial_capacity=0.0,
             investment_cost=1_500_000.0,
             variable_cost=4.0,
         )
+
+    assert exc_info.value.errors()[0]["loc"] == ("available_years",)
+
+
+def test_capacity_expansion_resource_rejects_duplicate_available_years():
+    """Candidate availability years must be unique."""
+    from pydantic import ValidationError
+
+    from r2x_reeds import ReEDSRegion, ReEDSVariableCapacityExpansionResource
+
+    with pytest.raises(ValidationError, match="unique and ascending") as exc_info:
+        ReEDSVariableCapacityExpansionResource(
+            name="wind_r01",
+            region=ReEDSRegion(name="r01"),
+            technology="wind",
+            available_years=(2030, 2030),
+            initial_capacity=0.0,
+            investment_cost=1_500_000.0,
+            variable_cost=4.0,
+        )
+
+    assert exc_info.value.errors()[0]["loc"] == ("available_years",)
 
 
 @pytest.mark.parametrize("available_year", [0, -1])

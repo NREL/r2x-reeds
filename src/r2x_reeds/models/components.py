@@ -9,8 +9,9 @@ from pydantic import Field, PositiveFloat
 
 from r2x_core.units import HasUnits, Unit
 
-from .base import FromTo_ToFrom, MinMax, ReEDSComponent, UnitFloat
+from .base import FromTo_ToFrom, MinMax, ReEDSComponent
 from .enums import EmissionSource, EmissionType, ReserveDirection, ReserveType
+from .types import UnitFloat
 
 
 class ReEDSEmission(SupplementalAttribute):

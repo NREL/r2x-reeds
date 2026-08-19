@@ -14,6 +14,14 @@ def test_fromto_tofrom_creation():
     assert model.from_to == 100.0
 
 
+def test_fromto_tofrom_allows_zero_capacity():
+    """A zero transfer capacity represents a direction that is unavailable."""
+    model = FromTo_ToFrom(from_to=0.0, to_from=0.0)
+
+    assert model.from_to == 0.0
+    assert model.to_from == 0.0
+
+
 def test_fromto_tofrom_to_from_value():
     """Test that to_from value is correctly set."""
     model = FromTo_ToFrom(from_to=100.0, to_from=150.0)
