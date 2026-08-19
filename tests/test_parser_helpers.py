@@ -49,7 +49,6 @@ def test_filter_generators_by_transmission_region_with_category_filter(sample_re
         capacity=200.0,
         heat_rate=7.5,
         fuel_type="gas",
-        fuel_price=4.0,
     )
 
     tech_categories = {"solar": {"prefixes": ["upv"], "exact": []}}
@@ -184,7 +183,7 @@ def test_filter_generators_by_category_handles_empty_list():
 
 
 def test_build_generator_emission_lookup_creates_correct_keys(sample_region):
-    from r2x_reeds.models import ReEDSThermalGenerator
+    from r2x_reeds.models import ReEDSGeneratorIdentity, ReEDSThermalGenerator
     from r2x_reeds.parser_utils import build_generator_emission_lookup
 
     gen = ReEDSThermalGenerator(
@@ -194,8 +193,7 @@ def test_build_generator_emission_lookup_creates_correct_keys(sample_region):
         capacity=200.0,
         heat_rate=7.5,
         fuel_type="gas",
-        fuel_price=4.0,
-        vintage="2020",
+        identity=ReEDSGeneratorIdentity(vintage="2020"),
     )
 
     lookup = build_generator_emission_lookup([gen])
@@ -218,7 +216,7 @@ def test_build_generator_emission_lookup_uses_sentinel_for_missing_vintage(sampl
 
 
 def test_build_generator_emission_lookup_groups_generators_with_same_key(sample_region):
-    from r2x_reeds.models import ReEDSThermalGenerator
+    from r2x_reeds.models import ReEDSGeneratorIdentity, ReEDSThermalGenerator
     from r2x_reeds.parser_utils import build_generator_emission_lookup
 
     gen1 = ReEDSThermalGenerator(
@@ -228,8 +226,7 @@ def test_build_generator_emission_lookup_groups_generators_with_same_key(sample_
         capacity=200.0,
         heat_rate=7.5,
         fuel_type="gas",
-        fuel_price=4.0,
-        vintage="2020",
+        identity=ReEDSGeneratorIdentity(vintage="2020"),
     )
     gen2 = ReEDSThermalGenerator(
         name="gas_p1_2020_b",
@@ -238,8 +235,7 @@ def test_build_generator_emission_lookup_groups_generators_with_same_key(sample_
         capacity=300.0,
         heat_rate=7.2,
         fuel_type="gas",
-        fuel_price=4.0,
-        vintage="2020",
+        identity=ReEDSGeneratorIdentity(vintage="2020"),
     )
 
     lookup = build_generator_emission_lookup([gen1, gen2])
@@ -392,7 +388,7 @@ def test_build_year_month_calendar_df_handles_empty_year_list():
 
 
 def test_calculate_hydro_budgets_for_generator_returns_budget_results(sample_region):
-    from r2x_reeds.models import ReEDSHydroGenerator
+    from r2x_reeds.models import ReEDSGeneratorIdentity, ReEDSHydroGenerator
     from r2x_reeds.parser_types import HydroBudgetResult
     from r2x_reeds.parser_utils import calculate_hydro_budgets_for_generator
 
@@ -401,7 +397,7 @@ def test_calculate_hydro_budgets_for_generator_returns_budget_results(sample_reg
         region=sample_region,
         technology="hyd",
         capacity=200.0,
-        vintage="2020",
+        identity=ReEDSGeneratorIdentity(vintage="2020"),
         is_dispatchable=True,
     )
 
@@ -431,7 +427,7 @@ def test_calculate_hydro_budgets_for_generator_returns_budget_results(sample_reg
 
 
 def test_calculate_hydro_budgets_for_generator_skips_incomplete_months(sample_region):
-    from r2x_reeds.models import ReEDSHydroGenerator
+    from r2x_reeds.models import ReEDSGeneratorIdentity, ReEDSHydroGenerator
     from r2x_reeds.parser_utils import calculate_hydro_budgets_for_generator
 
     gen = ReEDSHydroGenerator(
@@ -439,7 +435,7 @@ def test_calculate_hydro_budgets_for_generator_skips_incomplete_months(sample_re
         region=sample_region,
         technology="hyd",
         capacity=200.0,
-        vintage="2020",
+        identity=ReEDSGeneratorIdentity(vintage="2020"),
         is_dispatchable=True,
     )
 
@@ -466,7 +462,7 @@ def test_calculate_hydro_budgets_for_generator_skips_incomplete_months(sample_re
 
 
 def test_calculate_hydro_budgets_for_generator_returns_empty_when_no_match(sample_region):
-    from r2x_reeds.models import ReEDSHydroGenerator
+    from r2x_reeds.models import ReEDSGeneratorIdentity, ReEDSHydroGenerator
     from r2x_reeds.parser_utils import calculate_hydro_budgets_for_generator
 
     gen = ReEDSHydroGenerator(
@@ -474,7 +470,7 @@ def test_calculate_hydro_budgets_for_generator_returns_empty_when_no_match(sampl
         region=sample_region,
         technology="hyd",
         capacity=200.0,
-        vintage="2020",
+        identity=ReEDSGeneratorIdentity(vintage="2020"),
         is_dispatchable=True,
     )
 
@@ -501,7 +497,7 @@ def test_calculate_hydro_budgets_for_generator_returns_empty_when_no_match(sampl
 
 
 def test_calculate_hydro_budgets_for_generator_uses_capacity_and_cf(sample_region):
-    from r2x_reeds.models import ReEDSHydroGenerator
+    from r2x_reeds.models import ReEDSGeneratorIdentity, ReEDSHydroGenerator
     from r2x_reeds.parser_utils import calculate_hydro_budgets_for_generator
 
     gen = ReEDSHydroGenerator(
@@ -509,7 +505,7 @@ def test_calculate_hydro_budgets_for_generator_uses_capacity_and_cf(sample_regio
         region=sample_region,
         technology="hyd",
         capacity=100.0,
-        vintage="2020",
+        identity=ReEDSGeneratorIdentity(vintage="2020"),
         is_dispatchable=True,
     )
 
@@ -566,7 +562,6 @@ def test_calculate_hydro_budgets_generator_no_vintage(sample_region):
         region=sample_region,
         technology="hyd",
         capacity=200.0,
-        vintage=None,  # No vintage
         is_dispatchable=True,
     )
 
@@ -597,7 +592,7 @@ def test_calculate_hydro_budgets_generator_no_vintage(sample_region):
 
 def test_calculate_hydro_budgets_none_cf_values(sample_region):
     """Rows with None in hydro_cf should be skipped."""
-    from r2x_reeds.models import ReEDSHydroGenerator
+    from r2x_reeds.models import ReEDSGeneratorIdentity, ReEDSHydroGenerator
     from r2x_reeds.parser_utils import calculate_hydro_budgets_for_generator
 
     gen = ReEDSHydroGenerator(
@@ -605,7 +600,7 @@ def test_calculate_hydro_budgets_none_cf_values(sample_region):
         region=sample_region,
         technology="hyd",
         capacity=200.0,
-        vintage="2020",
+        identity=ReEDSGeneratorIdentity(vintage="2020"),
         is_dispatchable=True,
     )
 
@@ -635,7 +630,7 @@ def test_calculate_hydro_budgets_none_cf_values(sample_region):
 
 def test_calculate_hydro_budgets_multiple_years_partial_data(sample_region):
     """Only years with complete 12 months should return results."""
-    from r2x_reeds.models import ReEDSHydroGenerator
+    from r2x_reeds.models import ReEDSGeneratorIdentity, ReEDSHydroGenerator
     from r2x_reeds.parser_utils import calculate_hydro_budgets_for_generator
 
     gen = ReEDSHydroGenerator(
@@ -643,7 +638,7 @@ def test_calculate_hydro_budgets_multiple_years_partial_data(sample_region):
         region=sample_region,
         technology="hyd",
         capacity=200.0,
-        vintage="2020",
+        identity=ReEDSGeneratorIdentity(vintage="2020"),
         is_dispatchable=True,
     )
 

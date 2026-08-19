@@ -17,7 +17,7 @@ from typing import Any, cast
 import h5py
 import numpy as np
 import polars as pl
-from infrasys import Component, SingleTimeSeries
+from infrasys import Component, SingleTimeSeries, SupplementalAttribute
 from loguru import logger
 from rust_ok import Err, Ok, Result
 
@@ -41,14 +41,25 @@ from .getters import (
     resolve_emission_generator_identifier,
 )
 from .models.components import (
+    ReEDSConsumingTechnology,
+    ReEDSConsumingTechnologyEconomics,
+    ReEDSConsumingTechnologyPerformance,
     ReEDSDemand,
     ReEDSEmission,
     ReEDSGenerator,
+    ReEDSGeneratorEconomics,
+    ReEDSGeneratorIdentity,
+    ReEDSGeneratorOperatingConstraints,
+    ReEDSGeneratorPerformance,
+    ReEDSGeneratorSupplyCurve,
     ReEDSInterface,
     ReEDSRegion,
     ReEDSReserve,
     ReEDSReserveRegion,
+    ReEDSStorage,
+    ReEDSThermalGenerator,
     ReEDSTransmissionLine,
+    ReEDSVariableGenerator,
 )
 from .models.enums import EmissionType, ReserveType
 from .models.planning import (
@@ -1417,11 +1428,14 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                 creation_errors.append(f"{identifier}: {creation_result.err()}")
                 continue
 
-            generator = creation_result.ok()
-            if generator is None:
+            creation = creation_result.ok()
+            if creation is None:
                 creation_errors.append(f"{identifier}: generator creation returned None")
                 continue
+            generator, attributes = creation
             system.add_component(generator)
+            for attribute in attributes:
+                system.add_supplemental_attribute(generator, attribute)
             self._generator_cache[generator.name] = generator
             built += 1
 
@@ -1436,7 +1450,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         self,
         identifier: str,
         kwargs: dict[str, Any],
-    ) -> Result[ReEDSGenerator, str]:
+    ) -> Result[tuple[ReEDSGenerator, list[SupplementalAttribute]], str]:
         """Instantiate a generator component with technology-specific class resolution."""
         technology = kwargs.get("technology")
         if technology is None:
@@ -1454,11 +1468,54 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if generator_class is None:
             return Err(f"Generator {identifier} class lookup returned None")
 
+        component_kwargs = dict(kwargs)
+
+        def take(model: type[Any], *, exclude: set[str] | None = None) -> dict[str, Any]:
+            """Move source fields into one concept-specific enrichment model."""
+            fields = set(model.model_fields) - (exclude or set())
+            return {field: component_kwargs.pop(field) for field in fields if field in component_kwargs}
+
+        component_kwargs["identity"] = ReEDSGeneratorIdentity(**take(ReEDSGeneratorIdentity))
+        attributes: list[SupplementalAttribute] = []
+
+        def add_attribute(attribute: SupplementalAttribute) -> None:
+            """Keep only source records that contain at least one fact."""
+            values = attribute.model_dump(exclude_none=True)
+            values.pop("uuid", None)
+            if values:
+                attributes.append(attribute)
+
+        if issubclass(generator_class, ReEDSConsumingTechnology):
+            economics = ReEDSConsumingTechnologyEconomics(**take(ReEDSConsumingTechnologyEconomics))
+            performance = ReEDSConsumingTechnologyPerformance(**take(ReEDSConsumingTechnologyPerformance))
+            add_attribute(economics)
+            add_attribute(performance)
+        else:
+            economics = ReEDSGeneratorEconomics(**take(ReEDSGeneratorEconomics))
+            add_attribute(economics)
+            performance_exclude = (
+                {"heat_rate"} if issubclass(generator_class, ReEDSThermalGenerator) else set()
+            )
+            performance = ReEDSGeneratorPerformance(
+                **take(ReEDSGeneratorPerformance, exclude=performance_exclude)
+            )
+            operating_constraints = ReEDSGeneratorOperatingConstraints(
+                **take(ReEDSGeneratorOperatingConstraints)
+            )
+            add_attribute(performance)
+            add_attribute(operating_constraints)
+            if issubclass(generator_class, ReEDSVariableGenerator):
+                add_attribute(ReEDSGeneratorSupplyCurve(**take(ReEDSGeneratorSupplyCurve)))
+            if issubclass(generator_class, ReEDSStorage):
+                # Storage energy capacity is derived from power capacity and duration.
+                component_kwargs.pop("energy_capacity", None)
+                component_kwargs.pop("capital_cost_energy", None)
+
         try:
-            generator = self.create_component(generator_class, **kwargs)
+            generator = self.create_component(generator_class, **component_kwargs)
         except ComponentCreationError as exc:
             return Err(f"Generator {identifier} creation failed: {exc}")
-        return Ok(cast(ReEDSGenerator, generator))
+        return Ok((cast(ReEDSGenerator, generator), attributes))
 
     def _build_transmission(self, system: System) -> Result[None, str]:
         """Build transmission interface and line components with bi-directional ratings."""
@@ -1810,9 +1867,9 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                         "time_frame": reserve_time_frame.get(reserve_type_name),
                         "vors": reserve_vors.get(reserve_type_name),
                         "direction": reserve_direction.get(reserve_type_name, "Up"),
-                        "or_load_percentage": pct_cfg.get("or_load_percentage"),
-                        "or_wind_percentage": pct_cfg.get("or_wind_percentage"),
-                        "or_pv_percentage": pct_cfg.get("or_pv_percentage"),
+                        "or_load_percentage": pct_cfg.get("or_load_percentage") or 0.0,
+                        "or_wind_percentage": pct_cfg.get("or_wind_percentage") or 0.0,
+                        "or_pv_percentage": pct_cfg.get("or_pv_percentage") or 0.0,
                         "spin_cost": cost_cfg.get("spin_cost"),
                         "reg_cost": cost_cfg.get("reg_cost"),
                         "flex_cost": cost_cfg.get("flex_cost"),
@@ -1912,7 +1969,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
 
         generator_lookup: dict[tuple[str | None, str | None, str], list[str]] = {}
         for generated_name in generated:
-            vintage_key = generated_name.vintage or "__missing_vintage__"
+            vintage_key = generated_name.identity.vintage or "__missing_vintage__"
             key = (generated_name.technology, generated_name.region.name, vintage_key)
             generator_lookup.setdefault(key, []).append(generated_name.name)
 
@@ -2203,7 +2260,10 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                 ):
                     continue
 
-                reserve_list = gen.ext.get("reserves", [])
+                existing_reserves = gen.ext.get("reserves")
+                reserve_list: list[str] = (
+                    [str(value) for value in existing_reserves] if isinstance(existing_reserves, list) else []
+                )
                 if reserve.name not in reserve_list:
                     reserve_list.append(reserve.name)
                     gen.ext["reserves"] = reserve_list
@@ -2239,7 +2299,13 @@ class ReEDSParser(Plugin[ReEDSConfig]):
 
         hydro_capacity = pl.DataFrame(
             [
-                (gen.name, gen.technology, gen.region.name, gen.capacity, gen.vintage)
+                (
+                    gen.name,
+                    gen.technology,
+                    gen.region.name,
+                    gen.capacity,
+                    gen.identity.vintage,
+                )
                 for gen in hydro_generators
             ],
             schema=["name", "technology", "region", "capacity", "vintage"],
@@ -2270,7 +2336,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             tech_region_filter = (
                 (pl.col("technology") == generator.technology)
                 & (pl.col("region") == generator.region.name)
-                & (pl.col("vintage") == generator.vintage)
+                & (pl.col("vintage") == generator.identity.vintage)
             )
             for row, month_budget_by_vintage in hydro_data.filter(tech_region_filter).group_by(
                 ["year", "vintage"]
@@ -2548,9 +2614,9 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                 if not rtype:
                     continue
                 pct_map[rtype] = {
-                    "or_load_percentage": row.get("or_load_percentage"),
-                    "or_wind_percentage": row.get("or_wind_percentage"),
-                    "or_pv_percentage": row.get("or_pv_percentage"),
+                    "or_load_percentage": float(row.get("or_load_percentage") or 0.0),
+                    "or_wind_percentage": float(row.get("or_wind_percentage") or 0.0),
+                    "or_pv_percentage": float(row.get("or_pv_percentage") or 0.0),
                 }
         else:
             load_res = self._defaults.get("load_reserves", {})

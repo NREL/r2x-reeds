@@ -1,15 +1,4 @@
-"""Reusable annotated types and general validations for ReEDS model fields.
-
-This module is the catalog of field types and general invariants that can
-apply to multiple models. The aliases attach callbacks from ``checks`` to
-model fields with ``pydantic.AfterValidator``. Each callback returns the same
-field type on success and raises ``ValueError`` on failure, which is the
-contract required by Pydantic after-validators.
-
-Add a type here when its constraints or validation describe a reusable field
-concept rather than one model's private relationship. Add the corresponding
-focused callback in ``models.checks`` and attach it with ``AfterValidator``.
-"""
+"""Reusable validated types for ReEDS domain models."""
 
 from __future__ import annotations
 
@@ -17,12 +6,13 @@ from typing import TYPE_CHECKING, Annotated, TypeAlias
 
 from pydantic import AfterValidator, Field
 
+from r2x_core.units import Unit
+
 from .checks import (
     validate_active_emission_type_requires_a_cap_for_every_planning_period,
     validate_available_years_are_unique_and_ascending,
     validate_emission_caps_require_emission_type,
     validate_initial_capacities_are_unique_by_technology_and_region,
-    validate_maximum_unit_float_is_not_less_than_minimum,
     validate_minimum_capacity_factor_does_not_exceed_capacity_factor,
     validate_minimum_generation_fraction_does_not_exceed_capacity_factor,
     validate_planning_periods_are_ascending,
@@ -45,19 +35,20 @@ if TYPE_CHECKING:
         ReEDSStorageDurationOverride,
     )
 
-NonNegativeFloat: TypeAlias = Annotated[float, Field(ge=0)]
-EmissionRate = Annotated[NonNegativeFloat, Field(description="Emission rate in kg/MWh")]
-Percentage = Annotated[float, Field(description="Percentage value (0-100)", ge=0, le=100)]
+NonEmptyText: TypeAlias = Annotated[str, Field(min_length=1)]
+NonNegativeFloat: TypeAlias = Annotated[float, Field(ge=0.0)]
+Fraction: TypeAlias = Annotated[float, Unit("fraction"), Field(ge=0.0, le=1.0)]
+PositiveFraction: TypeAlias = Annotated[float, Unit("fraction"), Field(gt=0.0, le=1.0)]
+Percentage: TypeAlias = Annotated[float, Unit("%"), Field(ge=0.0, le=100.0)]
+EmissionRate: TypeAlias = Annotated[float, Unit("kg/MWh")]
 PlanningYear: TypeAlias = Annotated[
     int,
     Field(ge=1, description="ReEDS solve or resource-availability year"),
 ]
-UnitFloat: TypeAlias = Annotated[float, Field(ge=0, le=1)]
-PositiveUnitFloat: TypeAlias = Annotated[float, Field(gt=0, le=1)]
-MaximumUnitFloat: TypeAlias = Annotated[
-    UnitFloat,
-    AfterValidator(validate_maximum_unit_float_is_not_less_than_minimum),
-]
+
+# These names remain the package's established vocabulary for fractional values.
+UnitFloat: TypeAlias = Fraction
+PositiveUnitFloat: TypeAlias = PositiveFraction
 
 PlanningPeriods: TypeAlias = Annotated[
     tuple["ReEDSPlanningPeriod", ...],
@@ -93,10 +84,10 @@ StorageDurationOverrides: TypeAlias = Annotated[
     AfterValidator(validate_storage_duration_overrides_are_unique_by_technology_vintage_and_region),
 ]
 MinimumGenerationFraction: TypeAlias = Annotated[
-    UnitFloat,
+    Fraction,
     AfterValidator(validate_minimum_generation_fraction_does_not_exceed_capacity_factor),
 ]
 MinimumCapacityFactor: TypeAlias = Annotated[
-    UnitFloat,
+    Fraction,
     AfterValidator(validate_minimum_capacity_factor_does_not_exceed_capacity_factor),
 ]

@@ -11,7 +11,12 @@ from rust_ok import Err, Ok, Result
 from r2x_core import PluginConfig, expose_plugin
 from r2x_core.datafile import DataFile
 from r2x_core.store import DataStore
-from r2x_reeds.models.components import ReEDSGenerator
+from r2x_reeds.models.components import (
+    ReEDSGenerator,
+    ReEDSGeneratorEconomics,
+    ReEDSGeneratorOperatingConstraints,
+    ReEDSGeneratorPerformance,
+)
 
 
 class PCMDefaultsConfig(PluginConfig):
@@ -105,17 +110,25 @@ def add_pcm_defaults(
         msg = "Applying PCM defaults to {}"
         logger.debug(msg, component.name)
 
-        model_fields = type(component).model_fields
-        if not config.pcm_defaults_override:
-            fields_to_replace = [
-                key
-                for key in pcm_values
-                if key in model_fields and _check_if_null(_get_component_attribute(component, key))
-            ]
-        else:
-            fields_to_replace = [key for key in pcm_values if key in model_fields]
+        attribute_types = (
+            dict.fromkeys(ReEDSGeneratorPerformance.model_fields, ReEDSGeneratorPerformance)
+            | dict.fromkeys(
+                ReEDSGeneratorOperatingConstraints.model_fields, ReEDSGeneratorOperatingConstraints
+            )
+            | dict.fromkeys(ReEDSGeneratorEconomics.model_fields, ReEDSGeneratorEconomics)
+        )
+        fields_to_replace = [key for key in pcm_values if key in attribute_types]
 
         for field in sorted(fields_to_replace, key=lambda x: fields_weight.get(x, -999)):
+            attribute_type = attribute_types[field]
+            attributes = system.get_supplemental_attributes_with_component(component, attribute_type)
+            attribute = attributes[0] if attributes else attribute_type()
+            if not attributes:
+                system.add_supplemental_attribute(component, attribute)
+            if not config.pcm_defaults_override and not _check_if_null(
+                _get_component_attribute(attribute, field)
+            ):
+                continue
             value = pcm_values[field]
             if _check_if_null(value):
                 continue
@@ -129,8 +142,8 @@ def add_pcm_defaults(
                     continue
 
             try:
-                setattr(component, field, value)
-                logger.trace("Set {} = {} for {}", field, value, component.name)
+                setattr(attribute, field, value)
+                logger.trace("Set {}.{} = {}", type(attribute).__name__, field, value)
             except Exception as e:
                 logger.warning("Failed to set {} for {}: {}", field, component.name, e)
 

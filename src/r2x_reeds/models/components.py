@@ -1,162 +1,339 @@
-"""ReEDS component models."""
+"""Canonical ReEDS component and supplemental-attribute models."""
 
 from __future__ import annotations
 
 from typing import Annotated
 
 from infrasys import SupplementalAttribute
-from pydantic import Field, PositiveFloat
+from infrasys.models import InfraSysBaseModel
+from pydantic import AfterValidator, Field, model_validator
 
 from r2x_core.units import HasUnits, Unit
 
-from .base import FromTo_ToFrom, MinMax, ReEDSComponent
-from .enums import EmissionSource, EmissionType, ReserveDirection, ReserveType
-from .types import UnitFloat
+from .base import FractionRange, FromTo_ToFrom, ReEDSComponent
+from .checks import (
+    validate_optional_fraction,
+    validate_optional_nonnegative,
+    validate_optional_positive,
+)
+from .enums import EmissionSource, EmissionType, ReserveDirection, ReserveType, TransmissionLineType
+from .types import (
+    EmissionRate,
+    Fraction,
+    NonEmptyText,
+    PlanningYear,
+    PositiveUnitFloat,
+)
+
+
+class ReEDSGeneratorEconomics(SupplementalAttribute):
+    """Optional generator economics supplied by cost and fuel-price datasets."""
+
+    fuel_price: Annotated[
+        float | None,
+        Unit("$/MMBtu"),
+        AfterValidator(validate_optional_nonnegative),
+        Field(description="Fuel price"),
+    ] = None
+    vom_cost: Annotated[
+        float | None,
+        Unit("$/MWh"),
+        AfterValidator(validate_optional_nonnegative),
+        Field(description="Variable operation and maintenance cost"),
+    ] = None
+    fom_cost: Annotated[
+        float | None,
+        Unit("$/MW/year"),
+        AfterValidator(validate_optional_nonnegative),
+        Field(description="Fixed operation and maintenance cost"),
+    ] = None
+    capital_cost: Annotated[
+        float | None,
+        Unit("$/MW"),
+        AfterValidator(validate_optional_nonnegative),
+        Field(description="Capital cost"),
+    ] = None
+
+
+class ReEDSGeneratorPerformance(SupplementalAttribute):
+    """Optional performance characteristics supplied by plant data."""
+
+    heat_rate: Annotated[
+        float | None,
+        Unit("MMBtu/MWh"),
+        AfterValidator(validate_optional_positive),
+        Field(description="Heat rate"),
+    ] = None
+
+
+class ReEDSGeneratorOperatingConstraints(SupplementalAttribute):
+    """Optional operating constraints supplied by outage and plant-limit datasets."""
+
+    forced_outage_rate: Annotated[
+        float | None,
+        Unit("fraction"),
+        AfterValidator(validate_optional_fraction),
+        Field(description="Forced outage fraction"),
+    ] = None
+    planned_outage_rate: Annotated[
+        float | None,
+        Unit("fraction"),
+        AfterValidator(validate_optional_fraction),
+        Field(description="Planned outage fraction"),
+    ] = None
+    max_age: Annotated[int | None, Field(ge=0, description="Maximum age in years")] = None
+    min_stable_level: Annotated[
+        float | None,
+        Unit("fraction"),
+        AfterValidator(validate_optional_fraction),
+        Field(description="Minimum stable-load fraction"),
+    ] = None
+    ramp_rate: Annotated[
+        float | None,
+        Unit("fraction/hour"),
+        AfterValidator(validate_optional_nonnegative),
+        Field(description="Ramp rate"),
+    ] = None
+    capacity_factor_range: FractionRange | None = None
+    startup_cost: Annotated[
+        float | None,
+        Unit("$/MW"),
+        AfterValidator(validate_optional_nonnegative),
+        Field(description="Startup cost"),
+    ] = None
+    min_up_time: Annotated[
+        float | None,
+        Unit("hours"),
+        AfterValidator(validate_optional_positive),
+        Field(description="Minimum up time"),
+    ] = None
+    min_down_time: Annotated[
+        float | None,
+        Unit("hours"),
+        AfterValidator(validate_optional_positive),
+        Field(description="Minimum down time"),
+    ] = None
+
+
+class ReEDSGeneratorSupplyCurve(SupplementalAttribute):
+    """Optional renewable supply-curve enrichment."""
+
+    resource_class: Annotated[str | None, Field(min_length=1, description="Resource-class identifier")] = None
+    inverter_loading_ratio: Annotated[
+        float | None,
+        Unit("ratio"),
+        AfterValidator(validate_optional_positive),
+        Field(description="Inverter loading ratio"),
+    ] = None
+    capacity_factor_adjustment: Annotated[
+        float | None,
+        Unit("ratio"),
+        AfterValidator(validate_optional_positive),
+        Field(description="Capacity-factor adjustment"),
+    ] = None
+    max_capacity_factor: Annotated[
+        float | None,
+        Unit("fraction"),
+        AfterValidator(validate_optional_fraction),
+        Field(description="Maximum capacity factor"),
+    ] = None
+    supply_curve_cost: Annotated[
+        float | None,
+        Unit("$/MW"),
+        AfterValidator(validate_optional_nonnegative),
+        Field(description="Supply-curve cost"),
+    ] = None
+    transmission_adder: Annotated[
+        float | None,
+        Unit("$/MW"),
+        AfterValidator(validate_optional_nonnegative),
+        Field(description="Transmission cost adder"),
+    ] = None
+
+
+class ReEDSGeneratorIdentity(InfraSysBaseModel):
+    """Optional vintage and retirement metadata."""
+
+    vintage: Annotated[str | None, Field(min_length=1, description="Vintage-bin identifier")] = None
+    retirement_year: Annotated[PlanningYear | None, Field(description="Planned retirement year")] = None
+
+
+class ReEDSConsumingTechnologyEconomics(SupplementalAttribute):
+    """Optional cost data for an electricity-consuming technology."""
+
+    fuel_price: Annotated[
+        float | None,
+        Unit("$/MMBtu"),
+        AfterValidator(validate_optional_nonnegative),
+        Field(description="Fuel price"),
+    ] = None
+    capital_cost: Annotated[
+        float | None,
+        Unit("$/kW"),
+        AfterValidator(validate_optional_nonnegative),
+        Field(description="Capital cost"),
+    ] = None
+    fom_cost: Annotated[
+        float | None,
+        Unit("$/kW/year"),
+        AfterValidator(validate_optional_nonnegative),
+        Field(description="Fixed operation and maintenance cost"),
+    ] = None
+    vom_cost: Annotated[
+        float | None,
+        Unit("$/MWh"),
+        AfterValidator(validate_optional_nonnegative),
+        Field(description="Variable operation and maintenance cost"),
+    ] = None
+
+
+class ReEDSConsumingTechnologyPerformance(SupplementalAttribute):
+    """Optional performance data for an electricity-consuming technology."""
+
+    heat_rate: Annotated[
+        float | None,
+        Unit("MMBtu/MWh"),
+        AfterValidator(validate_optional_positive),
+        Field(description="Heat rate"),
+    ] = None
+    gas_consumption_rate: Annotated[
+        float | None,
+        Unit("MMBtu/kg"),
+        AfterValidator(validate_optional_positive),
+        Field(description="Gas consumption rate"),
+    ] = None
+    storage_transport_adder: Annotated[
+        float | None,
+        Unit("$/kW"),
+        AfterValidator(validate_optional_nonnegative),
+        Field(description="Storage and transport cost adder"),
+    ] = None
+    vintage: Annotated[str | None, Field(min_length=1, description="Vintage-bin identifier")] = None
 
 
 class ReEDSEmission(SupplementalAttribute):
-    """ReEDS emission supplemental attribute."""
+    """Nonnegative emission rate attached to a component."""
 
-    rate: Annotated[float, Unit("kg/MWh"), Field(description="Emission rate for emission type in kg/MWh")]
+    rate: Annotated[EmissionRate, Field(description="Emission rate for the emission type")]
     type: EmissionType
     source: EmissionSource = EmissionSource.COMBUSTION
 
 
 class ReEDSRegion(ReEDSComponent):
-    """ReEDS regional component.
+    """A ReEDS region with the complete hierarchy record from ``hierarchy.csv``."""
 
-    Represents a geographic region in the ReEDS model with various regional attributes and hierarchies.
-    """
-
-    state: Annotated[str | None, Field(description="State abbreviation")] = None
-    nerc_region: Annotated[str | None, Field(description="NERC region")] = None
-    transmission_region: Annotated[str | None, Field(description="Transmission planning region")] = None
-    transmission_group: Annotated[str | None, Field(description="Transmission group")] = None
+    state: Annotated[NonEmptyText, Field(description="State or regional abbreviation")]
+    nerc_region: Annotated[NonEmptyText, Field(description="NERC region")]
+    transmission_region: Annotated[NonEmptyText, Field(description="Transmission planning region")]
+    transmission_group: Annotated[NonEmptyText, Field(description="Transmission group")]
     interconnect: Annotated[
-        str | None,
-        Field(description="Interconnection (eastern, western, texas)"),
-    ] = None
-    country: Annotated[str | None, Field(description="Country code")] = None
-    max_active_power: Annotated[float | None, Field(description="Peak demand in MW")] = None
-    timezone: Annotated[str | None, Field(description="Time zone identifier")] = None
-    cendiv: Annotated[str | None, Field(description="Census division")] = None
-    usda_region: Annotated[str | None, Field(description="USDA region")] = None
-    h2ptc_region: Annotated[str | None, Field(description="H2 PTC region")] = None
-    hurdle_region: Annotated[str | None, Field(description="Hurdle rate region")] = None
-    cc_region: Annotated[str | None, Field(description="Climate change region")] = None
+        NonEmptyText,
+        Field(description="Interconnection, such as eastern, western, or texas"),
+    ]
+    country: Annotated[NonEmptyText, Field(description="Country code")]
+    cendiv: Annotated[NonEmptyText, Field(description="Census division")]
+    usda_region: Annotated[NonEmptyText, Field(description="USDA region")]
+    h2ptc_region: Annotated[NonEmptyText, Field(description="Hydrogen PTC region")]
+    hurdle_region: Annotated[NonEmptyText, Field(description="Hurdle-rate region")]
+    cc_region: Annotated[NonEmptyText, Field(description="Climate-change region")]
 
     @classmethod
     def example(cls) -> ReEDSRegion:
-        """Example region."""
-        return ReEDSRegion(name="p1", state="ca")
+        """Return a complete example region for documentation and tests."""
+        return ReEDSRegion(
+            name="p1",
+            state="CA",
+            nerc_region="WECC_CA",
+            transmission_region="CAISO",
+            transmission_group="CAISO",
+            interconnect="western",
+            country="USA",
+            cendiv="Pacific",
+            usda_region="pacific",
+            h2ptc_region="California",
+            hurdle_region="CAISO",
+            cc_region="CAISO",
+        )
 
 
 class ReEDSReserveRegion(ReEDSComponent):
-    """ReEDS reserve region component.
-
-    Represents a geographic region for operating reserve requirements.
-    """
+    """A reserve area identified by its transmission-region component name."""
 
 
-class ReEDSReserve(ReEDSComponent):
-    """ReEDS operating reserve component.
-
-    Defines operating reserve requirements and parameters for the system.
-    """
+class ReEDSReserve(HasUnits, ReEDSComponent):
+    """An operating-reserve requirement for one reserve area and direction."""
 
     time_frame: Annotated[
-        PositiveFloat,
-        Field(description="Timeframe in which the reserve is required in seconds"),
-    ] = 1e30
+        float,
+        Unit("s"),
+        Field(gt=0.0, description="Timeframe in which the reserve response is required"),
+    ]
     region: Annotated[
-        ReEDSReserveRegion | None,
-        Field(description="Reserve region where requirement applies"),
-    ] = None
+        ReEDSReserveRegion,
+        Field(description="Reserve area where the requirement applies"),
+    ]
     vors: Annotated[
         float,
-        Field(description="Value of reserve shortage in $/MW. Positive value acts as soft constraint"),
-    ] = -1
+        Unit("$/MW"),
+        Field(description="Value of reserve shortage; negative values represent a hard constraint"),
+    ]
     duration: Annotated[
-        PositiveFloat | None,
-        Field(description="Time over which the required response must be maintained in seconds"),
-    ] = None
+        float,
+        Unit("s"),
+        Field(gt=0.0, description="Time over which the reserve response must be maintained"),
+    ]
     or_load_percentage: Annotated[
-        float | None,
-        Field(description="Proportion of load that contributes to the reserve requirement"),
-    ] = None
+        Fraction,
+        Field(description="Fraction of load contributing to the reserve requirement"),
+    ]
     or_wind_percentage: Annotated[
-        float | None,
-        Field(description="Proportion of wind generation that contributes to the reserve requirement"),
-    ] = None
+        Fraction,
+        Field(description="Fraction of wind generation contributing to the reserve requirement"),
+    ]
     or_pv_percentage: Annotated[
-        float | None,
-        Field(description="Proportion of solar generation that contributes to the reserve requirement"),
-    ] = None
-    season: Annotated[
-        str | None,
-        Field(description="Seasonal identifier for reserve requirement variations (summ/fall/wint/spri)"),
-    ] = None
-    reg_cost: Annotated[
-        float | None,
-        Field(description="Regulation reserve cost in $/MW from cost_opres files"),
-    ] = None
-    flex_cost: Annotated[
-        float | None,
-        Field(description="Flexibility reserve cost in $/MW from cost_opres files"),
-    ] = None
-    spin_cost: Annotated[
-        float | None,
-        Field(description="Spinning reserve cost in $/MW from cost_opres files"),
-    ] = None
+        Fraction,
+        Field(description="Fraction of solar generation contributing to the reserve requirement"),
+    ]
     reserve_type: Annotated[ReserveType, Field(description="Type of reserve")]
     direction: Annotated[ReserveDirection, Field(description="Direction of reserve provision")]
 
 
 class ReEDSInterface(ReEDSComponent):
-    """ReEDS region interface.
-
-    Represents the connection between two regions for power transfer.
-    """
+    """An undirected interface between two distinct ReEDS regions."""
 
     from_region: Annotated[ReEDSRegion, Field(description="Origin region")]
     to_region: Annotated[ReEDSRegion, Field(description="Destination region")]
 
+    @model_validator(mode="after")
+    def validate_distinct_regions(self) -> ReEDSInterface:
+        """Reject self-referential interfaces."""
+        if self.from_region.name == self.to_region.name:
+            raise ValueError("from_region and to_region must be distinct")
+        return self
+
 
 class ReEDSGenerator(HasUnits, ReEDSComponent):
-    """Base generator component with fields common to all generation types."""
+    """Base generator component containing intrinsic identity and capacity."""
 
     region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
-    technology: Annotated[str, Field(description="ReEDS technology type")]
-    capacity: Annotated[PositiveFloat, Unit("MW"), Field(description="Installed capacity", ge=0)]
-    heat_rate: Annotated[PositiveFloat | None, Unit("MMBtu/MWh"), Field(description="Heat rate")] = None
-    fuel_type: Annotated[str | None, Field(description="Fuel type")] = None
-    fuel_price: Annotated[PositiveFloat | None, Unit("$/MMBtu"), Field(description="Fuel price")] = None
-    forced_outage_rate: Annotated[UnitFloat | None, Field(description="Forced outage rate")] = None
-    planned_outage_rate: Annotated[UnitFloat | None, Field(description="Planned outage rate")] = None
-    max_age: Annotated[int | None, Unit("years"), Field(description="Maximum age")] = None
-    vom_cost: Annotated[PositiveFloat | None, Unit("$/MWh"), Field(description="Variable O&M")] = None
-    fom_cost: Annotated[PositiveFloat | None, Unit("$/MW/year"), Field(description="Fixed O&M")] = None
-    capital_cost: Annotated[PositiveFloat | None, Unit("$/MW"), Field(description="Capital cost")] = None
-    vintage: Annotated[str | None, Field(description="Vintage bin identifier")] = None
-    retirement_year: Annotated[int | None, Field(description="Planned retirement year")] = None
+    technology: Annotated[NonEmptyText, Field(description="ReEDS technology type")]
+    capacity: Annotated[
+        float,
+        Unit("MW"),
+        Field(ge=0.0, description="Installed capacity"),
+    ]
+    identity: ReEDSGeneratorIdentity = Field(default_factory=ReEDSGeneratorIdentity)
 
 
 class ReEDSThermalGenerator(ReEDSGenerator):
-    """Thermal generators with fuel combustion and heat rates."""
+    """Thermal generator with required combustion characteristics."""
 
-    heat_rate: Annotated[PositiveFloat, Unit("MMBtu/MWh"), Field(description="Heat rate")]
-    fuel_type: Annotated[str, Field(description="Fuel type")]
-    fuel_price: Annotated[PositiveFloat | None, Unit("$/MMBtu"), Field(description="Fuel price")] = None
-    min_stable_level: Annotated[UnitFloat | None, Field(description="Min load fraction")] = None
-    ramp_rate: Annotated[PositiveFloat | None, Unit("fraction/hour"), Field(description="Ramp rate")] = None
-    capacity_factor_range: MinMax | None = None
-    startup_cost: Annotated[PositiveFloat | None, Unit("$/MW"), Field(description="Startup cost")] = None
-    min_up_time: Annotated[PositiveFloat | None, Unit("hours"), Field(description="Min up time")] = None
-    min_down_time: Annotated[PositiveFloat | None, Unit("hours"), Field(description="Min down time")] = None
+    heat_rate: Annotated[float, Unit("MMBtu/MWh"), Field(gt=0.0, description="Heat rate")]
+    fuel_type: Annotated[NonEmptyText, Field(description="Fuel type")]
 
     @classmethod
     def example(cls) -> ReEDSThermalGenerator:
-        """Example thermal generator."""
+        """Return a complete example thermal generator."""
         return ReEDSThermalGenerator(
             name="simple-bus",
             category="thermal",
@@ -165,179 +342,136 @@ class ReEDSThermalGenerator(ReEDSGenerator):
             capacity=100,
             heat_rate=15,
             fuel_type="ngas",
-            fuel_price=10,
         )
 
 
 class ReEDSVariableGenerator(ReEDSGenerator):
-    """Renewable generators with capacity factor profiles."""
-
-    resource_class: Annotated[str | None, Field(description="Resource class identifier")] = None
-    inverter_loading_ratio: Annotated[PositiveFloat | None, Field(description="ILR for PV")] = None
-    capacity_factor_adjustment: Annotated[PositiveFloat | None, Field(description="CF adjustment")] = None
-    max_capacity_factor: Annotated[UnitFloat | None, Field(description="Max CF")] = None
-    supply_curve_cost: Annotated[
-        PositiveFloat | None, Unit("$/MW"), Field(description="Supply curve cost")
-    ] = None
-    transmission_adder: Annotated[
-        PositiveFloat | None, Unit("$/MW"), Field(description="Transmission adder")
-    ] = None
+    """Renewable generator with capacity-factor profiles."""
 
 
 class ReEDSStorage(ReEDSGenerator):
-    """Storage technologies with energy/power characteristics."""
+    """Storage generator with energy/power characteristics."""
 
-    storage_duration: Annotated[PositiveFloat, Unit("hours"), Field(description="Storage duration")]
-    round_trip_efficiency: Annotated[UnitFloat, Field(description="Round-trip efficiency")]
-    energy_capacity: Annotated[PositiveFloat | None, Unit("MWh"), Field(description="Energy capacity")] = None
-    max_charge_rate: Annotated[PositiveFloat | None, Unit("MW"), Field(description="Max charge")] = None
-    max_discharge_rate: Annotated[PositiveFloat | None, Unit("MW"), Field(description="Max discharge")] = None
-    capital_cost_energy: Annotated[
-        PositiveFloat | None, Unit("$/MWh"), Field(description="Energy capital cost")
-    ] = None
-    fom_cost_energy: Annotated[PositiveFloat | None, Unit("$/MWh/year"), Field(description="Energy FOM")] = (
-        None
-    )
-    energy_vom_cost: Annotated[PositiveFloat | None, Unit("$/MWh"), Field(description="Energy VOM")] = None
-    inverter_loading_ratio: Annotated[PositiveFloat | None, Field(description="ILR for hybrid")] = None
+    storage_duration: Annotated[
+        float,
+        Unit("hours"),
+        Field(gt=0.0, description="Storage duration"),
+    ]
+    round_trip_efficiency: Annotated[
+        PositiveUnitFloat,
+        Field(description="Round-trip efficiency"),
+    ]
 
 
 class ReEDSHydroGenerator(ReEDSGenerator):
-    """Hydroelectric generators with monthly/daily energy budgets."""
+    """Hydroelectric generator with optional operating-flow bounds."""
 
     is_dispatchable: Annotated[bool, Field(description="Whether hydro is dispatchable")]
-    flow_range: Annotated[MinMax | None, Unit("MW"), Field(description="Flow range")] = None
-    ramp_rate: Annotated[PositiveFloat | None, Unit("fraction/hour"), Field(description="Ramp rate")] = None
 
 
 class ReEDSConsumingTechnology(HasUnits, ReEDSComponent):
-    """Technologies that consume electricity to produce other products."""
+    """Technology that consumes electricity to produce another product."""
 
     region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
-    technology: Annotated[str, Field(description="Technology type")]
-    capacity: Annotated[PositiveFloat, Unit("MW"), Field(description="Consumption capacity")]
-    heat_rate: Annotated[PositiveFloat | None, Unit("MMBtu/MWh"), Field(description="Heat rate")] = None
-    fuel_price: Annotated[PositiveFloat | None, Unit("$/MMBtu"), Field(description="Fuel price")] = None
-    capital_cost: Annotated[PositiveFloat | None, Unit("$/kW"), Field(description="Capital cost")] = None
-    fom_cost: Annotated[PositiveFloat | None, Unit("$/kW/year"), Field(description="Fixed O&M")] = None
-    vom_cost: Annotated[PositiveFloat | None, Unit("$/MWh"), Field(description="Variable O&M")] = None
-    electricity_efficiency: Annotated[
-        PositiveFloat, Unit("kWh/kg"), Field(description="Electricity consumption rate")
+    technology: Annotated[NonEmptyText, Field(description="Technology type")]
+    capacity: Annotated[
+        float,
+        Unit("MW"),
+        Field(ge=0.0, description="Consumption capacity"),
     ]
-    gas_efficiency: Annotated[
-        PositiveFloat | None, Unit("MMBtu/kg"), Field(description="Gas consumption rate")
-    ] = None
-    storage_transport_adder: Annotated[
-        PositiveFloat | None, Unit("$/kW"), Field(description="Infrastructure costs")
-    ] = None
-    vintage: Annotated[str | None, Field(description="Vintage bin identifier")] = None
+    electricity_consumption_rate: Annotated[
+        float,
+        Unit("kWh/kg"),
+        Field(gt=0.0, description="Electricity consumption rate"),
+    ]
+    identity: ReEDSGeneratorIdentity = Field(default_factory=ReEDSGeneratorIdentity)
 
 
 class ReEDSElectrolyzerDemand(ReEDSConsumingTechnology):
-    """Electricity demand from electrolyzers."""
+    """Electricity demand from an electrolyzer."""
 
-    region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
     max_active_power: Annotated[
-        float | None,
-        Field(description="Maximum active power demand in MW"),
-    ] = None
+        float,
+        Unit("MW"),
+        Field(ge=0.0, description="Maximum active power demand"),
+    ]
 
 
 class ReEDSDataCenterDemand(ReEDSConsumingTechnology):
-    """Electricity demand from data centers or other large facilities."""
+    """Electricity demand from a data center or other large facility."""
 
-    region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
     max_active_power: Annotated[
-        float | None,
-        Field(description="Maximum active power demand in MW"),
-    ] = None
+        float,
+        Unit("MW"),
+        Field(ge=0.0, description="Maximum active power demand"),
+    ]
 
 
 class ReEDSH2Storage(HasUnits, ReEDSComponent):
-    """H2 storage infrastructure."""
+    """Hydrogen storage infrastructure."""
 
     region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
-    storage_type: Annotated[str, Field(description="Storage type")]
-    capacity: Annotated[PositiveFloat, Unit("tonnes"), Field(description="Storage capacity")]
-    capital_cost: Annotated[PositiveFloat | None, Unit("$/tonne"), Field(description="Capital cost")] = None
-    fom_cost: Annotated[PositiveFloat | None, Unit("$/tonne/year"), Field(description="FOM")] = None
-    parasitic_load: Annotated[PositiveFloat | None, Unit("kWh/kg"), Field(description="Parasitic load")] = (
-        None
-    )
+    storage_type: Annotated[NonEmptyText, Field(description="Storage type")]
+    capacity: Annotated[
+        float,
+        Unit("tonnes"),
+        Field(ge=0.0, description="Hydrogen storage capacity"),
+    ]
 
 
 class ReEDSH2Pipeline(HasUnits, ReEDSComponent):
-    """H2 transmission pipeline."""
+    """Hydrogen transmission pipeline."""
 
     from_region: Annotated[ReEDSRegion, Field(description="Origin region")]
     to_region: Annotated[ReEDSRegion, Field(description="Destination region")]
-    capacity: Annotated[PositiveFloat, Unit("tonnes"), Field(description="Pipeline capacity")]
-    distance_km: Annotated[PositiveFloat, Unit("km"), Field(description="Distance")]
-    capital_cost_per_km: Annotated[
-        PositiveFloat | None, Unit("$/tonne/km"), Field(description="Capital cost")
-    ] = None
-    fom_cost_per_km: Annotated[PositiveFloat | None, Unit("$/tonne/year/km"), Field(description="FOM")] = None
+    capacity: Annotated[
+        float,
+        Unit("tonnes"),
+        Field(ge=0.0, description="Pipeline capacity"),
+    ]
+    distance: Annotated[float, Unit("km"), Field(gt=0.0, description="Pipeline distance")]
 
 
-class ReEDSTransmissionLine(ReEDSComponent):
-    """ReEDS transmission line component.
-
-    Represents a transmission line connection between two regions.
-    """
+class ReEDSTransmissionLine(HasUnits, ReEDSComponent):
+    """Transmission line with directional capacity and line characteristics."""
 
     interface: Annotated[ReEDSInterface, Field(description="Interface connecting two regions")]
-    max_active_power: Annotated[FromTo_ToFrom, Field(description="Transfer capacity limit in MW")]
+    max_active_power: Annotated[
+        FromTo_ToFrom,
+        Field(description="Directional transfer capacity limits"),
+    ]
     losses: Annotated[
-        float | None,
-        Field(description="Transmission losses (fraction)"),
-    ] = None
-    line_type: Annotated[str | None, Field(description="Line type (AC/DC)")] = None
-    voltage: Annotated[float | None, Field(description="Voltage level in kV")] = None
-    distance_miles: Annotated[float | None, Field(description="Distance in miles")] = None
-    line_cost_per_mw_mile: Annotated[
-        float | None,
-        Field(description="Cost per MW-mile"),
-    ] = None
-    hurdle_rate: Annotated[
-        float | None,
-        Field(description="Hurdle rate forward direction"),
-    ] = None
+        float,
+        Unit("fraction"),
+        Field(ge=0.0, le=1.0, description="Transmission-loss fraction"),
+    ]
+    line_type: Annotated[TransmissionLineType, Field(description="Transmission line type")]
 
 
-class ReEDSDemand(ReEDSComponent):
-    """ReEDS electrical demand component.
-
-    Represents load/demand in a region.
-    """
+class ReEDSDemand(HasUnits, ReEDSComponent):
+    """Electrical demand with a required regional peak-power value."""
 
     region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
     max_active_power: Annotated[
-        float | None,
-        Field(description="Maximum active power demand in MW"),
-    ] = None
+        float,
+        Unit("MW"),
+        Field(ge=0.0, description="Maximum active power demand"),
+    ]
 
 
-class ReEDSResourceClass(ReEDSComponent):
-    """ReEDS supply curve resource component.
+class ReEDSResourceClass(HasUnits, ReEDSComponent):
+    """Renewable supply-curve resource class for one technology and region."""
 
-    Represents renewable resource potential in a region with
-    associated costs and capacity factors.
-    """
-
-    technology: Annotated[str, Field(description="Technology type (e.g., 'upv', 'wind-ons')")]
+    technology: Annotated[NonEmptyText, Field(description="Technology type")]
     region: Annotated[ReEDSRegion, Field(description="ReEDS region")]
-    resource_class: Annotated[str, Field(description="Resource class identifier")]
-    capacity: Annotated[float, Field(description="Available capacity in MW")]
-    capacity_factor: Annotated[
-        float | None,
-        Field(description="Average capacity factor"),
-    ] = None
-    cost_per_mw: Annotated[float | None, Field(description="Cost per MW")] = None
-    fixed_om_per_mw: Annotated[
-        float | None,
-        Field(description="Fixed O&M per MW-year"),
-    ] = None
-    variable_om_per_mwh: Annotated[
-        float | None,
-        Field(description="Variable O&M per MWh"),
-    ] = None
+    resource_class: Annotated[NonEmptyText, Field(description="Resource-class identifier")]
+    capacity: Annotated[
+        float,
+        Unit("MW"),
+        Field(ge=0.0, description="Available resource capacity"),
+    ]
+    cost: Annotated[
+        float,
+        Unit("$/MW"),
+        Field(ge=0.0, description="Supply-curve cost"),
+    ]

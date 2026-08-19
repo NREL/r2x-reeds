@@ -162,10 +162,7 @@
       "capital_cost": "capital_cost",
       "vintage": "vintage",
       "storage_duration": "storage_duration",
-      "round_trip_efficiency": "round_trip_efficiency",
-      "energy_capacity": "energy_capacity",
-      "capital_cost_energy": "capital_cost_energy",
-      "fom_cost_energy": "fom_cost_energy"
+      "round_trip_efficiency": "round_trip_efficiency"
     },
     "getters": {
       "name": "build_generator_name",
@@ -179,12 +176,7 @@
       "vom_cost": null,
       "fom_cost": null,
       "capital_cost": null,
-      "vintage": null,
-      "storage_duration": null,
-      "round_trip_efficiency": null,
-      "energy_capacity": null,
-      "capital_cost_energy": null,
-      "fom_cost_energy": null
+      "vintage": null
     }
   },
   {
@@ -240,7 +232,7 @@
       "fom_cost": "fom_cost",
       "capital_cost": "capital_cost",
       "vintage": "vintage",
-      "electricity_efficiency": "electricity_efficiency",
+      "electricity_consumption_rate": "electricity_consumption_rate",
       "storage_transport_adder": "storage_transport_adder"
     },
     "getters": {
@@ -258,7 +250,7 @@
       "fom_cost": null,
       "capital_cost": null,
       "vintage": null,
-      "electricity_efficiency": 1.0,
+      "electricity_consumption_rate": 1.0,
       "storage_transport_adder": null
     }
   },
@@ -280,7 +272,8 @@
       "fom_cost": "fom_cost",
       "capital_cost": "capital_cost",
       "vintage": "vintage",
-      "electricity_efficiency": "electricity_efficiency",
+      "electricity_consumption_rate": "electricity_consumption_rate",
+      "max_active_power": "max_active_power",
       "storage_transport_adder": "storage_transport_adder"
     },
     "getters": {
@@ -298,7 +291,7 @@
       "fom_cost": null,
       "capital_cost": null,
       "vintage": null,
-      "electricity_efficiency": 1.0,
+      "electricity_consumption_rate": 1.0,
       "storage_transport_adder": null
     }
   },
@@ -326,9 +319,7 @@
       "name": "build_region_name"
     },
     "defaults": {
-      "category": null,
-      "timezone": null,
-      "max_active_power": null
+      "category": null
     }
   }
   ,
@@ -345,9 +336,7 @@
       "name": "build_load_name",
       "region": "lookup_region"
     },
-    "defaults": {
-      "max_active_power": null
-    }
+    "defaults": {}
   },
   {
     "source_type": "data_row",
@@ -358,7 +347,10 @@
       "region": "region",
       "duration": "duration",
       "time_frame": "time_frame",
-      "vors": "vors"
+      "vors": "vors",
+      "or_load_percentage": "or_load_percentage",
+      "or_wind_percentage": "or_wind_percentage",
+      "or_pv_percentage": "or_pv_percentage"
     },
     "getters": {
       "name": "build_reserve_name",
@@ -366,12 +358,7 @@
       "direction": "resolve_reserve_direction",
       "region": "lookup_reserve_region"
     },
-    "defaults": {
-      "direction": null,
-      "time_frame": null,
-      "vors": null,
-      "duration": null
-    }
+    "defaults": {}
   },
   {
     "source_type": "data_row",
@@ -412,7 +399,6 @@
     "version": 1,
     "name": "transmission_line",
     "field_map": {
-      "category": "trtype",
       "line_type": "trtype",
       "losses": "losses"
     },
@@ -422,10 +408,7 @@
       "max_active_power": "build_transmission_flow"
     },
     "defaults": {
-      "category": null,
-      "line_type": null,
-      "losses": null,
-      "reverse_capacity": null
+      "losses": 0.0
     }
   }
 ]

@@ -1,4 +1,4 @@
-"""Base models for ReEDS components."""
+"""Base models and reusable directional/range value objects."""
 
 from __future__ import annotations
 
@@ -6,65 +6,72 @@ from typing import Annotated
 
 from infrasys import Component
 from infrasys.models import InfraSysBaseModel
-from pydantic import Field, PositiveFloat
+from pydantic import Field, model_validator
 
-from .types import MaximumUnitFloat, NonNegativeFloat, UnitFloat
+from r2x_core.units import Unit
+
+from .types import Fraction, NonNegativeFloat
 
 
 class ReEDSComponent(Component):
-    """Base class for ReEDS components with common metadata fields.
+    """Base class for ReEDS components with common metadata."""
 
-    Provides an extensible ext field for storing additional metadata and component
-    information that doesn't fit into standard fields.
-
-    Attributes
-    ----------
-    category : str, optional
-        Technology category that this component belongs to.
-    ext : dict
-        Additional information and metadata for the component. Can store any
-        serializable key-value pairs for extended functionality.
-
-    Notes
-    -----
-    Version information should be stored at the System level using
-    system.data_format_version, not on individual components.
-    """
-
-    category: Annotated[str | None, Field(description="Technology category")] = None
-    ext: dict = Field(
-        default_factory=dict, description="Additional information and metadata for the component."
+    category: Annotated[str | None, Field(min_length=1, description="Technology category")] = None
+    ext: dict[str, object] = Field(
+        default_factory=dict,
+        description="Additional serializable metadata for the component.",
     )
 
 
 class FromTo_ToFrom(InfraSysBaseModel):  # noqa: N801
-    """Bidirectional flow capacity model.
+    """Nonnegative power-capacity limits in both transfer directions."""
 
-    Represents capacity limits in both directions between two regions or nodes.
-    Used for transmission lines and interfaces in ReEDS models.
-    """
-
-    from_to: Annotated[NonNegativeFloat, Field(description="Capacity from origin to destination in MW")]
-    to_from: Annotated[NonNegativeFloat, Field(description="Capacity from destination to origin in MW")]
+    from_to: Annotated[
+        float,
+        Unit("MW"),
+        Field(ge=0.0, description="Capacity from origin to destination"),
+    ]
+    to_from: Annotated[
+        float,
+        Unit("MW"),
+        Field(ge=0.0, description="Capacity from destination to origin"),
+    ]
 
 
 class UpDown(InfraSysBaseModel):
-    """Bidirectional rate or value.
+    """Nonnegative values that differ between upward and downward directions."""
 
-    Represents rates or values that differ in up and down directions,
-    such as ramp rates or reserve provision capabilities.
-    """
-
-    up: PositiveFloat
-    down: PositiveFloat
+    up: NonNegativeFloat
+    down: NonNegativeFloat
 
 
-class MinMax(InfraSysBaseModel):
-    """Min/Max bounds for operational parameters.
+class FractionRange(InfraSysBaseModel):
+    """Inclusive unit-interval range with an ordered lower and upper bound."""
 
-    Represents minimum and maximum bounds for operational parameters
-    like capacity factors, flow rates, etc.
-    """
+    min: Annotated[Fraction, Field(description="Lower bound")]
+    max: Annotated[Fraction, Field(description="Upper bound")]
 
-    min: UnitFloat
-    max: MaximumUnitFloat
+    @model_validator(mode="after")
+    def validate_order(self) -> FractionRange:
+        """Require the lower bound not to exceed the upper bound."""
+        if self.min > self.max:
+            raise ValueError("min must be <= max")
+        return self
+
+
+class NonNegativeRange(InfraSysBaseModel):
+    """Inclusive nonnegative range for quantities such as power in MW."""
+
+    min: Annotated[NonNegativeFloat, Field(description="Lower bound")]
+    max: Annotated[NonNegativeFloat, Field(description="Upper bound")]
+
+    @model_validator(mode="after")
+    def validate_order(self) -> NonNegativeRange:
+        """Require the lower bound not to exceed the upper bound."""
+        if self.min > self.max:
+            raise ValueError("min must be <= max")
+        return self
+
+
+class MinMax(FractionRange):
+    """Compatibility name for the unit-interval range used by capacity factors."""

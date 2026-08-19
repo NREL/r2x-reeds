@@ -15,8 +15,8 @@ pytestmark = [pytest.mark.integration]
 
 def _build_regions() -> tuple[System, ReEDSRegion, ReEDSRegion]:
     system = System(name="test_electrolyzer")
-    west = ReEDSRegion(name="west")
-    east = ReEDSRegion(name="east")
+    west = ReEDSRegion.example().model_copy(update={"name": "west"})
+    east = ReEDSRegion.example().model_copy(update={"name": "east"})
     system.add_component(west)
     system.add_component(east)
     return system, west, east

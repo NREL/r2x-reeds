@@ -9,7 +9,15 @@ import pytest
 from infrasys import SingleTimeSeries
 
 from r2x_core import System
-from r2x_reeds.models.components import ReEDSEmission, ReEDSGenerator, ReEDSRegion
+from r2x_reeds.models.components import (
+    ReEDSEmission,
+    ReEDSGenerator,
+    ReEDSGeneratorEconomics,
+    ReEDSGeneratorIdentity,
+    ReEDSGeneratorOperatingConstraints,
+    ReEDSGeneratorPerformance,
+    ReEDSRegion,
+)
 from r2x_reeds.models.enums import EmissionType
 from r2x_reeds.sysmod.break_gens import BreakGensConfig, break_generators
 
@@ -370,13 +378,20 @@ def test_create_split_generator_preserves_all_fields(system_with_region) -> None
         technology="wind",
         capacity=100.0,
         category="wind",
-        heat_rate=7.5,
-        forced_outage_rate=0.05,
-        planned_outage_rate=0.10,
-        fuel_type="wind",
-        fuel_price=0.0,
-        vom_cost=25.0,
-        vintage="2020",
+        identity=ReEDSGeneratorIdentity(vintage="2020"),
+    )
+    sys.add_component(original)
+    sys.add_supplemental_attribute(original, ReEDSGeneratorPerformance(heat_rate=7.5))
+    sys.add_supplemental_attribute(
+        original,
+        ReEDSGeneratorOperatingConstraints(
+            forced_outage_rate=0.05,
+            planned_outage_rate=0.10,
+        ),
+    )
+    sys.add_supplemental_attribute(
+        original,
+        ReEDSGeneratorEconomics(fuel_price=0.0, vom_cost=25.0),
     )
 
     split = _create_split_generator(sys, original, "split_01", 50.0)
@@ -386,13 +401,16 @@ def test_create_split_generator_preserves_all_fields(system_with_region) -> None
     assert split.region is original.region
     assert split.technology == original.technology
     assert split.category == original.category
-    assert split.heat_rate == pytest.approx(7.5)
-    assert split.forced_outage_rate == pytest.approx(0.05)
-    assert split.planned_outage_rate == pytest.approx(0.10)
-    assert split.fuel_type == "wind"
-    assert split.fuel_price == pytest.approx(0.0)
-    assert split.vom_cost == pytest.approx(25.0)
-    assert split.vintage == "2020"
+    assert sys.get_supplemental_attributes_with_component(split, ReEDSGeneratorPerformance)[
+        0
+    ].heat_rate == pytest.approx(7.5)
+    constraints = sys.get_supplemental_attributes_with_component(split, ReEDSGeneratorOperatingConstraints)[0]
+    assert constraints.forced_outage_rate == pytest.approx(0.05)
+    assert constraints.planned_outage_rate == pytest.approx(0.10)
+    economics = sys.get_supplemental_attributes_with_component(split, ReEDSGeneratorEconomics)[0]
+    assert economics.fuel_price == pytest.approx(0.0)
+    assert economics.vom_cost == pytest.approx(25.0)
+    assert split.identity.vintage == "2020"
 
 
 def test_create_split_generator_added_to_system(system_with_region) -> None:
@@ -554,8 +572,8 @@ def test_break_generators_with_custom_break_category(system_with_region) -> None
 def test_break_generators_include_regions_filter() -> None:
     """Only generators in selected balancing areas are disaggregated."""
     sys = System(name="Test", auto_add_composed_components=True)
-    r1 = ReEDSRegion(name="p1")
-    r2 = ReEDSRegion(name="p2")
+    r1 = ReEDSRegion.example().model_copy(update={"name": "p1"})
+    r2 = ReEDSRegion.example().model_copy(update={"name": "p2"})
     sys.add_component(r1)
     sys.add_component(r2)
 
@@ -649,8 +667,8 @@ def test_break_generators_include_technologies_filter(system_with_region) -> Non
 def test_break_generators_include_filters_use_or_behavior() -> None:
     """A generator should be split when it matches any include filter."""
     sys = System(name="Test", auto_add_composed_components=True)
-    r1 = ReEDSRegion(name="p1")
-    r2 = ReEDSRegion(name="p2")
+    r1 = ReEDSRegion.example().model_copy(update={"name": "p1"})
+    r2 = ReEDSRegion.example().model_copy(update={"name": "p2"})
     sys.add_component(r1)
     sys.add_component(r2)
 
@@ -806,15 +824,13 @@ def test_create_split_generator_with_none_values(system_with_region) -> None:
         technology="wind",
         capacity=100.0,
         category=None,
-        heat_rate=None,
-        fuel_type=None,
     )
 
     split = _create_split_generator(sys, original, "split_01", 50.0)
 
     assert split.category is None
-    assert split.heat_rate is None
-    assert split.fuel_type is None
+    assert split.identity.vintage is None
+    assert not sys.get_supplemental_attributes_with_component(split)
 
 
 def test_break_generators_very_large_capacity(system_with_region) -> None:

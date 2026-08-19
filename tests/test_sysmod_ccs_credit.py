@@ -6,7 +6,7 @@ import polars as pl
 import pytest
 from infrasys import System
 
-from r2x_reeds.models.components import ReEDSGenerator, ReEDSRegion
+from r2x_reeds.models.components import ReEDSGenerator, ReEDSGeneratorIdentity, ReEDSRegion
 from r2x_reeds.sysmod import ccs_credit
 
 pytestmark = [pytest.mark.integration]
@@ -14,7 +14,7 @@ pytestmark = [pytest.mark.integration]
 
 def _build_system() -> tuple[System, ReEDSRegion]:
     system = System(name="test_ccs_credit")
-    region = ReEDSRegion(name="west")
+    region = ReEDSRegion.example().model_copy(update={"name": "west"})
     system.add_component(region)
     return system, region
 
@@ -32,7 +32,7 @@ def _add_generator(
         technology=technology,
         capacity=100.0,
         category=technology,
-        vintage=vintage,
+        identity=ReEDSGeneratorIdentity(vintage=vintage),
     )
     system.add_component(generator)
     return generator

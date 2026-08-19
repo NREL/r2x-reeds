@@ -8,6 +8,9 @@ from infrasys import System
 
 from r2x_reeds.models.components import (
     ReEDSGenerator,
+    ReEDSGeneratorEconomics,
+    ReEDSGeneratorOperatingConstraints,
+    ReEDSGeneratorPerformance,
     ReEDSHydroGenerator,
     ReEDSRegion,
     ReEDSThermalGenerator,
@@ -19,7 +22,7 @@ pytestmark = [pytest.mark.integration]
 
 def _build_generator(name: str = "GEN1", category: str = "coal") -> tuple[System, ReEDSGenerator]:
     system = System(name="test_pcm_defaults")
-    region = ReEDSRegion(name="west")
+    region = ReEDSRegion.example().model_copy(update={"name": "west"})
     system.add_component(region)
     generator = ReEDSGenerator(
         name=name, region=region, capacity=100.0, technology=category, category=category
@@ -32,7 +35,7 @@ def _build_thermal_generator(
     name: str = "GEN1", category: str = "coal"
 ) -> tuple[System, ReEDSThermalGenerator]:
     system = System(name="test_pcm_defaults")
-    region = ReEDSRegion(name="west")
+    region = ReEDSRegion.example().model_copy(update={"name": "west"})
     system.add_component(region)
     generator = ReEDSThermalGenerator(
         name=name,
@@ -49,7 +52,7 @@ def _build_thermal_generator(
 
 def _build_hydro_generator(name: str = "GEN1", category: str = "hydro") -> tuple[System, ReEDSHydroGenerator]:
     system = System(name="test_pcm_defaults")
-    region = ReEDSRegion(name="west")
+    region = ReEDSRegion.example().model_copy(update={"name": "west"})
     system.add_component(region)
     generator = ReEDSHydroGenerator(
         name=name,
@@ -61,6 +64,13 @@ def _build_hydro_generator(name: str = "GEN1", category: str = "hydro") -> tuple
     )
     system.add_component(generator)
     return system, generator
+
+
+def _get_attribute(system: System, component: ReEDSGenerator, attribute_type):
+    """Return the attached concept-specific enrichment record."""
+    attributes = system.get_supplemental_attributes_with_component(component, attribute_type)
+    assert attributes
+    return attributes[0]
 
 
 def _run_pcm_defaults(system: System, **kwargs) -> System:
@@ -76,14 +86,14 @@ def test_pcm_defaults_scope_from_dict() -> None:
 
     _run_pcm_defaults(system, pcm_defaults_dict=defaults)
 
-    assert generator.heat_rate == pytest.approx(9.0)
-    assert generator.vom_cost == pytest.approx(2.5)
+    assert _get_attribute(system, generator, ReEDSGeneratorPerformance).heat_rate == pytest.approx(9.0)
+    assert _get_attribute(system, generator, ReEDSGeneratorEconomics).vom_cost == pytest.approx(2.5)
 
 
 def test_pcm_defaults_scope_override() -> None:
     """Override flag replaces existing values."""
     system, generator = _build_generator()
-    generator.vom_cost = 1.0
+    system.add_supplemental_attribute(generator, ReEDSGeneratorEconomics(vom_cost=1.0))
 
     _run_pcm_defaults(
         system,
@@ -91,7 +101,7 @@ def test_pcm_defaults_scope_override() -> None:
         pcm_defaults_override=True,
     )
 
-    assert generator.vom_cost == pytest.approx(3.0)
+    assert _get_attribute(system, generator, ReEDSGeneratorEconomics).vom_cost == pytest.approx(3.0)
 
 
 def test_pcm_defaults_scope_file(tmp_path: Path) -> None:
@@ -103,7 +113,7 @@ def test_pcm_defaults_scope_file(tmp_path: Path) -> None:
 
     _run_pcm_defaults(system, pcm_defaults_fpath=str(json_path))
 
-    assert generator.fuel_price == pytest.approx(4.5)
+    assert _get_attribute(system, generator, ReEDSGeneratorEconomics).fuel_price == pytest.approx(4.5)
 
 
 def test_pcm_defaults_scope_file_list_format(tmp_path: Path) -> None:
@@ -118,8 +128,8 @@ def test_pcm_defaults_scope_file_list_format(tmp_path: Path) -> None:
 
     _run_pcm_defaults(system, pcm_defaults_fpath=str(json_path))
 
-    assert generator.heat_rate == pytest.approx(8.5)
-    assert generator.vom_cost == pytest.approx(3.0)
+    assert _get_attribute(system, generator, ReEDSGeneratorPerformance).heat_rate == pytest.approx(8.5)
+    assert _get_attribute(system, generator, ReEDSGeneratorEconomics).vom_cost == pytest.approx(3.0)
 
 
 def test_pcm_defaults_scope_no_inputs(caplog) -> None:
@@ -137,7 +147,7 @@ def test_pcm_defaults_scope_no_match(caplog) -> None:
 
     _run_pcm_defaults(system, pcm_defaults_dict={"coal": {"heat_rate": 9.0}})
 
-    assert generator.heat_rate is None
+    assert not system.get_supplemental_attributes_with_component(generator, ReEDSGeneratorPerformance)
     assert "Could not find a matching category" in caplog.text
 
 
@@ -161,7 +171,9 @@ def test_pcm_defaults_ramp_rate_is_multiplied_thermal() -> None:
 
     _run_pcm_defaults(system, pcm_defaults_dict={"coal": {"ramp_rate": 0.01}})
 
-    assert generator.ramp_rate == pytest.approx(100.0 * 0.01)
+    assert _get_attribute(system, generator, ReEDSGeneratorOperatingConstraints).ramp_rate == pytest.approx(
+        100.0 * 0.01
+    )
 
 
 def test_pcm_defaults_ramp_rate_is_multiplied_hydro() -> None:
@@ -170,4 +182,6 @@ def test_pcm_defaults_ramp_rate_is_multiplied_hydro() -> None:
 
     _run_pcm_defaults(system, pcm_defaults_dict={"hydro": {"ramp_rate": 0.3}})
 
-    assert generator.ramp_rate == pytest.approx(100.0 * 0.3)
+    assert _get_attribute(system, generator, ReEDSGeneratorOperatingConstraints).ramp_rate == pytest.approx(
+        100.0 * 0.3
+    )

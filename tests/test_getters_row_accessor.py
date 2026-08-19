@@ -26,7 +26,7 @@ def test_system():
     from r2x_reeds.models import ReEDSRegion, ReEDSReserveRegion
 
     system = System(name="test_system")
-    region = ReEDSRegion(name="p1", state="CA")
+    region = ReEDSRegion.example().model_copy(update={"name": "p1"})
     system.add_component(region)
     reserve_region = ReEDSReserveRegion(name="reserve_p1")
     system.add_component(reserve_region)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 from infrasys.models import InfraSysBaseModel
-from pydantic import Field, PositiveFloat, model_validator
+from pydantic import Field, model_validator
 
 from r2x_core.units import HasUnits, Unit
 
@@ -17,7 +17,6 @@ from .types import (
     InitialCapacities,
     MinimumCapacityFactor,
     MinimumGenerationFraction,
-    NonNegativeFloat,
     PlanningPeriods,
     PlanningYear,
     PlantCharacteristics,
@@ -34,17 +33,18 @@ class ReEDSPlanningPeriod(InfraSysBaseModel):
 
     year: PlanningYear
     present_value_factor: Annotated[
-        PositiveFloat,
-        Field(description="Present-value factor for overnight capital costs"),
+        float,
+        Unit("fraction"),
+        Field(gt=0.0, description="Present-value factor for overnight capital costs"),
     ]
     emission_cap: (
         Annotated[
-            NonNegativeFloat,
+            float,
             Unit("tonne"),
-            Field(ge=0),
+            Field(ge=0.0, description="Annual emissions cap"),
         ]
         | None
-    ) = Field(default=None, description="Annual emissions cap in tonnes; None means no cap is imposed")
+    ) = Field(default=None, description="None means no cap is imposed")
 
 
 class ReEDSRepresentativeTimepoint(InfraSysBaseModel):
@@ -56,9 +56,9 @@ class ReEDSRepresentativeTimepoint(InfraSysBaseModel):
         Field(ge=0, description="Zero-based chronological position in the representative sequence"),
     ]
     weight: Annotated[
-        PositiveFloat,
+        float,
         Unit("hours"),
-        Field(gt=0, description="Calendar hours represented by this timepoint"),
+        Field(gt=0.0, description="Calendar hours represented by this timepoint"),
     ]
 
 
@@ -72,70 +72,70 @@ class ReEDSPlantCharacteristics(InfraSysBaseModel):
     technology: Annotated[str, Field(min_length=1, description="ReEDS technology identifier")]
     year: PlanningYear
     capital_cost: Annotated[
-        NonNegativeFloat,
+        float,
         Unit("$/MW"),
-        Field(ge=0, description="Overnight power-capacity capital cost"),
+        Field(ge=0.0, description="Overnight power-capacity capital cost"),
     ]
     capital_cost_energy: Annotated[
-        NonNegativeFloat,
+        float,
         Unit("$/MWh"),
-        Field(ge=0, description="Overnight energy-capacity capital cost"),
+        Field(ge=0.0, description="Overnight energy-capacity capital cost"),
     ]
     fom_cost: Annotated[
-        NonNegativeFloat,
+        float,
         Unit("$/MW/year"),
-        Field(ge=0, description="Fixed power-capacity operation and maintenance cost"),
+        Field(ge=0.0, description="Fixed power-capacity operation and maintenance cost"),
     ]
     fom_cost_energy: Annotated[
-        NonNegativeFloat,
+        float,
         Unit("$/MWh/year"),
-        Field(ge=0, description="Fixed energy-capacity operation and maintenance cost"),
+        Field(ge=0.0, description="Fixed energy-capacity operation and maintenance cost"),
     ]
     vom_cost: Annotated[
-        NonNegativeFloat,
+        float,
         Unit("$/MWh"),
-        Field(ge=0, description="Variable operation and maintenance cost"),
+        Field(ge=0.0, description="Variable operation and maintenance cost"),
     ]
     heat_rate: (
         Annotated[
-            PositiveFloat,
+            float,
             Unit("MMBtu/MWh"),
-            Field(gt=0),
+            Field(gt=0.0, description="Thermal heat rate"),
         ]
         | None
-    ) = Field(default=None, description="Thermal heat rate; None for non-combustion technologies")
+    ) = Field(default=None, description="None for non-combustion technologies")
     round_trip_efficiency: PositiveUnitFloat | None = Field(
         default=None,
         description="Storage round-trip efficiency when defined",
     )
     upgrade_cost: (
         Annotated[
-            NonNegativeFloat,
+            float,
             Unit("$/MW"),
-            Field(ge=0),
+            Field(ge=0.0, description="Technology upgrade capital cost"),
         ]
         | None
-    ) = Field(default=None, description="Technology upgrade capital cost when defined")
+    ) = Field(default=None, description="None when no upgrade cost is defined")
 
 
 class ReEDSInitialCapacity(InfraSysBaseModel):
-    """Initial non-resource capacity from ``capnonrsc.csv`` and ``capnonrsc_energy.csv``."""
+    """Initial non-resource capacity from ``capnonrsc.csv`` and its energy table."""
 
     technology: Annotated[str, Field(min_length=1, description="ReEDS technology identifier")]
     region: Annotated[str, Field(min_length=1, description="ReEDS region identifier")]
     initial_power_capacity: Annotated[
-        NonNegativeFloat,
+        float,
         Unit("MW"),
-        Field(ge=0, description="Initial power capacity before retirements"),
+        Field(ge=0.0, description="Initial power capacity before retirements"),
     ]
     initial_energy_capacity: (
         Annotated[
-            NonNegativeFloat,
+            float,
             Unit("MWh"),
-            Field(ge=0),
+            Field(ge=0.0, description="Initial storage energy capacity"),
         ]
         | None
-    ) = Field(default=None, description="Initial storage energy capacity when defined")
+    ) = Field(default=None, description="None when no energy-capacity table is available")
 
 
 class ReEDSStorageDuration(InfraSysBaseModel):
@@ -143,33 +143,27 @@ class ReEDSStorageDuration(InfraSysBaseModel):
 
     technology: Annotated[str, Field(min_length=1, description="ReEDS technology identifier")]
     duration: Annotated[
-        PositiveFloat,
+        float,
         Unit("hours"),
-        Field(gt=0, description="Fixed energy-to-power duration"),
+        Field(gt=0.0, description="Fixed energy-to-power duration"),
     ]
 
 
 class ReEDSStorageDurationOverride(InfraSysBaseModel):
-    """An enabled regional and vintage-specific duration from ``storage_duration_pshdata.csv``."""
+    """Regional and vintage-specific duration from ``storage_duration_pshdata.csv``."""
 
     technology: Annotated[str, Field(min_length=1, description="ReEDS technology identifier")]
     vintage: Annotated[str, Field(min_length=1, description="ReEDS capacity vintage identifier")]
     region: Annotated[str, Field(min_length=1, description="ReEDS region identifier")]
     duration: Annotated[
-        PositiveFloat,
+        float,
         Unit("hours"),
-        Field(gt=0, description="Asset-specific energy-to-power duration"),
+        Field(gt=0.0, description="Asset-specific energy-to-power duration"),
     ]
 
 
 class ReEDSCapacityExpansionInputs(InfraSysBaseModel):
-    """Validated source data for a ReEDS capacity-expansion formulation.
-
-    This model represents canonical ReEDS input tables, not region-specific
-    investment candidates. Source tables define technology-year characteristics
-    and non-resource initial capacity, but not a complete candidate-feasibility
-    relation.
-    """
+    """Validated source data for a ReEDS capacity-expansion formulation."""
 
     emission_type: Annotated[
         EmissionType | None,
@@ -210,15 +204,12 @@ class ReEDSCapacityExpansionInputs(InfraSysBaseModel):
     ] = ()
     pumped_storage_supply_curve_duration: (
         Annotated[
-            PositiveFloat,
+            float,
             Unit("hours"),
-            Field(gt=0),
+            Field(gt=0.0, description="Selected pumped-storage supply-curve duration"),
         ]
         | None
-    ) = Field(
-        default=None,
-        description="Selected supply-curve duration that overrides pumped-storage defaults",
-    )
+    ) = Field(default=None, description="None when no override is selected")
     storage_duration_overrides: Annotated[
         StorageDurationOverrides,
         Field(description="Unique technology-vintage-region storage-duration overrides."),
@@ -253,10 +244,7 @@ class ReEDSCapacityExpansion(HasUnits, ReEDSComponent):
 
 
 class ReEDSCapacityExpansionResource(HasUnits, ReEDSComponent):
-    """Abstract base class for investable capacity-expansion resource variants.
-
-    Use a dispatchable, variable, or storage subtype; this base class cannot be instantiated.
-    """
+    """Abstract base class for investable capacity-expansion resource variants."""
 
     region: Annotated[ReEDSRegion, Field(description="ReEDS region hosting the candidate")]
     technology: Annotated[str, Field(min_length=1, description="ReEDS technology identifier")]
@@ -265,19 +253,19 @@ class ReEDSCapacityExpansionResource(HasUnits, ReEDSComponent):
         Field(min_length=1, description="Unique ascending planning years in which the candidate is active."),
     ]
     initial_capacity: Annotated[
-        NonNegativeFloat,
+        float,
         Unit("MW"),
-        Field(ge=0, description="Installed capacity before capacity-expansion investment"),
+        Field(ge=0.0, description="Installed capacity before capacity-expansion investment"),
     ]
     investment_cost: Annotated[
-        NonNegativeFloat,
+        float,
         Unit("$/MW"),
-        Field(ge=0, description="Capacity investment cost"),
+        Field(ge=0.0, description="Capacity investment cost"),
     ]
     variable_cost: Annotated[
-        NonNegativeFloat,
+        float,
         Unit("$/MWh"),
-        Field(ge=0, description="Variable operating cost"),
+        Field(ge=0.0, description="Variable operating cost"),
     ]
 
     @model_validator(mode="before")
@@ -298,20 +286,16 @@ class ReEDSDispatchableCapacityExpansionResource(ReEDSCapacityExpansionResource)
     ]
     minimum_generation_fraction: Annotated[
         MinimumGenerationFraction,
-        Field(
-            description="Minimum hourly generation fraction that must not exceed capacity_factor.",
-        ),
+        Field(description="Minimum hourly generation fraction that must not exceed capacity_factor"),
     ] = 0.0
     minimum_capacity_factor: Annotated[
         MinimumCapacityFactor,
-        Field(
-            description="Minimum annual capacity factor that must not exceed capacity_factor.",
-        ),
+        Field(description="Minimum annual capacity factor that must not exceed capacity_factor"),
     ] = 0.0
     ramp_up_cost: Annotated[
-        NonNegativeFloat,
+        float,
         Unit("$/MW-ramp"),
-        Field(ge=0, description="Cost applied to positive generation ramps"),
+        Field(ge=0.0, description="Cost applied to positive generation ramps"),
     ] = 0.0
 
 
@@ -324,10 +308,10 @@ class ReEDSStorageCapacityExpansionResource(ReEDSCapacityExpansionResource):
 
     round_trip_efficiency: Annotated[
         PositiveUnitFloat,
-        Field(gt=0, le=1, description="Round-trip storage efficiency"),
+        Field(description="Round-trip storage efficiency"),
     ]
     storage_duration: Annotated[
-        PositiveFloat,
+        float,
         Unit("hours"),
-        Field(gt=0, description="Energy capacity duration at rated power"),
+        Field(gt=0.0, description="Energy capacity duration at rated power"),
     ]

@@ -1,5 +1,7 @@
 """Enumerations for ReEDS model components."""
 
+from __future__ import annotations
+
 from enum import StrEnum
 
 
@@ -54,3 +56,20 @@ class FuelType(StrEnum):
     URANIUM = "uranium"
     OIL = "oil"
     OTHER = "OTHER"
+
+
+class TransmissionLineType(StrEnum):
+    """Transmission technologies represented in ReEDS line tables."""
+
+    AC = "AC"
+    LCC = "LCC"
+    VSC = "VSC"
+    B2B = "B2B"
+
+    @classmethod
+    def _missing_(cls, value: object) -> TransmissionLineType | None:
+        """Accept source values regardless of their letter case."""
+        if isinstance(value, str):
+            normalized = value.upper()
+            return next((member for member in cls if member.value == normalized), None)
+        return None

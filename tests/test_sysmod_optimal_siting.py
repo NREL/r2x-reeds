@@ -22,7 +22,7 @@ def _build_system_with_loads() -> tuple[System, dict[str, ReEDSDemand], np.ndarr
 
     demands: dict[str, ReEDSDemand] = {}
     for region_name in ("p1", "p4", "p5"):
-        region = ReEDSRegion(name=region_name)
+        region = ReEDSRegion.example().model_copy(update={"name": region_name})
         system.add_component(region)
         demand = ReEDSDemand(name=f"{region_name}_load", region=region, max_active_power=200.0)
         system.add_component(demand)
@@ -97,7 +97,7 @@ def test_optimal_siting_skips_when_paths_missing(caplog) -> None:
 
 def test_optimal_siting_skips_load_without_time_series(tmp_path: Path) -> None:
     system = System(name="test_optimal_siting_missing_ts")
-    region = ReEDSRegion(name="p4")
+    region = ReEDSRegion.example().model_copy(update={"name": "p4"})
     system.add_component(region)
     demand = ReEDSDemand(name="p4_load", region=region, max_active_power=100.0)
     system.add_component(demand)
@@ -272,7 +272,7 @@ def test_build_region_increments_empty_expand(monkeypatch: pytest.MonkeyPatch) -
 
 def test_apply_increments_handles_min_len_zero() -> None:
     system = System(name="test_optimal_siting_zero_len")
-    region = ReEDSRegion(name="p4")
+    region = ReEDSRegion.example().model_copy(update={"name": "p4"})
     system.add_component(region)
     demand = ReEDSDemand(name="p4_load", region=region, max_active_power=10.0)
     system.add_component(demand)

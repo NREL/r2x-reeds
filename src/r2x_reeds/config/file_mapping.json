@@ -232,8 +232,7 @@
     "info": {
       "description": "AC transmission line cost parameters (distances are inferred from a dedicated distance table)",
       "is_input": true,
-      "is_optional": false,
-      "units": "MW"
+      "is_optional": false
     },
     "proc_spec": {
       "column_mapping": {
@@ -270,10 +269,10 @@
     "name": "transmission_losses",
     "fpath": "outputs/outputs.h5",
     "info": {
-      "description": "Transmission line losses",
+      "description": "Transmission line loss fractions",
       "is_input": false,
       "is_optional": true,
-      "units": "%"
+      "units": "fraction"
     },
     "proc_spec": {
       "column_mapping": {
@@ -426,10 +425,10 @@
     "name": "forced_outages",
     "fpath": "outputs/outputs.h5",
     "info": {
-      "description": "Forced outage rates by technology",
+      "description": "Forced outage fractions by technology",
       "is_input": false,
       "is_optional": true,
-      "units": "%"
+      "units": "fraction"
     },
     "proc_spec": {
       "column_mapping": {
@@ -442,10 +441,10 @@
     "name": "planned_outages",
     "fpath": "outputs/outputs.h5",
     "info": {
-      "description": "Planned outage rates by technology",
+      "description": "Planned outage fractions by technology",
       "is_input": false,
       "is_optional": true,
-      "units": "%"
+      "units": "fraction"
     },
     "proc_spec": {
       "column_mapping": {
@@ -518,10 +517,9 @@
     "name": "renewable_supply_curves",
     "fpath": "inputs_case/caprsc.csv",
     "info": {
-      "description": "Renewable supply curve data",
+      "description": "Renewable supply curve data with capacity, cost, and transmission-adder columns",
       "is_input": true,
-      "is_optional": false,
-      "units": "MW"
+      "is_optional": false
     },
     "proc_spec": {
       "column_mapping": {
@@ -532,7 +530,8 @@
         "supply_curve_cost_per_mw": "supply_curve_cost",
         "capital_adder_per_mw": "transmission_adder"
       }
-    }
+    },
+    "note": "Column units: capacity is MW; supply_curve_cost and transmission_adder are $/MW."
   },
   {
     "name": "modeled_years",
@@ -793,7 +792,7 @@
         "r": "from_region",
         "rr": "to_region",
         "allt": "year",
-        "value": "cost_hurdle_rate"
+        "value": "hurdle_cost"
       },
       "filter_by": {
         "year": "{solve_year}"

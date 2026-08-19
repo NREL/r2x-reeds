@@ -149,7 +149,7 @@ def _apply_ccs_credit(
         ReEDSGenerator, filter_func=lambda gen: gen.technology in ccs_techs
     ):
         reeds_tech = generator.technology
-        reeds_vintage = generator.vintage
+        reeds_vintage = generator.identity.vintage
         reeds_region = generator.region.name
 
         # Create filter for this generator's characteristics

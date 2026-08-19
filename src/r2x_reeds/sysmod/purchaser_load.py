@@ -241,7 +241,8 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
                         region=region,
                         technology="electrolyzer",
                         capacity=capacity,
-                        electricity_efficiency=efficiency,
+                        max_active_power=capacity,
+                        electricity_consumption_rate=efficiency,
                     )
                 )
                 created += 1
@@ -285,7 +286,8 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
                         region=region,
                         technology="data-center",
                         capacity=float(region_profile.max()),
-                        electricity_efficiency=1.0,
+                        max_active_power=float(region_profile.max()),
+                        electricity_consumption_rate=1.0,
                     )
                 )
                 created += 1

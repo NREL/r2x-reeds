@@ -11,17 +11,23 @@ def sample_region():
     return ReEDSRegion(
         name="p1",
         state="CA",
-        nerc_region="WECC",
-        transmission_region="CA_N",
+        nerc_region="WECC_CA",
+        transmission_region="CAISO",
+        transmission_group="CAISO",
         interconnect="western",
         country="USA",
+        cendiv="Pacific",
+        usda_region="pacific",
+        h2ptc_region="California",
+        hurdle_region="CAISO",
+        cc_region="CAISO",
     )
 
 
 @pytest.fixture
 def thermal_generator(sample_region):
     """Create a sample thermal generator."""
-    from r2x_reeds.models import MinMax, ReEDSThermalGenerator
+    from r2x_reeds.models import ReEDSThermalGenerator
 
     return ReEDSThermalGenerator(
         name="gas-cc_init-1_p1",
@@ -30,18 +36,6 @@ def thermal_generator(sample_region):
         capacity=500.0,
         heat_rate=7.5,
         fuel_type="naturalgas",
-        fuel_price=4.5,
-        vom_cost=3.5,
-        fom_cost=15000.0,
-        capital_cost=1000000.0,
-        forced_outage_rate=0.05,
-        planned_outage_rate=0.03,
-        ramp_rate=0.5,
-        min_stable_level=0.4,
-        startup_cost=50.0,
-        capacity_factor_range=MinMax(min=0.1, max=0.9),
-        max_age=40,
-        vintage="init-1",
     )
 
 
@@ -55,12 +49,6 @@ def renewable_generator(sample_region):
         region=sample_region,
         technology="upv",
         capacity=300.0,
-        resource_class="class1",
-        inverter_loading_ratio=1.3,
-        max_capacity_factor=0.4,
-        vom_cost=0.0,
-        fom_cost=12000.0,
-        capital_cost=800000.0,
     )
 
 
@@ -76,19 +64,13 @@ def storage_generator(sample_region):
         capacity=100.0,
         storage_duration=4.0,
         round_trip_efficiency=0.85,
-        energy_capacity=400.0,
-        capital_cost=363000.0,
-        capital_cost_energy=391.0,
-        fom_cost=9080.0,
-        fom_cost_energy=9.77,
-        vom_cost=0.0,
     )
 
 
 @pytest.fixture
 def hydro_generator(sample_region):
     """Create a sample hydro generator."""
-    from r2x_reeds.models import MinMax, ReEDSHydroGenerator
+    from r2x_reeds.models import ReEDSHydroGenerator
 
     return ReEDSHydroGenerator(
         name="hyd_p1",
@@ -96,10 +78,6 @@ def hydro_generator(sample_region):
         technology="hyd",
         capacity=200.0,
         is_dispatchable=True,
-        flow_range=MinMax(min=0.25, max=1.0),
-        ramp_rate=1.0,
-        vom_cost=0.0,
-        fom_cost=18000.0,
     )
 
 
@@ -113,13 +91,7 @@ def consuming_technology(sample_region):
         region=sample_region,
         technology="electrolyzer",
         capacity=150.0,
-        capital_cost=788000.0,
-        heat_rate=10.1,
-        fuel_price=13.2,
-        fom_cost=27500.0,
-        vom_cost=0.0,
-        electricity_efficiency=51.45,
-        storage_transport_adder=390000.0,
+        electricity_consumption_rate=51.45,
     )
 
 
@@ -150,9 +122,9 @@ def h2_pipeline(sample_region):
         from_region=sample_region,
         to_region=region2,
         capacity=500.0,
-        distance_km=100.0,
-        capital_cost_per_km=34045.0,
-        fom_cost_per_km=963.0,
+        distance=100.0,
+        capital_cost=34045.0,
+        fom_cost=963.0,
     )
 
 

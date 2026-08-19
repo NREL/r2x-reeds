@@ -71,7 +71,7 @@ def test_build_generator_field_map_replaces_region_component():
     from r2x_reeds.models import ReEDSRegion
 
     system = System(name="test_parser_utils")
-    region = ReEDSRegion(name="north")
+    region = ReEDSRegion.example().model_copy(update={"name": "north"})
     system.add_component(region)
 
     row = {"technology": "wind", "region": "north"}
@@ -159,7 +159,7 @@ def test_prepare_generator_dataset_with_optional_data() -> None:
     ).unwrap()
     assert "fuel_type" in df.columns
     assert df.filter(pl.col("technology") == "wind").select("fuel_type").item() == "windfuel"
-    assert df.filter(pl.col("technology") == "gas").select("electricity_efficiency").item() == 0.8
+    assert df.filter(pl.col("technology") == "gas").select("electricity_consumption_rate").item() == 0.8
     assert df.filter(pl.col("technology") == "wind").select("storage_duration").item() == 5.5
     assert df.filter(pl.col("technology") == "coal").is_empty()
 
@@ -999,7 +999,7 @@ def test_prepare_generator_dataset_storage_duration_not_overwritten() -> None:
 
 
 def test_prepare_generator_dataset_consume_char_filters_non_efficiency() -> None:
-    """Consume characteristics should only include electricity_efficiency."""
+    """Consume characteristics should only include the electricity consumption rate."""
     import polars as pl
 
     from r2x_reeds import parser_utils
@@ -1033,9 +1033,9 @@ def test_prepare_generator_dataset_consume_char_filters_non_efficiency() -> None
         excluded_technologies=[],
         technology_categories=categories,
     ).unwrap()
-    # Should only have electricity_efficiency, not other params
-    assert "electricity_efficiency" in df.columns
-    assert df.select("electricity_efficiency").item() == 0.8
+    # Should only have the electricity consumption rate, not other parameters.
+    assert "electricity_consumption_rate" in df.columns
+    assert df.select("electricity_consumption_rate").item() == 0.8
 
 
 def test_aggregate_variable_generators_single_row() -> None:

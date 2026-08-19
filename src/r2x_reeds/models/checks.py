@@ -113,7 +113,9 @@ def validate_plant_characteristics_are_unique_by_technology_and_year(
     plant_characteristics: tuple[ReEDSPlantCharacteristics, ...],
 ) -> tuple[ReEDSPlantCharacteristics, ...]:
     """Require one plant-characteristics record per technology and year."""
-    keys = tuple((characteristics.technology, characteristics.year) for characteristics in plant_characteristics)
+    keys = tuple(
+        (characteristics.technology, characteristics.year) for characteristics in plant_characteristics
+    )
     if len(set(keys)) != len(keys):
         msg = "plant_characteristics must be unique by technology and year"
         raise ValueError(msg)
@@ -162,8 +164,7 @@ def validate_storage_duration_overrides_are_unique_by_technology_vintage_and_reg
 ) -> tuple[ReEDSStorageDurationOverride, ...]:
     """Require one duration override per technology, vintage, and region."""
     keys = tuple(
-        (override.technology, override.vintage, override.region)
-        for override in storage_duration_overrides
+        (override.technology, override.vintage, override.region) for override in storage_duration_overrides
     )
     if len(set(keys)) != len(keys):
         msg = "storage_duration_overrides must be unique by technology, vintage, and region"
@@ -215,3 +216,24 @@ def validate_minimum_capacity_factor_does_not_exceed_capacity_factor(
         msg = "minimum_capacity_factor must not exceed capacity_factor"
         raise ValueError(msg)
     return minimum_capacity_factor
+
+
+def validate_optional_nonnegative(value: float | None) -> float | None:
+    """Validate an optional quantity whose present value cannot be negative."""
+    if value is not None and value < 0.0:
+        raise ValueError("value must be greater than or equal to 0")
+    return value
+
+
+def validate_optional_positive(value: float | None) -> float | None:
+    """Validate an optional quantity whose present value must be positive."""
+    if value is not None and value <= 0.0:
+        raise ValueError("value must be greater than 0")
+    return value
+
+
+def validate_optional_fraction(value: float | None) -> float | None:
+    """Validate an optional value in the inclusive unit interval."""
+    if value is not None and not 0.0 <= value <= 1.0:
+        raise ValueError("value must be between 0 and 1")
+    return value

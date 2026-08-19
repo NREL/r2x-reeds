@@ -7,7 +7,7 @@ import polars as pl
 import pytest
 from infrasys import System
 
-from r2x_reeds.models.components import ReEDSEmission, ReEDSGenerator, ReEDSRegion
+from r2x_reeds.models.components import ReEDSEmission, ReEDSGenerator, ReEDSGeneratorIdentity, ReEDSRegion
 from r2x_reeds.models.enums import EmissionType
 from r2x_reeds.sysmod import emission_cap
 
@@ -16,7 +16,7 @@ pytestmark = [pytest.mark.integration]
 
 def _build_system() -> tuple[System, ReEDSRegion]:
     system = System(name="test_emission_cap")
-    region = ReEDSRegion(name="west")
+    region = ReEDSRegion.example().model_copy(update={"name": "west"})
     system.add_component(region)
     return system, region
 
@@ -35,7 +35,7 @@ def _add_generator(
         technology=technology,
         capacity=150.0,
         category=category,
-        vintage=vintage,
+        identity=ReEDSGeneratorIdentity(vintage=vintage),
     )
     system.add_component(generator)
     return generator

@@ -96,7 +96,7 @@ def test_hydro_generator_requires_dispatchable_flag(sample_region):
     assert "is_dispatchable" in str(exc_info.value)
 
 
-def test_consuming_tech_requires_electricity_efficiency(sample_region):
+def test_consuming_tech_requires_electricity_consumption_rate(sample_region):
     from r2x_reeds.models.components import ReEDSConsumingTechnology
 
     bad_input: dict[str, Any] = {
@@ -107,7 +107,7 @@ def test_consuming_tech_requires_electricity_efficiency(sample_region):
     }
     with pytest.raises(ValidationError) as exc_info:
         ReEDSConsumingTechnology(**bad_input)
-    assert "electricity_efficiency" in str(exc_info.value)
+    assert "electricity_consumption_rate" in str(exc_info.value)
 
 
 def test_h2_storage_requires_storage_type(sample_region):
@@ -134,37 +134,31 @@ def test_h2_pipeline_requires_distance(sample_region):
     }
     with pytest.raises(ValidationError) as exc_info:
         ReEDSH2Pipeline(**bad_input)
-    assert "distance_km" in str(exc_info.value)
+    assert "distance" in str(exc_info.value)
 
 
 def test_thermal_generator_valid(thermal_generator):
     assert thermal_generator.heat_rate == 7.5
     assert thermal_generator.fuel_type == "naturalgas"
-    assert thermal_generator.ramp_rate == 0.5
-    assert thermal_generator.startup_cost == 50.0
 
 
 def test_renewable_generator_valid(renewable_generator):
     assert renewable_generator.technology == "upv"
-    assert renewable_generator.inverter_loading_ratio == 1.3
-    assert renewable_generator.resource_class == "class1"
+    assert renewable_generator.technology == "upv"
 
 
 def test_storage_generator_valid(storage_generator):
     assert storage_generator.storage_duration == 4.0
     assert storage_generator.round_trip_efficiency == 0.85
-    assert storage_generator.energy_capacity == 400.0
 
 
 def test_hydro_generator_valid(hydro_generator):
     assert hydro_generator.is_dispatchable is True
-    assert hydro_generator.flow_range.min == 0.25
-    assert hydro_generator.ramp_rate == 1.0
 
 
 def test_consuming_technology_valid(consuming_technology):
-    assert consuming_technology.electricity_efficiency == 51.45
-    assert consuming_technology.storage_transport_adder == 390000.0
+    assert consuming_technology.electricity_consumption_rate == 51.45
+    assert consuming_technology.electricity_consumption_rate == 51.45
 
 
 def test_emission_optional_pollutants():

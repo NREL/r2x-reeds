@@ -14,7 +14,7 @@ pytestmark = [pytest.mark.integration]
 
 def _build_generator() -> tuple[System, ReEDSGenerator]:
     system = System(name="test_imports")
-    region = ReEDSRegion(name="west")
+    region = ReEDSRegion.example().model_copy(update={"name": "west"})
     system.add_component(region)
     generator = ReEDSGenerator(
         name="can-imports_west",

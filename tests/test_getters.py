@@ -17,7 +17,7 @@ def context_with_regions(sample_region):
     system.add_component(sample_region)
     from r2x_reeds.models import ReEDSInterface, ReEDSRegion, ReEDSReserveRegion
 
-    other_region = ReEDSRegion(name="p2")
+    other_region = ReEDSRegion.example().model_copy(update={"name": "p2"})
     system.add_component(other_region)
     reserve_region = ReEDSReserveRegion(name="rsv")
     system.add_component(reserve_region)

@@ -205,16 +205,22 @@ def _valid_capacity_expansion_input_kwargs():
         region="r1",
         duration=10.0,
     )
-    return {
-        "planning_periods": (ReEDSPlanningPeriod(year=2030, present_value_factor=1.0),),
-        "representative_timepoints": (
-            ReEDSRepresentativeTimepoint(label="h0", position=0, weight=8_760.0),
-        ),
-        "plant_characteristics": (characteristics,),
-        "initial_capacities": (capacity,),
-        "storage_durations": (duration,),
-        "storage_duration_overrides": (duration_override,),
-    }, characteristics, capacity, duration, duration_override
+    return (
+        {
+            "planning_periods": (ReEDSPlanningPeriod(year=2030, present_value_factor=1.0),),
+            "representative_timepoints": (
+                ReEDSRepresentativeTimepoint(label="h0", position=0, weight=8_760.0),
+            ),
+            "plant_characteristics": (characteristics,),
+            "initial_capacities": (capacity,),
+            "storage_durations": (duration,),
+            "storage_duration_overrides": (duration_override,),
+        },
+        characteristics,
+        capacity,
+        duration,
+        duration_override,
+    )
 
 
 def test_capacity_expansion_inputs_reject_plant_characteristics_outside_modeled_years():
@@ -258,9 +264,7 @@ def test_capacity_expansion_inputs_reject_duplicate_initial_capacities():
     common, _, capacity, _, _ = _valid_capacity_expansion_input_kwargs()
 
     with pytest.raises(ValidationError, match="unique by technology and region") as exc_info:
-        ReEDSCapacityExpansionInputs(
-            **(common | {"initial_capacities": (capacity, capacity.model_copy())})
-        )
+        ReEDSCapacityExpansionInputs(**(common | {"initial_capacities": (capacity, capacity.model_copy())}))
 
     assert exc_info.value.errors()[0]["loc"] == ("initial_capacities",)
 
@@ -291,9 +295,7 @@ def test_capacity_expansion_inputs_reject_duplicate_storage_durations():
     common, _, _, duration, _ = _valid_capacity_expansion_input_kwargs()
 
     with pytest.raises(ValidationError, match="unique by technology") as exc_info:
-        ReEDSCapacityExpansionInputs(
-            **(common | {"storage_durations": (duration, duration.model_copy())})
-        )
+        ReEDSCapacityExpansionInputs(**(common | {"storage_durations": (duration, duration.model_copy())}))
 
     assert exc_info.value.errors()[0]["loc"] == ("storage_durations",)
 
@@ -320,6 +322,7 @@ def test_capacity_expansion_inputs_reject_duplicate_storage_duration_overrides()
         )
 
     assert exc_info.value.errors()[0]["loc"] == ("storage_duration_overrides",)
+
 
 def test_capacity_expansion_rejects_unordered_planning_periods():
     """Planning periods must have one chronological interpretation."""
@@ -415,7 +418,7 @@ def test_capacity_expansion_resource_variants_allow_unbuilt_candidates():
         ReEDSVariableCapacityExpansionResource,
     )
 
-    region = ReEDSRegion(name="r01")
+    region = ReEDSRegion.example().model_copy(update={"name": "r01"})
     dispatchable = ReEDSDispatchableCapacityExpansionResource(
         name="gas_cc_r01",
         region=region,
@@ -464,7 +467,7 @@ def test_dispatchable_capacity_expansion_resource_rejects_minimum_generation_fra
     with pytest.raises(ValidationError, match="minimum_generation_fraction must not exceed capacity_factor"):
         ReEDSDispatchableCapacityExpansionResource(
             name="gas_cc_r01",
-            region=ReEDSRegion(name="r01"),
+            region=ReEDSRegion.example().model_copy(update={"name": "r01"}),
             technology="gas_cc",
             available_years=(2030,),
             initial_capacity=0.0,
@@ -485,7 +488,7 @@ def test_dispatchable_capacity_expansion_resource_rejects_minimum_capacity_facto
     with pytest.raises(ValidationError, match="minimum_capacity_factor must not exceed capacity_factor"):
         ReEDSDispatchableCapacityExpansionResource(
             name="gas_cc_r01",
-            region=ReEDSRegion(name="r01"),
+            region=ReEDSRegion.example().model_copy(update={"name": "r01"}),
             technology="gas_cc",
             available_years=(2030,),
             initial_capacity=0.0,
@@ -506,7 +509,7 @@ def test_capacity_expansion_resource_requires_a_concrete_operational_subtype():
     with pytest.raises(ValidationError, match="concrete operational subtype"):
         ReEDSCapacityExpansionResource(
             name="candidate_r01",
-            region=ReEDSRegion(name="r01"),
+            region=ReEDSRegion.example().model_copy(update={"name": "r01"}),
             technology="candidate",
             available_years=(2030,),
             initial_capacity=0.0,
@@ -524,7 +527,7 @@ def test_capacity_expansion_resource_rejects_descending_available_years():
     with pytest.raises(ValidationError, match="unique and ascending") as exc_info:
         ReEDSVariableCapacityExpansionResource(
             name="wind_r01",
-            region=ReEDSRegion(name="r01"),
+            region=ReEDSRegion.example().model_copy(update={"name": "r01"}),
             technology="wind",
             available_years=(2035, 2030),
             initial_capacity=0.0,
@@ -544,7 +547,7 @@ def test_capacity_expansion_resource_rejects_duplicate_available_years():
     with pytest.raises(ValidationError, match="unique and ascending") as exc_info:
         ReEDSVariableCapacityExpansionResource(
             name="wind_r01",
-            region=ReEDSRegion(name="r01"),
+            region=ReEDSRegion.example().model_copy(update={"name": "r01"}),
             technology="wind",
             available_years=(2030, 2030),
             initial_capacity=0.0,
@@ -565,7 +568,7 @@ def test_capacity_expansion_resource_rejects_invalid_planning_year(available_yea
     with pytest.raises(ValidationError, match="greater than or equal to 1"):
         ReEDSVariableCapacityExpansionResource(
             name="wind_r01",
-            region=ReEDSRegion(name="r01"),
+            region=ReEDSRegion.example().model_copy(update={"name": "r01"}),
             technology="wind",
             available_years=(available_year,),
             initial_capacity=0.0,
@@ -598,8 +601,8 @@ def test_capacity_expansion_components_round_trip_through_an_infrasys_system(tmp
 
     system = System(name="synthetic")
     try:
-        region_a = ReEDSRegion(name="r01")
-        region_b = ReEDSRegion(name="r02")
+        region_a = ReEDSRegion.example().model_copy(update={"name": "r01"})
+        region_b = ReEDSRegion.example().model_copy(update={"name": "r02"})
         system.add_components(region_a, region_b)
 
         expansion = ReEDSCapacityExpansion(
@@ -657,6 +660,7 @@ def test_capacity_expansion_components_round_trip_through_an_infrasys_system(tmp
             interface=interface,
             max_active_power=FromTo_ToFrom(from_to=25.0, to_from=30.0),
             losses=0.02,
+            line_type="AC",
         )
         system.add_components(expansion, demand, dispatchable, variable, storage, interface, line)
         system.add_supplemental_attribute(

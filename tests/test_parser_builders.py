@@ -62,6 +62,19 @@ def _builder_calls(parser: ReEDSParser, system: System) -> list[tuple[str, Resul
 
 
 @pytest.mark.unit
+def test_parser_attaches_source_enrichments_to_generators(example_system: System) -> None:
+    """Optional generator datasets are stored as Infrasys supplemental attributes."""
+    from r2x_reeds.models import ReEDSGenerator, ReEDSGeneratorEconomics
+
+    generators = list(example_system.get_components(ReEDSGenerator))
+    assert generators
+    assert any(
+        example_system.get_supplemental_attributes_with_component(generator, ReEDSGeneratorEconomics)
+        for generator in generators
+    )
+    assert all("source_data" not in type(generator).model_fields for generator in generators)
+
+
 def test_build_regions_with_valid_data(initialized_parser: ReEDSParser, built_system: System) -> None:
     """Test _build_regions succeeds with valid hierarchy data."""
     result = initialized_parser._build_regions(built_system)
@@ -151,7 +164,7 @@ def test_build_emissions_only_attaches_to_created_generators(
     assert parser.on_prepare().is_ok()
 
     system = System(name="emissions-test")
-    region = ReEDSRegion(name="test-region")
+    region = ReEDSRegion.example().model_copy(update={"name": "test-region"})
     system.add_component(region)
     parser._region_cache[region.name] = region
 
@@ -173,7 +186,7 @@ def test_build_emissions_only_attaches_to_created_generators(
         {
             "i": [generator.technology, "missing-tech"],
             "r": [generator.region.name, "p999"],
-            "v": [generator.vintage, None],
+            "v": [generator.identity.vintage, None],
             "rate": [1.23, 4.56],
             "emission_type": ["CO2E", "CO2E"],
             "emission_source": ["COMBUSTION", "COMBUSTION"],

@@ -15,8 +15,8 @@ pytestmark = [pytest.mark.integration]
 
 def _build_system() -> tuple[System, ReEDSRegion, ReEDSRegion]:
     system = System(name="test_purchaser_load")
-    p4 = ReEDSRegion(name="p4")
-    p5 = ReEDSRegion(name="p5")
+    p4 = ReEDSRegion.example().model_copy(update={"name": "p4"})
+    p5 = ReEDSRegion.example().model_copy(update={"name": "p5"})
     system.add_component(p4)
     system.add_component(p5)
     return system, p4, p5
@@ -104,7 +104,7 @@ def test_purchaser_load_scope_full_flow(tmp_path: Path) -> None:
 
     electrolyzer_demand = system.get_component(ReEDSElectrolyzerDemand, "p4_electrolyzer_demand")
     assert electrolyzer_demand.capacity == pytest.approx(120.0)
-    assert electrolyzer_demand.electricity_efficiency == pytest.approx(1.25)
+    assert electrolyzer_demand.electricity_consumption_rate == pytest.approx(1.25)
 
     data_center_p4 = system.get_component(ReEDSDataCenterDemand, "p4_data_center_demand")
     data_center_p5 = system.get_component(ReEDSDataCenterDemand, "p5_data_center_demand")
@@ -148,7 +148,8 @@ def test_purchaser_load_skips_electrolyzer_creation_when_existing(tmp_path: Path
         region=p4,
         technology="electrolyzer",
         capacity=200.0,
-        electricity_efficiency=1.0,
+        max_active_power=200.0,
+        electricity_consumption_rate=1.0,
     )
     system.add_component(existing)
 
@@ -212,7 +213,8 @@ def test_purchaser_load_creates_missing_region_when_other_exists(tmp_path: Path)
         region=p4,
         technology="electrolyzer",
         capacity=200.0,
-        electricity_efficiency=1.0,
+        max_active_power=200.0,
+        electricity_consumption_rate=1.0,
     )
     system.add_component(existing_p4)
 

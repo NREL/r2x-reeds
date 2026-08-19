@@ -269,7 +269,7 @@ def _prepare_generator_dataset(
             return frame.filter(pl.col("parameter") == "electricity_efficiency").select(
                 pl.col("technology"),
                 pl.col("year"),
-                pl.col("value").alias("electricity_efficiency"),
+                pl.col("value").alias("electricity_consumption_rate"),
             )
         return frame
 
@@ -742,7 +742,7 @@ def build_generator_emission_lookup(
     """Create lookup from (technology, region, vintage) to generator names."""
     lookup: dict[tuple[str | None, str, str], list[str]] = {}
     for gen in generators:
-        vintage_key = gen.vintage or "__missing_vintage__"
+        vintage_key = gen.identity.vintage or "__missing_vintage__"
         key = (gen.technology, gen.region.name, vintage_key)
         lookup.setdefault(key, []).append(gen.name)
     return lookup
@@ -815,8 +815,8 @@ def calculate_hydro_budgets_for_generator(
     tech_region_filter = (pl.col("technology") == generator.technology) & (
         pl.col("region") == generator.region.name
     )
-    if generator.vintage:
-        tech_region_filter = tech_region_filter & (pl.col("vintage") == generator.vintage)
+    if generator.identity.vintage:
+        tech_region_filter = tech_region_filter & (pl.col("vintage") == generator.identity.vintage)
 
     filtered_data = hydro_data.filter(tech_region_filter)
     if filtered_data.is_empty():
