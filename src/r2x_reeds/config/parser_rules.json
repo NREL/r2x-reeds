@@ -11,7 +11,7 @@
       "forced_outage_rate": "forced_outage_rate",
       "planned_outage_rate": "planned_outage_rate",
       "max_age": "maxage_years",
-      "vom_cost": "vom_price",
+      "vom_cost": "vom_cost",
       "fom_cost": "fom_cost",
       "capital_cost": "capital_cost",
       "heat_rate": "heat_rate",
@@ -28,9 +28,7 @@
     },
     "getters": {
       "name": "build_generator_name",
-      "region": "lookup_region",
-      "storage_duration": "get_storage_duration",
-      "round_trip_efficiency": "get_round_trip_efficiency"
+      "region": "lookup_region"
     },
     "defaults": {
       "category": null,
@@ -40,17 +38,17 @@
       "vom_cost": null,
       "fom_cost": null,
       "capital_cost": null,
-      "vintage": null,
-      "is_aggregated": false,
       "heat_rate": null,
       "fuel_type": null,
       "fuel_price": null,
+      "is_aggregated": false,
       "resource_class": null,
       "inverter_loading_ratio": null,
       "capacity_factor_adjustment": null,
       "max_capacity_factor": null,
       "supply_curve_cost": null,
-      "transmission_adder": null
+      "transmission_adder": null,
+      "vintage": null
     }
   },
   {
@@ -61,10 +59,8 @@
     "field_map": {
       "technology": "technology",
       "capacity": "capacity",
-      "category": "technology",
-      "forced_outage_rate": "forced_outage_rate",
-      "planned_outage_rate": "planned_outage_rate",
-      "max_age": "max_age",
+      "category": "category",
+      "max_age": "maxage_years",
       "vom_cost": "vom_cost",
       "fom_cost": "fom_cost",
       "capital_cost": "capital_cost",
@@ -76,7 +72,9 @@
       "startup_cost": "startup_cost",
       "ramp_rate": "ramp_rate",
       "min_up_time": "min_up_time",
-      "min_down_time": "min_down_time"
+      "min_down_time": "min_down_time",
+      "forced_outage_rate": "forced_outage_rate",
+      "planned_outage_rate": "planned_outage_rate"
     },
     "getters": {
       "name": "build_generator_name",
@@ -85,8 +83,6 @@
     },
     "defaults": {
       "category": null,
-      "forced_outage_rate": null,
-      "planned_outage_rate": null,
       "max_age": null,
       "vom_cost": null,
       "fom_cost": null,
@@ -98,7 +94,9 @@
       "startup_cost": null,
       "ramp_rate": null,
       "min_up_time": null,
-      "min_down_time": null
+      "min_down_time": null,
+      "forced_outage_rate": null,
+      "planned_outage_rate": null
     }
   },
   {
@@ -110,13 +108,13 @@
       "technology": "technology",
       "capacity": "capacity",
       "category": "category",
-      "forced_outage_rate": "forced_outage_rate",
-      "planned_outage_rate": "planned_outage_rate",
-      "max_age": "max_age",
+      "max_age": "maxage_years",
       "vom_cost": "vom_cost",
       "fom_cost": "fom_cost",
       "capital_cost": "capital_cost",
       "vintage": "vintage",
+      "forced_outage_rate": "forced_outage_rate",
+      "planned_outage_rate": "planned_outage_rate",
       "resource_class": "resource_class",
       "inverter_loading_ratio": "inverter_loading_ratio",
       "capacity_factor_adjustment": "capacity_factor_adjustment",
@@ -130,13 +128,13 @@
     },
     "defaults": {
       "category": null,
-      "forced_outage_rate": null,
-      "planned_outage_rate": null,
       "max_age": null,
       "vom_cost": null,
       "fom_cost": null,
       "capital_cost": null,
       "vintage": null,
+      "forced_outage_rate": null,
+      "planned_outage_rate": null,
       "resource_class": null,
       "inverter_loading_ratio": null,
       "capacity_factor_adjustment": null,
@@ -154,29 +152,29 @@
       "technology": "technology",
       "capacity": "capacity",
       "category": "category",
-      "forced_outage_rate": "forced_outage_rate",
-      "planned_outage_rate": "planned_outage_rate",
-      "max_age": "max_age",
+      "max_age": "maxage_years",
       "vom_cost": "vom_cost",
       "fom_cost": "fom_cost",
       "capital_cost": "capital_cost",
       "vintage": "vintage",
-      "storage_duration": "storage_duration",
-      "round_trip_efficiency": "round_trip_efficiency"
+      "forced_outage_rate": "forced_outage_rate",
+      "planned_outage_rate": "planned_outage_rate"
     },
     "getters": {
       "name": "build_generator_name",
-      "region": "lookup_region"
+      "region": "lookup_region",
+      "storage_duration": "get_storage_duration",
+      "round_trip_efficiency": "get_round_trip_efficiency"
     },
     "defaults": {
       "category": null,
-      "forced_outage_rate": null,
-      "planned_outage_rate": null,
       "max_age": null,
       "vom_cost": null,
       "fom_cost": null,
       "capital_cost": null,
-      "vintage": null
+      "vintage": null,
+      "forced_outage_rate": null,
+      "planned_outage_rate": null
     }
   },
   {
@@ -188,14 +186,14 @@
       "technology": "technology",
       "capacity": "capacity",
       "category": "category",
-      "forced_outage_rate": "forced_outage_rate",
-      "planned_outage_rate": "planned_outage_rate",
-      "max_age": "max_age",
+      "max_age": "maxage_years",
       "vom_cost": "vom_cost",
       "fom_cost": "fom_cost",
       "capital_cost": "capital_cost",
       "vintage": "vintage",
-      "ramp_rate": "ramp_rate"
+      "ramp_rate": "ramp_rate",
+      "forced_outage_rate": "forced_outage_rate",
+      "planned_outage_rate": "planned_outage_rate"
     },
     "getters": {
       "name": "build_generator_name",
@@ -204,14 +202,14 @@
     },
     "defaults": {
       "category": null,
-      "forced_outage_rate": null,
-      "planned_outage_rate": null,
       "max_age": null,
       "vom_cost": null,
       "fom_cost": null,
       "capital_cost": null,
       "vintage": null,
-      "ramp_rate": null
+      "ramp_rate": null,
+      "forced_outage_rate": null,
+      "planned_outage_rate": null
     }
   },
   {
@@ -223,17 +221,17 @@
       "technology": "technology",
       "capacity": "capacity",
       "category": "category",
-      "forced_outage_rate": "forced_outage_rate",
-      "planned_outage_rate": "planned_outage_rate",
-      "fuel_price": "fuel_price",
-      "heat_rate": "heat_rate",
-      "max_age": "max_age",
+      "max_age": "maxage_years",
       "vom_cost": "vom_cost",
       "fom_cost": "fom_cost",
       "capital_cost": "capital_cost",
       "vintage": "vintage",
+      "fuel_price": "fuel_price",
+      "heat_rate": "heat_rate",
       "electricity_consumption_rate": "electricity_consumption_rate",
-      "storage_transport_adder": "storage_transport_adder"
+      "storage_transport_adder": "storage_transport_adder",
+      "forced_outage_rate": "forced_outage_rate",
+      "planned_outage_rate": "planned_outage_rate"
     },
     "getters": {
       "name": "build_generator_name",
@@ -241,17 +239,17 @@
     },
     "defaults": {
       "category": null,
-      "forced_outage_rate": null,
-      "planned_outage_rate": null,
       "max_age": null,
       "vom_cost": null,
-      "fuel_price": null,
-      "heat_rate": null,
       "fom_cost": null,
       "capital_cost": null,
       "vintage": null,
+      "fuel_price": null,
+      "heat_rate": null,
       "electricity_consumption_rate": 1.0,
-      "storage_transport_adder": null
+      "storage_transport_adder": null,
+      "forced_outage_rate": null,
+      "planned_outage_rate": null
     }
   },
   {
@@ -263,18 +261,18 @@
       "technology": "technology",
       "capacity": "capacity",
       "category": "category",
-      "forced_outage_rate": "forced_outage_rate",
-      "planned_outage_rate": "planned_outage_rate",
-      "fuel_price": "fuel_price",
-      "heat_rate": "heat_rate",
-      "max_age": "max_age",
+      "max_age": "maxage_years",
       "vom_cost": "vom_cost",
       "fom_cost": "fom_cost",
       "capital_cost": "capital_cost",
       "vintage": "vintage",
+      "fuel_price": "fuel_price",
+      "heat_rate": "heat_rate",
       "electricity_consumption_rate": "electricity_consumption_rate",
       "max_active_power": "max_active_power",
-      "storage_transport_adder": "storage_transport_adder"
+      "storage_transport_adder": "storage_transport_adder",
+      "forced_outage_rate": "forced_outage_rate",
+      "planned_outage_rate": "planned_outage_rate"
     },
     "getters": {
       "name": "build_generator_name",
@@ -282,17 +280,17 @@
     },
     "defaults": {
       "category": null,
-      "forced_outage_rate": null,
-      "planned_outage_rate": null,
       "max_age": null,
       "vom_cost": null,
-      "fuel_price": null,
-      "heat_rate": null,
       "fom_cost": null,
       "capital_cost": null,
       "vintage": null,
+      "fuel_price": null,
+      "heat_rate": null,
       "electricity_consumption_rate": 1.0,
-      "storage_transport_adder": null
+      "storage_transport_adder": null,
+      "forced_outage_rate": null,
+      "planned_outage_rate": null
     }
   },
   {
@@ -302,41 +300,38 @@
     "name": "region",
     "field_map": {
       "category": "region_type",
-      "cc_region": "cc_region",
-      "cendiv": "cendiv",
+      "state": "state",
+      "nerc_region": "nerc_region",
+      "transmission_region": "transmission_region",
+      "transmission_group": "transmission_group",
+      "interconnect": "interconnect",
       "country": "country",
+      "cendiv": "cendiv",
+      "usda_region": "usda_region",
       "h2ptc_region": "h2ptc_region",
       "hurdle_region": "hurdle_region",
-      "interconnect": "interconnect",
-      "nerc_region": "nerc_region",
-      "state": "state",
-      "transmission_group": "transmission_group",
-      "transmission_region": "transmission_region",
-      "usda_region": "usda_region"
+      "cc_region": "cc_region"
     },
     "getters": {
-      "description": "build_region_description",
-      "name": "build_region_name"
+      "name": "build_region_name",
+      "description": "build_region_description"
     },
     "defaults": {
       "category": null
     }
-  }
-  ,
+  },
   {
     "source_type": "data_row",
     "target_type": "ReEDSDemand",
     "version": 1,
     "name": "load",
     "field_map": {
-      "region": "region",
       "max_active_power": "max_active_power"
     },
     "getters": {
       "name": "build_load_name",
       "region": "lookup_region"
-    },
-    "defaults": {}
+    }
   },
   {
     "source_type": "data_row",
@@ -344,7 +339,6 @@
     "version": 1,
     "name": "reserve",
     "field_map": {
-      "region": "region",
       "duration": "duration",
       "time_frame": "time_frame",
       "vors": "vors",
@@ -357,8 +351,7 @@
       "reserve_type": "resolve_reserve_type",
       "direction": "resolve_reserve_direction",
       "region": "lookup_reserve_region"
-    },
-    "defaults": {}
+    }
   },
   {
     "source_type": "data_row",
@@ -393,7 +386,7 @@
       "category": null
     }
   },
-    {
+  {
     "source_type": "data_row",
     "target_type": "ReEDSTransmissionLine",
     "version": 1,

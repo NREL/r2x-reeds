@@ -7,7 +7,12 @@ import pytest
 
 from r2x_reeds.upgrader.data_upgrader import ReEDSVersionDetector
 from r2x_reeds.upgrader.helpers import LEGACY_VERSION
-from r2x_reeds.upgrader.upgrade_steps import move_hmap_file, move_hmap_myr_file, move_transmission_cost
+from r2x_reeds.upgrader.upgrade_steps import (
+    create_outputs_h5,
+    move_hmap_file,
+    move_hmap_myr_file,
+    move_transmission_cost,
+)
 
 pytestmark = [pytest.mark.integration]
 
@@ -66,6 +71,26 @@ def test_version_detector_missing_file(tmp_path: Path) -> None:
     detector = ReEDSVersionDetector()
     with pytest.raises(FileNotFoundError):
         detector.read_version(tmp_path)
+
+
+def test_create_outputs_h5_from_legacy_csvs(tmp_path: Path) -> None:
+    """Legacy output CSVs are converted into the current shared HDF5 layout."""
+    import h5py
+
+    outputs = tmp_path / "outputs"
+    outputs.mkdir()
+    (outputs / "fuel_price.csv").write_text("i,r,t,value\ngas,r1,2030,3.0\n")
+
+    result = create_outputs_h5(tmp_path)
+
+    assert result == tmp_path
+    with h5py.File(outputs / "outputs.h5", mode="r") as h5_file:
+        group = h5_file["fuel_price"]
+        assert list(group["columns"].asstr()[:]) == ["i", "r", "t", "value"]
+        assert group["value"][0] == 3.0
+
+    create_outputs_h5(tmp_path)
+    assert (outputs / "outputs.h5").exists()
 
 
 def test_move_hmap_file_moves_and_skips(tmp_path: Path) -> None:

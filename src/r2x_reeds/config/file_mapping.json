@@ -71,6 +71,14 @@
       "filter_by": {
         "year": "{solve_year}"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "cap_ivrt",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -92,6 +100,14 @@
       "filter_by": {
         "year": "{solve_year}"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "cap",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -113,6 +129,14 @@
       "filter_by": {
         "year": "{solve_year}"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "prod_load_ann",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -135,6 +159,14 @@
       "filter_by": {
         "year": "{solve_year}"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "prod_load",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -224,6 +256,14 @@
       "filter_by": {
         "year": "{solve_year}"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "tran_cap_energy",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -280,6 +320,14 @@
         "value": "losses",
         "rr": "to_region"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "tranloss",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -304,13 +352,14 @@
       "function": null
     },
     "proc_spec": {
-      "column_mapping": {
-        "year": "solve_year"
-      },
+      "column_mapping": {},
       "filter_by": {
         "solve_year": "{solve_year}",
         "datetime": "{weather_year}"
-      }
+      },
+      "drop_columns": [
+        "year"
+      ]
     }
   },
   {
@@ -324,7 +373,9 @@
     },
     "reader": {
       "kwargs": {
-        "null_values": ["Eps"]
+        "group_key": "loadsite_op",
+        "columns_key": "columns",
+        "columns_as_datasets": true
       },
       "function": null
     },
@@ -360,6 +411,14 @@
       "filter_by": {
         "year": "{solve_year}"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "heat_rate",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -381,6 +440,14 @@
       "filter_by": {
         "year": "{solve_year}"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "fuel_price",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -401,6 +468,14 @@
       "filter_by": {
         "year": "{solve_year}"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "repbioprice",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -419,6 +494,14 @@
       "drop_columns": [
         "value"
       ]
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "fuel2tech",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -435,6 +518,14 @@
         "i": "technology",
         "value": "forced_outage_rate"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "forced_outage",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -451,6 +542,14 @@
         "i": "technology",
         "value": "planned_outage_rate"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "planned_outage",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -494,6 +593,14 @@
       "filter_by": {
         "year": "{solve_year}"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "cf_adj_t",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -511,7 +618,15 @@
         "value": "inverter_loading_ratio"
       }
     },
-    "note": "Different from 1 for inverter-based technologies. 1 otherwise."
+    "note": "Different from 1 for inverter-based technologies. 1 otherwise.",
+    "reader": {
+      "kwargs": {
+        "group_key": "ilr",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
+    }
   },
   {
     "name": "renewable_supply_curves",
@@ -750,6 +865,14 @@
       "filter_by": {
         "year": "{solve_year}"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "cost_vom",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -797,6 +920,14 @@
       "filter_by": {
         "year": "{solve_year}"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "cost_hurdle",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -901,6 +1032,14 @@
       "filter_by": {
         "year": "{solve_year}"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "emit_rate",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -1010,6 +1149,14 @@
       "filter_by": {
         "year": "{solve_year}"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "storage_eff",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -1029,6 +1176,14 @@
         "t": "year",
         "value": "storage_duration"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "storage_duration_out",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -1045,6 +1200,14 @@
         "i": "technology",
         "value": "storage_duration"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "storage_duration",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -1065,6 +1228,14 @@
       "filter_by": {
         "year": "{solve_year}"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "cost_cap",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {
@@ -1085,6 +1256,14 @@
       "filter_by": {
         "year": "{solve_year}"
       }
+    },
+    "reader": {
+      "kwargs": {
+        "group_key": "cost_cap_energy",
+        "columns_key": "columns",
+        "columns_as_datasets": true
+      },
+      "function": null
     }
   },
   {

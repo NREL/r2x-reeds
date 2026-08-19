@@ -36,6 +36,10 @@ def reeds_run_path(reeds_data_path_override: Path | None, tmp_path_factory, test
 
     run_path = base_tmp / "test_Pacific"
     logger.debug("Unpacked test data to: {}", run_path)
+    from r2x_reeds.upgrader.data_upgrader import ReEDSUpgrader
+
+    result = ReEDSUpgrader(run_path).upgrade()
+    assert result.is_ok(), result.err()
     return run_path
 
 

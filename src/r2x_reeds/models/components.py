@@ -260,6 +260,15 @@ class ReEDSReserveRegion(ReEDSComponent):
     """A reserve area identified by its transmission-region component name."""
 
 
+class ReEDSReservePercentages(InfraSysBaseModel):
+    """Reserve contribution percentages by reserve type."""
+
+    reserve_type: ReserveType
+    or_load_percentage: Fraction = 0.0
+    or_wind_percentage: Fraction = 0.0
+    or_pv_percentage: Fraction = 0.0
+
+
 class ReEDSReserve(HasUnits, ReEDSComponent):
     """An operating-reserve requirement for one reserve area and direction."""
 

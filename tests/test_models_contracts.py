@@ -139,7 +139,72 @@ def test_file_mapping_and_parser_rules_match_canonical_contracts() -> None:
     resource_rule = rules["ReEDSVariableGenerator"]
     assert resource_rule["field_map"]["resource_class"] == "resource_class"
     load_rule = rules["ReEDSDemand"]
-    assert "max_active_power" not in load_rule["defaults"]
+    assert "max_active_power" not in load_rule.get("defaults", {})
+
+
+def test_generator_parser_rules_use_normalized_optional_columns() -> None:
+    """Generator rules consume the columns produced by the current data mappings."""
+    config_dir = Path(__file__).parents[1] / "src" / "r2x_reeds" / "config"
+    parser_rules = json.loads((config_dir / "parser_rules.json").read_text())
+    rules = {rule["target_type"]: rule for rule in parser_rules}
+
+    generator_targets = (
+        "ReEDSGenerator",
+        "ReEDSThermalGenerator",
+        "ReEDSVariableGenerator",
+        "ReEDSStorage",
+        "ReEDSHydroGenerator",
+        "ReEDSConsumingTechnology",
+        "ReEDSElectrolyzerDemand",
+    )
+    for target_type in generator_targets:
+        assert rules[target_type]["field_map"]["max_age"] == "maxage_years"
+
+    assert rules["ReEDSGenerator"]["field_map"]["vom_cost"] == "vom_cost"
+    assert rules["ReEDSThermalGenerator"]["field_map"]["category"] == "category"
+    assert "heat_rate" not in rules["ReEDSThermalGenerator"].get("defaults", {})
+    assert "max_active_power" not in rules["ReEDSElectrolyzerDemand"].get("defaults", {})
+
+    storage_rule = rules["ReEDSStorage"]
+    assert "storage_duration" not in storage_rule["field_map"]
+    assert "round_trip_efficiency" not in storage_rule["field_map"]
+    assert storage_rule["getters"]["storage_duration"] == "get_storage_duration"
+    assert storage_rule["getters"]["round_trip_efficiency"] == "get_round_trip_efficiency"
+
+
+def test_storage_parser_rule_defaults_optional_duration_facts() -> None:
+    """Storage rules use core getters when optional duration inputs are absent."""
+    from importlib import import_module
+
+    from r2x_core import PluginConfig, PluginContext, Rule, System
+    import_module("r2x_reeds.getters")
+    from r2x_core.utils import build_component_kwargs
+
+    config_dir = Path(__file__).parents[1] / "src" / "r2x_reeds" / "config"
+    parser_rules = json.loads((config_dir / "parser_rules.json").read_text())
+    storage_rule_record = next(
+        rule for rule in parser_rules if rule["target_type"] == "ReEDSStorage"
+    )
+    storage_rule = Rule.from_records([storage_rule_record])[0]
+
+    system = System(name="parser-rule-test")
+    system.add_component(ReEDSRegion(**region_kwargs()))
+    context = PluginContext(config=PluginConfig(), system=system)
+    result = build_component_kwargs(
+        {
+            "technology": "battery",
+            "capacity": 10.0,
+            "category": "storage",
+            "region": "p1",
+        },
+        rule=storage_rule,
+        context=context,
+    )
+
+    assert result.is_ok()
+    kwargs = result.unwrap()
+    assert kwargs["storage_duration"] == 1.0
+    assert kwargs["round_trip_efficiency"] == 1.0
 
 
 def test_storage_energy_capacity_is_derived_from_required_facts() -> None:

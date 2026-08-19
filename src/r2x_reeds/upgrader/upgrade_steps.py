@@ -1,11 +1,67 @@
 """Upgrades for ReEDS data."""
 
+import json
+from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
+import h5py
+import numpy as np
+import polars as pl
 from loguru import logger
 
 from r2x_core import UpgradeStep, UpgradeType
+
+
+def create_outputs_h5(folder: Path, upgrader_context: dict[str, Any] | None = None) -> Path:
+    """Create the current shared outputs HDF5 file from legacy output CSVs.
+
+    The operation is idempotent. Existing ``outputs.h5`` files are left
+    untouched because their contents belong to the source run.
+    """
+    outputs_dir = folder / "outputs"
+    outputs_h5 = outputs_dir / "outputs.h5"
+    if outputs_h5.exists():
+        logger.debug("{} already exists, skipping HDF5 creation", outputs_h5)
+        return folder
+
+    mapping_path = files("r2x_reeds").joinpath("config/file_mapping.json")
+    mappings = json.loads(mapping_path.read_text())
+    output_mappings = [
+        record
+        for record in mappings
+        if record.get("fpath") == "outputs/outputs.h5"
+        and record.get("reader", {}).get("kwargs", {}).get("group_key")
+    ]
+    csv_mappings = [
+        (record["reader"]["kwargs"]["group_key"], outputs_dir / f"{record['reader']['kwargs']['group_key']}.csv")
+        for record in output_mappings
+    ]
+    available = [(group_key, path) for group_key, path in csv_mappings if path.exists()]
+    if not available:
+        logger.debug("No legacy output CSVs found under {}; skipping HDF5 creation", outputs_dir)
+        return folder
+
+    outputs_dir.mkdir(parents=True, exist_ok=True)
+    with h5py.File(outputs_h5, mode="w") as h5_file:
+        for group_key, csv_path in available:
+            frame = pl.read_csv(csv_path)
+            group = h5_file.create_group(group_key)
+            group.create_dataset("columns", data=np.array(frame.columns, dtype=h5py.string_dtype()))
+            for column in frame.columns:
+                series = frame[column]
+                values = series.to_list()
+                if series.dtype == pl.String:
+                    data = np.array(
+                        ["" if value is None else str(value) for value in values],
+                        dtype=h5py.string_dtype(),
+                    )
+                else:
+                    data = np.array([0 if value is None else value for value in values])
+                group.create_dataset(column, data=data)
+
+    logger.info("Created {} from legacy output CSVs", outputs_h5)
+    return folder
 
 
 def move_hmap_file(folder: Path, upgrader_context: dict[str, Any] | None = None) -> Path:
@@ -93,6 +149,13 @@ def move_hmap_myr_file(folder: Path, upgrader_context: dict[str, Any] | None = N
 
 
 UPGRADE_STEPS = [
+    UpgradeStep(
+        name="create_outputs_h5",
+        func=create_outputs_h5,
+        target_version="2026.03.24",
+        upgrade_type=UpgradeType.FILE,
+        priority=40,
+    ),
     UpgradeStep(
         name="move_hmap_file",
         func=move_hmap_file,

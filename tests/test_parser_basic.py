@@ -14,7 +14,6 @@ import h5py
 import numpy as np
 import polars as pl
 import pytest
-from rust_ok import Err, Ok
 
 pytestmark = [pytest.mark.integration]
 
@@ -42,8 +41,6 @@ def _build_parser(run_path: Path):
 def _write_minimal_outputs_h5_from_fuel_price(csv_path: Path, h5_path: Path) -> None:
     """Create a minimal outputs.h5 containing a fuel_price group."""
     fuel_price = pl.read_csv(csv_path)
-    if "value" in fuel_price.columns:
-        fuel_price = fuel_price.rename({"value": "Value"})
 
     with h5py.File(h5_path, "w") as h5_file:
         group = h5_file.create_group("fuel_price")
@@ -59,8 +56,8 @@ def _write_minimal_outputs_h5_from_fuel_price(csv_path: Path, h5_path: Path) -> 
             group.create_dataset(column, data=dataset_values)
 
 
-def test_read_data_file_falls_back_to_legacy_outputs_csv(reeds_run_path: Path) -> None:
-    """When outputs.h5 is absent, parser should still read legacy outputs CSV files."""
+def test_read_data_file_uses_configured_outputs_h5_group(reeds_run_path: Path) -> None:
+    """The configured DataFile mapping reads the shared outputs HDF5 group."""
     parser = _build_parser(reeds_run_path)
 
     result = parser.read_data_file("fuel_price")
@@ -102,224 +99,3 @@ def test_read_data_file_uses_store_for_non_outputs_dataset(reeds_run_path: Path)
     df = result.collect()
     assert not df.is_empty()
     assert "region_id" in df.columns
-
-
-def test_is_outputs_h5_mapped_matches_expected_datasets(reeds_run_path: Path) -> None:
-    """Outputs bundle detector should classify outputs and non-outputs correctly."""
-    parser = _build_parser(reeds_run_path)
-
-    assert parser._is_outputs_h5_mapped("fuel_price") is True
-    assert parser._is_outputs_h5_mapped("hierarchy") is False
-
-
-def test_read_outputs_h5_group_missing_file_returns_none(tmp_path: Path, reeds_run_path: Path) -> None:
-    """Missing outputs.h5 should be handled as no data available."""
-    parser = _build_parser(reeds_run_path)
-
-    result = parser._read_outputs_h5_group(tmp_path / "missing.h5", "fuel_price")
-
-    assert result is None
-
-
-def test_read_outputs_h5_group_missing_dataset_returns_none(tmp_path: Path, reeds_run_path: Path) -> None:
-    """Missing dataset groups in outputs.h5 should return None."""
-    parser = _build_parser(reeds_run_path)
-    h5_path = tmp_path / "outputs.h5"
-    with h5py.File(h5_path, "w") as h5_file:
-        h5_file.create_group("some_other_group")
-
-    result = parser._read_outputs_h5_group(h5_path, "fuel_price")
-
-    assert result is None
-
-
-def test_read_outputs_h5_group_non_group_node_returns_none(tmp_path: Path, reeds_run_path: Path) -> None:
-    """Non-group H5 nodes should be rejected for dataset extraction."""
-    parser = _build_parser(reeds_run_path)
-    h5_path = tmp_path / "outputs.h5"
-    with h5py.File(h5_path, "w") as h5_file:
-        h5_file.create_dataset("fuel_price", data=np.array([1.0]))
-
-    result = parser._read_outputs_h5_group(h5_path, "fuel_price")
-
-    assert result is None
-
-
-def test_read_outputs_h5_group_missing_columns_value_nodes_returns_none(
-    tmp_path: Path, reeds_run_path: Path
-) -> None:
-    """Groups missing required columns/value nodes should be skipped."""
-    parser = _build_parser(reeds_run_path)
-    h5_path = tmp_path / "outputs.h5"
-    with h5py.File(h5_path, "w") as h5_file:
-        h5_file.create_group("fuel_price")
-
-    result = parser._read_outputs_h5_group(h5_path, "fuel_price")
-
-    assert result is None
-
-
-def test_read_outputs_h5_group_missing_column_dataset_returns_none(
-    tmp_path: Path, reeds_run_path: Path
-) -> None:
-    """If a column listed in 'columns' is absent as a dataset, parser skips the group."""
-    parser = _build_parser(reeds_run_path)
-    h5_path = tmp_path / "outputs.h5"
-    with h5py.File(h5_path, "w") as h5_file:
-        group = h5_file.create_group("fuel_price")
-        group.create_dataset("columns", data=np.array([b"i", b"r", b"Value"]))
-        group.create_dataset("Value", data=np.array([1.0, 2.0]))
-        group.create_dataset("i", data=np.array([b"tech1", b"tech2"]))
-        # Intentionally omit column dataset "r"
-
-    result = parser._read_outputs_h5_group(h5_path, "fuel_price")
-
-    assert result is None
-
-
-def test_read_outputs_h5_group_lowercase_value_dataset(tmp_path: Path, reeds_run_path: Path) -> None:
-    """H5 groups using lowercase 'value' (as declared in several file_mapping.json
-    entries, e.g. online_capacity) must be read without falling back or dropping data."""
-    parser = _build_parser(reeds_run_path)
-    h5_path = tmp_path / "outputs.h5"
-    with h5py.File(h5_path, "w") as h5_file:
-        group = h5_file.create_group("online_capacity")
-        # Mirrors what a ReEDS outputs.h5 group looks like when the measure column is
-        # stored as lowercase 'value' rather than 'Value'.
-        group.create_dataset("columns", data=np.array([b"i", b"r", b"value"]))
-        group.create_dataset("value", data=np.array([10.0, 20.0]))
-        group.create_dataset("i", data=np.array([b"wind-ons", b"upv"]))
-        group.create_dataset("r", data=np.array([b"p4", b"p5"]))
-
-    result = parser._read_outputs_h5_group(h5_path, "online_capacity")
-
-    assert result is not None, "lowercase 'value' dataset should be accepted"
-    df = result.collect()
-    assert not df.is_empty()
-    assert "value" in df.columns
-    assert list(df["value"].to_list()) == pytest.approx([10.0, 20.0])
-
-
-def test_read_outputs_h5_group_uses_cache_for_repeat_reads(tmp_path: Path, reeds_run_path: Path) -> None:
-    """Repeated reads should return the cached LazyFrame for a dataset key."""
-    parser = _build_parser(reeds_run_path)
-    h5_path = tmp_path / "outputs.h5"
-    with h5py.File(h5_path, "w") as h5_file:
-        group = h5_file.create_group("fuel_price")
-        group.create_dataset("columns", data=np.array([b"i", b"r", b"Value"]))
-        group.create_dataset("Value", data=np.array([1.0, 2.0]))
-        group.create_dataset("i", data=np.array([b"tech1", b"tech2"]))
-        group.create_dataset("r", data=np.array([b"p1", b"p2"]))
-
-    first = parser._read_outputs_h5_group(h5_path, "fuel_price")
-    second = parser._read_outputs_h5_group(h5_path, "fuel_price")
-
-    assert first is not None
-    assert second is first
-
-
-def test_read_outputs_dataset_processing_error_raises(monkeypatch, reeds_run_path: Path) -> None:
-    """Processing failures should surface as ValueError from the parser wrapper."""
-    import r2x_reeds.parser as parser_module
-
-    parser = _build_parser(reeds_run_path)
-
-    monkeypatch.setattr(
-        parser,
-        "_read_outputs_h5_group",
-        lambda outputs_h5, dataset_key: pl.DataFrame({"i": ["tech"], "r": ["p1"], "Value": [1.0]}).lazy(),
-    )
-    monkeypatch.setattr(
-        parser_module,
-        "apply_processing",
-        lambda data, data_file, proc_spec, placeholders: Err(ValueError("boom")),
-    )
-
-    with pytest.raises(ValueError, match="boom"):
-        parser._read_outputs_dataset("fuel_price", {"solve_year": 2032, "weather_year": 2012})
-
-
-def test_read_outputs_dataset_none_processed_returns_none(monkeypatch, reeds_run_path: Path) -> None:
-    """None payload from processing should be returned unchanged."""
-    import r2x_reeds.parser as parser_module
-
-    parser = _build_parser(reeds_run_path)
-    monkeypatch.setattr(
-        parser,
-        "_read_outputs_h5_group",
-        lambda outputs_h5, dataset_key: pl.DataFrame({"i": ["tech"], "r": ["p1"], "Value": [1.0]}).lazy(),
-    )
-    monkeypatch.setattr(
-        parser_module,
-        "apply_processing",
-        lambda data, data_file, proc_spec, placeholders: Ok(None),
-    )
-
-    result = parser._read_outputs_dataset("fuel_price", {"solve_year": 2032, "weather_year": 2012})
-    assert result is None
-
-
-def test_read_outputs_csv_fallback_optional_missing_returns_none(
-    tmp_path: Path, reeds_run_path: Path
-) -> None:
-    """Optional output datasets should return None when CSV fallback is absent."""
-    parser = _build_parser(reeds_run_path)
-    outputs_h5 = tmp_path / "outputs.h5"
-    outputs_h5.touch()
-
-    result = parser._read_outputs_csv_fallback(
-        name="fuel_price",
-        data_file_fpath=outputs_h5,
-        dataset_key="fuel_price",
-        placeholders={"solve_year": 2032, "weather_year": 2012},
-    )
-
-    assert result is None
-
-
-def test_read_outputs_csv_fallback_required_missing_raises(tmp_path: Path, reeds_run_path: Path) -> None:
-    """Required output datasets should raise when neither H5 nor CSV is available."""
-    from r2x_core.datafile import DataFile, FileInfo
-
-    parser = _build_parser(reeds_run_path)
-    outputs_h5 = tmp_path / "outputs.h5"
-    outputs_h5.touch()
-
-    parser.store._cache["required_out"] = DataFile(
-        name="required_out",
-        fpath=outputs_h5,
-        info=FileInfo(description="required", is_input=False, is_optional=False),
-    )
-
-    with pytest.raises(FileNotFoundError):
-        parser._read_outputs_csv_fallback(
-            name="required_out",
-            data_file_fpath=outputs_h5,
-            dataset_key="required_out",
-            placeholders={"solve_year": 2032, "weather_year": 2012},
-        )
-
-
-def test_decode_h5_scalar_and_close_handle(tmp_path: Path, reeds_run_path: Path) -> None:
-    """Scalar decoding and explicit handle close should clean parser H5 state."""
-    parser = _build_parser(reeds_run_path)
-    h5_path = tmp_path / "outputs.h5"
-    with h5py.File(h5_path, "w") as h5_file:
-        group = h5_file.create_group("fuel_price")
-        group.create_dataset("columns", data=np.array([b"i", b"r", b"Value"]))
-        group.create_dataset("Value", data=np.array([1.0]))
-        group.create_dataset("i", data=np.array([b"tech1"]))
-        group.create_dataset("r", data=np.array([b"p1"]))
-
-    assert parser._decode_h5_scalar(b"abc") == "abc"
-    assert parser._decode_h5_scalar(np.bytes_(b"xyz")) == "xyz"
-    assert parser._decode_h5_scalar(123) == 123
-
-    assert parser._read_outputs_h5_group(h5_path, "fuel_price") is not None
-    assert parser._outputs_h5_handle is not None
-    assert parser._outputs_h5_cache
-
-    parser._close_outputs_h5()
-
-    assert parser._outputs_h5_handle is None
-    assert parser._outputs_h5_cache == {}
