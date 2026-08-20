@@ -8,6 +8,24 @@ import pytest
 pytestmark = [pytest.mark.unit]
 
 
+def test_prepare_generator_inputs_joins_startup_cost_by_technology():
+    from r2x_reeds.parser_utils import prepare_generator_inputs
+
+    result = prepare_generator_inputs(
+        capacity_data=pl.LazyFrame([{"technology": "gas-cc", "region": "p1", "capacity": 100.0}]),
+        optional_data={
+            "fuel_tech_map": pl.LazyFrame([{"technology": "gas-cc", "fuel_type": "ngas"}]),
+            "startcost": pl.LazyFrame([{"technology": "gas-cc", "startup_cost": 68.0}]),
+        },
+        excluded_technologies=[],
+        technology_categories={"thermal": {"exact": ["gas-cc"], "prefixes": []}},
+    )
+
+    assert result.is_ok()
+    _, non_variable_df = result.unwrap()
+    assert non_variable_df["startup_cost"].to_list() == [68.0]
+
+
 def test_filter_generators_by_transmission_region_returns_matching(sample_region):
     from r2x_reeds.models import ReEDSVariableGenerator
     from r2x_reeds.parser_utils import filter_generators_by_transmission_region
