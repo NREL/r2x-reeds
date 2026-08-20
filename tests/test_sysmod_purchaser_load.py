@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import h5py
 import numpy as np
 import polars as pl
 import pytest
@@ -73,6 +74,27 @@ def test_datastore_mapped_purchaser_columns_are_supported() -> None:
     assert purchaser_load._rename_existing_columns(
         annual, {"i": "technology", "r": "region", "Value": "value", "t": "year"}
     ).equals(annual)
+
+
+def test_purchaser_load_reads_reeds_outputs_h5_groups(tmp_path: Path) -> None:
+    outputs_h5 = tmp_path / "outputs.h5"
+    with h5py.File(outputs_h5, "w") as h5_file:
+        group = h5_file.create_group("cap")
+        group.create_dataset("columns", data=np.array([b"i", b"r", b"t", b"Value"]))
+        group.create_dataset("i", data=np.array([b"electrolyzer"]))
+        group.create_dataset("r", data=np.array([b"p4"]))
+        group.create_dataset("t", data=np.array([2032]))
+        group.create_dataset("Value", data=np.array([120.0]))
+
+    frame = purchaser_load._read_optional_frame(outputs_h5, "hydrogen_production_capacity")
+
+    assert frame is not None
+    assert frame.to_dict(as_series=False) == {
+        "i": ["electrolyzer"],
+        "r": ["p4"],
+        "t": [2032],
+        "Value": [120.0],
+    }
 
 
 def test_purchaser_load_scope_full_flow(tmp_path: Path) -> None:

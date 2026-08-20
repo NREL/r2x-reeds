@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TypeVar
 
+import h5py
+import numpy as np
 import polars as pl
 from infrasys import Component, SingleTimeSeries, System
 from loguru import logger
@@ -28,6 +30,12 @@ HYDROGEN_PRODUCTION_COMPONENT_TYPES = {
     "smr_ccs": ReEDSSteamMethaneReformingDemand,
 }
 HYDROGEN_PRODUCTION_TECHNOLOGIES = tuple(HYDROGEN_PRODUCTION_COMPONENT_TYPES)
+H5_DATASET_KEYS = {
+    "hydrogen_production_capacity": "cap",
+    "hydrogen_production_load": "prod_load",
+    "hydrogen_production_annual_load": "prod_load_ann",
+    "loadsite_op": "loadsite_op",
+}
 
 
 class PurchaserLoadConfig(PluginConfig):
@@ -84,10 +92,46 @@ def _read_optional_frame(path: Path | str | None, name: str) -> pl.DataFrame | N
     """
     if path is None:
         return None
+    path = Path(path)
+    if path.suffix.lower() in {".h5", ".hdf5"}:
+        dataset_key = H5_DATASET_KEYS.get(name, name)
+        with h5py.File(path, mode="r") as h5_file:
+            group = h5_file.get(dataset_key)
+            if not isinstance(group, h5py.Group):
+                logger.warning("Dataset '{}' not found in {}", dataset_key, path)
+                return None
+
+            columns_node = group.get("columns")
+            if columns_node is None:
+                logger.warning("Dataset '{}' is missing 'columns' in {}", dataset_key, path)
+                return None
+
+            columns = [_decode_h5_scalar(value) for value in np.asarray(columns_node[()]).tolist()]
+            data: dict[str, list[object]] = {}
+            for column in columns:
+                node = group.get(str(column))
+                if node is None:
+                    logger.warning("Dataset '{}' is missing column '{}' in {}", dataset_key, column, path)
+                    return None
+                values = np.asarray(node[()])
+                if values.ndim == 0:
+                    values = values.reshape(1)
+                data[str(column)] = [_decode_h5_scalar(value) for value in values.tolist()]
+            return pl.DataFrame(data, strict=False)
+
     frame = DataStore.load_file(path, name=name)
     if frame is None:
         return None
     return frame.collect()
+
+
+def _decode_h5_scalar(value: object) -> object:
+    """Decode byte-valued HDF5 columns to strings."""
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    if isinstance(value, np.bytes_):
+        return value.tobytes().decode("utf-8")
+    return value
 
 
 def _normalize_hour_map_myr(frame: pl.DataFrame) -> pl.DataFrame:
