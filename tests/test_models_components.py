@@ -174,7 +174,7 @@ def test_resource_site_valid_and_exported(sample_region):
         capacity=341.13,
         available_capacity=254.58,
         capacity_factor=0.1877,
-        supply_curve_cost={"value": 577564.52875, "unit": "$/MW"},
+        supply_curve_cost=577564.52875,
     )
 
     assert site.region == sample_region

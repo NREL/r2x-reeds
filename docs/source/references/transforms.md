@@ -13,6 +13,23 @@ Transforms are optional post-parse system modifiers exposed under the `r2x.trans
 - `add-imports`
 - `add-optimal-siting`
 
+## Configuration Summary
+
+Each transform accepts a plugin-specific configuration model. The complete CLI
+configuration examples and field descriptions are in the [ReEDS to PLEXOS CLI
+guide](../how-tos/reeds-to-x-cli.md).
+
+| Transform | Configuration model | Main purpose |
+| --- | --- | --- |
+| `break-gens` | `BreakGensConfig` | Split oversized generators into reference units |
+| `add-pcm-defaults` | `PCMDefaultsConfig` | Fill or override generator attributes |
+| `add-emission-cap` | `EmissionCapConfig` | Add an annual CO2 constraint |
+| `add-electrolyzer-load` | `ElectrolyzerConfig` | Add legacy electrolyzer and hydrogen-price data |
+| `add-purchaser-load` | `PurchaserLoadConfig` | Add hydrogen-production and data-center demand |
+| `add-ccs-credit` | `CCSCreditConfig` | Apply CCS incentives |
+| `add-imports` | `ImportsConfig` | Add Canadian import time series |
+| `add-optimal-siting` | `OptimalSitingConfig` | Apply loadsite increments to demand profiles |
+
 ## Purchaser Load Transform
 
 Transform id: `add-purchaser-load`

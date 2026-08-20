@@ -1135,15 +1135,15 @@
     },
     "reader": {
       "kwargs": {
-        "has_header": true,
-        "skip_rows": 1
+        "has_header": true
       },
       "function": null
     },
     "proc_spec": {
       "column_mapping": {
         "*i": "technology",
-        "$2004/MW": "startup_cost"
+        "$2004/MW": "startup_cost",
+        "$2004/mw": "startup_cost"
       }
     }
   },

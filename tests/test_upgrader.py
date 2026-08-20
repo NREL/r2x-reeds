@@ -2,7 +2,8 @@ import csv
 
 import pytest
 
-from r2x_core import SemanticVersioningStrategy
+from r2x_core import DataStore, PluginContext, SemanticVersioningStrategy
+from r2x_reeds import ReEDSConfig
 from r2x_reeds.upgrader.data_upgrader import ReEDSUpgrader, run_reeds_upgrades
 from r2x_reeds.upgrader.helpers import LEGACY_VERSION
 
@@ -99,8 +100,13 @@ def test_run_reeds_upgrades_missing_meta_file(tmp_path):
     class _Store:
         folder = tmp_path
 
-    ctx = SimpleNamespace(current_version=None, target_version=None, version_strategy=SemanticVersioningStrategy())
-    result = run_reeds_upgrades(store=cast(object, _Store()), ctx=cast(object, ctx))
+    ctx = SimpleNamespace(
+        current_version=None, target_version=None, version_strategy=SemanticVersioningStrategy()
+    )
+    result = run_reeds_upgrades(
+        store=cast(DataStore, _Store()),
+        ctx=cast(PluginContext[ReEDSConfig], ctx),
+    )
     assert result.is_err()
     assert "not found" in str(result.err())
 
@@ -115,10 +121,15 @@ def test_run_reeds_upgrades_missing_version_value(tmp_path, monkeypatch):
     class _Store:
         folder = tmp_path
 
-    ctx = SimpleNamespace(current_version=None, target_version=None, version_strategy=SemanticVersioningStrategy())
+    ctx = SimpleNamespace(
+        current_version=None, target_version=None, version_strategy=SemanticVersioningStrategy()
+    )
     monkeypatch.setattr(ReEDSVersionDetector, "read_version", lambda self, folder_path: None)
 
-    result = run_reeds_upgrades(store=cast(object, _Store()), ctx=cast(object, ctx))
+    result = run_reeds_upgrades(
+        store=cast(DataStore, _Store()),
+        ctx=cast(PluginContext[ReEDSConfig], ctx),
+    )
     assert result.is_err()
     assert "could not be determined" in str(result.err())
 
@@ -133,10 +144,15 @@ def test_run_reeds_upgrades_propagates_upgrade_error(tmp_path, monkeypatch):
     class _Store:
         folder = tmp_path
 
-    ctx = SimpleNamespace(current_version="2026.01.22", target_version=None, version_strategy=SemanticVersioningStrategy())
+    ctx = SimpleNamespace(
+        current_version="2026.01.22", target_version=None, version_strategy=SemanticVersioningStrategy()
+    )
     monkeypatch.setattr(ReEDSUpgrader, "upgrade", lambda self, **kwargs: Err("boom"))
 
-    result = run_reeds_upgrades(store=cast(object, _Store()), ctx=cast(object, ctx))
+    result = run_reeds_upgrades(
+        store=cast(DataStore, _Store()),
+        ctx=cast(PluginContext[ReEDSConfig], ctx),
+    )
     assert result.is_err()
     assert "boom" in str(result.err())
 
@@ -270,13 +286,18 @@ def test_run_reeds_upgrades_reads_version_when_missing(tmp_path, monkeypatch):
     class _Store:
         folder = tmp_path
 
-    ctx = SimpleNamespace(current_version=None, target_version=None, version_strategy=SemanticVersioningStrategy())
+    ctx = SimpleNamespace(
+        current_version=None, target_version=None, version_strategy=SemanticVersioningStrategy()
+    )
 
     def _fake_upgrade(self, **kwargs):
         return self.version_reader.read_version(self.path) and __import__("rust_ok").Ok(tmp_path)
 
     monkeypatch.setattr(ReEDSUpgrader, "upgrade", _fake_upgrade)
 
-    result = run_reeds_upgrades(store=cast(object, _Store()), ctx=cast(object, ctx))
+    result = run_reeds_upgrades(
+        store=cast(DataStore, _Store()),
+        ctx=cast(PluginContext[ReEDSConfig], ctx),
+    )
     assert result.is_ok()
     assert ctx.current_version == "2026.01.22"

@@ -10,7 +10,7 @@
 [![PyPI](https://img.shields.io/pypi/v/r2x-reeds)](https://pypi.org/project/r2x-reeds/)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-green)](./LICENSE.txt)
 [![codecov](https://codecov.io/gh/NREL/r2x-reeds/branch/main/graph/badge.svg)](https://codecov.io/gh/NREL/r2x-reeds)
-[![Documentation](https://github.com/NREL/r2x-reeds/actions/workflows/docs.yaml/badge.svg?branch=main)](https://nrel.github.io/r2x-reeds/)
+[![Documentation](https://github.com/NatLabRockies/r2x-reeds/actions/workflows/docs.yaml/badge.svg?branch=main)](https://github.com/NatLabRockies/r2x-reeds/tree/main/docs)
 
 </div>
 

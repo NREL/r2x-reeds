@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TypeVar
 
+import h5py
+import numpy as np
 import polars as pl
 from infrasys import Component, SingleTimeSeries, System
 from loguru import logger
@@ -28,6 +30,12 @@ HYDROGEN_PRODUCTION_COMPONENT_TYPES = {
     "smr_ccs": ReEDSSteamMethaneReformingDemand,
 }
 HYDROGEN_PRODUCTION_TECHNOLOGIES = tuple(HYDROGEN_PRODUCTION_COMPONENT_TYPES)
+H5_DATASET_KEYS = {
+    "hydrogen_production_capacity": "cap",
+    "hydrogen_production_load": "prod_load",
+    "hydrogen_production_annual_load": "prod_load_ann",
+    "loadsite_op": "loadsite_op",
+}
 
 
 class PurchaserLoadConfig(PluginConfig):
@@ -84,10 +92,46 @@ def _read_optional_frame(path: Path | str | None, name: str) -> pl.DataFrame | N
     """
     if path is None:
         return None
+    path = Path(path)
+    if path.suffix.lower() in {".h5", ".hdf5"}:
+        dataset_key = H5_DATASET_KEYS.get(name, name)
+        with h5py.File(path, mode="r") as h5_file:
+            group = h5_file.get(dataset_key)
+            if not isinstance(group, h5py.Group):
+                logger.warning("Dataset '{}' not found in {}", dataset_key, path)
+                return None
+
+            columns_node = group.get("columns")
+            if columns_node is None:
+                logger.warning("Dataset '{}' is missing 'columns' in {}", dataset_key, path)
+                return None
+
+            columns = [_decode_h5_scalar(value) for value in np.asarray(columns_node[()]).tolist()]
+            data: dict[str, list[object]] = {}
+            for column in columns:
+                node = group.get(str(column))
+                if node is None:
+                    logger.warning("Dataset '{}' is missing column '{}' in {}", dataset_key, column, path)
+                    return None
+                values = np.asarray(node[()])
+                if values.ndim == 0:
+                    values = values.reshape(1)
+                data[str(column)] = [_decode_h5_scalar(value) for value in values.tolist()]
+            return pl.DataFrame(data, strict=False)
+
     frame = DataStore.load_file(path, name=name)
     if frame is None:
         return None
     return frame.collect()
+
+
+def _decode_h5_scalar(value: object) -> object:
+    """Decode byte-valued HDF5 columns to strings."""
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    if isinstance(value, np.bytes_):
+        return value.tobytes().decode("utf-8")
+    return value
 
 
 def _normalize_hour_map_myr(frame: pl.DataFrame) -> pl.DataFrame:
@@ -112,6 +156,17 @@ def _normalize_hour_map_myr(frame: pl.DataFrame) -> pl.DataFrame:
     return normalized.with_columns(
         pl.col("sequential_hour").cast(pl.Int64, strict=False),
         pl.col("hour_period").cast(pl.Utf8),
+    )
+
+
+def _rename_existing_columns(frame: pl.DataFrame, rename_map: dict[str, str]) -> pl.DataFrame:
+    """Rename raw ReEDS columns without repeating DataStore mappings."""
+    return frame.rename(
+        {
+            source: target
+            for source, target in rename_map.items()
+            if source in frame.columns and target not in frame.columns
+        }
     )
 
 
@@ -195,13 +250,9 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
             "consume_characteristics",
         )
         if hydrogen_production_capacity_raw is not None and not hydrogen_production_capacity_raw.is_empty():
-            cap_df = hydrogen_production_capacity_raw.rename(
-                {
-                    "i": "technology",
-                    "r": "region",
-                    "Value": "capacity",
-                    "t": "year",
-                }
+            cap_df = _rename_existing_columns(
+                hydrogen_production_capacity_raw,
+                {"i": "technology", "r": "region", "Value": "capacity", "t": "year"},
             )
             if config.solve_year is not None and "year" in cap_df.columns:
                 cap_df = cap_df.filter(pl.col("year").cast(pl.Int64, strict=False) == config.solve_year)
@@ -212,11 +263,9 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
 
             efficiencies: dict[str, float] = {}
             if consume_char_raw is not None and not consume_char_raw.is_empty():
-                consume_df = consume_char_raw.rename(
-                    {
-                        "*i": "technology",
-                        "t": "year",
-                    }
+                consume_df = _rename_existing_columns(
+                    consume_char_raw,
+                    {"*i": "technology", "t": "year"},
                 )
                 if config.solve_year is not None and "year" in consume_df.columns:
                     consume_df = consume_df.filter(
@@ -317,14 +366,15 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
             "hydrogen_production_annual_load",
         )
         if hydrogen_production_profile_raw is not None and not hydrogen_production_profile_raw.is_empty():
-            profile = hydrogen_production_profile_raw.rename(
+            profile = _rename_existing_columns(
+                hydrogen_production_profile_raw,
                 {
                     "i": "technology",
                     "r": "region",
                     "allh": "hour_period",
                     "Value": "value",
                     "t": "year",
-                }
+                },
             )
             if config.solve_year is not None and "year" in profile.columns:
                 profile = profile.filter(pl.col("year").cast(pl.Int64, strict=False) == config.solve_year)
@@ -336,13 +386,14 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
 
             annual_targets: dict[tuple[str, str], float] = {}
             if hydrogen_production_annual_raw is not None and not hydrogen_production_annual_raw.is_empty():
-                annual = hydrogen_production_annual_raw.rename(
+                annual = _rename_existing_columns(
+                    hydrogen_production_annual_raw,
                     {
                         "i": "technology",
                         "r": "region",
                         "Value": "value",
                         "t": "year",
-                    }
+                    },
                 )
                 if config.solve_year is not None and "year" in annual.columns:
                     annual = annual.filter(pl.col("year").cast(pl.Int64, strict=False) == config.solve_year)

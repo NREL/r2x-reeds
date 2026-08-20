@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import h5py
 import numpy as np
 import polars as pl
 import pytest
@@ -36,6 +37,64 @@ def _run_modifier(system: System, **kwargs) -> System:
     result = purchaser_load.add_purchaser_load(system, purchaser_load.PurchaserLoadConfig(**kwargs))
     assert result.is_ok()
     return result.unwrap()
+
+
+def test_datastore_mapped_purchaser_columns_are_supported() -> None:
+    capacity = pl.DataFrame(
+        {"technology": ["electrolyzer"], "region": ["p4"], "year": [2032], "capacity": [1.0]}
+    )
+    consume_char = pl.DataFrame(
+        {
+            "technology": ["electrolyzer"],
+            "year": [2032],
+            "parameter": ["electricity_efficiency"],
+            "value": [1.0],
+        }
+    )
+    profile = pl.DataFrame(
+        {
+            "technology": ["electrolyzer"],
+            "region": ["p4"],
+            "hour_period": ["h1"],
+            "year": [2032],
+            "value": [1.0],
+        }
+    )
+    annual = pl.DataFrame({"technology": ["electrolyzer"], "region": ["p4"], "year": [2032], "value": [1.0]})
+
+    assert purchaser_load._rename_existing_columns(capacity, {"i": "technology", "r": "region"}).equals(
+        capacity
+    )
+    assert purchaser_load._rename_existing_columns(consume_char, {"*i": "technology", "t": "year"}).equals(
+        consume_char
+    )
+    assert purchaser_load._rename_existing_columns(
+        profile, {"i": "technology", "r": "region", "allh": "hour_period", "Value": "value", "t": "year"}
+    ).equals(profile)
+    assert purchaser_load._rename_existing_columns(
+        annual, {"i": "technology", "r": "region", "Value": "value", "t": "year"}
+    ).equals(annual)
+
+
+def test_purchaser_load_reads_reeds_outputs_h5_groups(tmp_path: Path) -> None:
+    outputs_h5 = tmp_path / "outputs.h5"
+    with h5py.File(outputs_h5, "w") as h5_file:
+        group = h5_file.create_group("cap")
+        group.create_dataset("columns", data=np.array([b"i", b"r", b"t", b"Value"]))
+        group.create_dataset("i", data=np.array([b"electrolyzer"]))
+        group.create_dataset("r", data=np.array([b"p4"]))
+        group.create_dataset("t", data=np.array([2032]))
+        group.create_dataset("Value", data=np.array([120.0]))
+
+    frame = purchaser_load._read_optional_frame(outputs_h5, "hydrogen_production_capacity")
+
+    assert frame is not None
+    assert frame.to_dict(as_series=False) == {
+        "i": ["electrolyzer"],
+        "r": ["p4"],
+        "t": [2032],
+        "Value": [120.0],
+    }
 
 
 def test_purchaser_load_scope_full_flow(tmp_path: Path) -> None:

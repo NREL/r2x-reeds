@@ -99,6 +99,7 @@ OUTPUTS_H5_DATASET_KEYS: dict[str, str] = {
     "cost_capital_energy": "cost_cap_energy",
 }
 
+
 def _resource_dataset_names(technology: str) -> tuple[str, str, str]:
     """Return dataset names for source, candidate, and selected resource rows."""
 
@@ -480,6 +481,13 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         columns_node = group.get("columns")
         values_node = group.get("Value") or group.get("value")
         if columns_node is None or values_node is None:
+            if dataset_key == "fuel2tech":
+                mapping_columns = [column for column in ("f", "i", "value") if group.get(column) is not None]
+                if {"f", "i"}.issubset(mapping_columns):
+                    data = {column: self._decode_h5_values(group[column][()]) for column in mapping_columns}
+                    frame = pl.DataFrame(data, strict=False).lazy()
+                    self._outputs_h5_cache[dataset_key] = frame
+                    return frame
             logger.warning(
                 "Dataset '{}' is missing required 'columns' or 'Value' nodes in {}",
                 dataset_key,
@@ -558,6 +566,13 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if isinstance(value, np.bytes_):
             return value.tobytes().decode("utf-8")
         return value
+
+    def _decode_h5_values(self, values: Any) -> list[Any]:
+        """Decode a one-dimensional HDF5 value array into Python values."""
+        array = np.asarray(values)
+        if array.ndim == 0:
+            array = array.reshape(1)
+        return [self._decode_h5_scalar(value) for value in array.tolist()]
 
     def _close_outputs_h5(self) -> None:
         """Close active outputs.h5 handle and clear in-memory dataset cache."""
@@ -988,11 +1003,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                 logger.debug("No selected resource data found for {}", technology)
                 return Ok(0)
             reference_base = source_df if source_df is not None and not source_df.is_empty() else candidate_df
-            if (
-                reference_base is not None
-                and candidate_df is not None
-                and reference_base is not candidate_df
-            ):
+            if reference_base is not None and candidate_df is not None and reference_base is not candidate_df:
                 reference_df = self._merge_resource_frames(reference_base, candidate_df, technology)
             else:
                 reference_df = reference_base
@@ -1088,7 +1099,13 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         ]
         if coalesced_columns:
             merged = merged.with_columns(coalesced_columns)
-            merged = merged.drop([f"{column}_enrichment" for column in enrichment_columns if f"{column}_enrichment" in merged.columns])
+            merged = merged.drop(
+                [
+                    f"{column}_enrichment"
+                    for column in enrichment_columns
+                    if f"{column}_enrichment" in merged.columns
+                ]
+            )
         return merged
 
     def _normalize_resource_frame(self, df: pl.DataFrame, *, source_name: str) -> pl.DataFrame:
@@ -1164,7 +1181,9 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             built_capacity = _coerce_optional_float(row.get("built_capacity"))
             investment_bool = _coerce_optional_bool(row.get("investment_bool"))
             if resource_year is None or built_capacity is None or investment_bool is None:
-                logger.debug("Skipping {} selected row missing year, built_capacity, or investment_bool", technology)
+                logger.debug(
+                    "Skipping {} selected row missing year, built_capacity, or investment_bool", technology
+                )
                 return None
             base_kwargs.update(
                 {
@@ -2269,9 +2288,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         self._tech_categories = self._defaults.get("tech_categories", {})
         self._excluded_techs = self._defaults.get("excluded_techs", [])
         self._category_to_class_map = self._defaults.get("category_class_mapping", {})
-        self._resource_supply_curve_datasets = tuple(
-            self._defaults.get("resource_supply_curve_datasets", [])
-        )
+        self._resource_supply_curve_datasets = tuple(self._defaults.get("resource_supply_curve_datasets", []))
         return Ok(None)
 
     def _prepare_generator_datasets(self) -> Result[None, str]:
@@ -2302,6 +2319,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                 "cost_vom": self.read_data_file("cost_vom"),
                 "forced_outages": self.read_data_file("forced_outages"),
                 "planned_outages": self.read_data_file("planned_outages"),
+                "startcost": self.read_data_file("startcost"),
                 "maxage": self.read_data_file("maxage"),
                 "storage_duration": self.read_data_file("storage_duration"),
                 "storage_efficiency": self.read_data_file("storage_efficiency"),
