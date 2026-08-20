@@ -59,6 +59,15 @@ def _write_minimal_outputs_h5_from_fuel_price(csv_path: Path, h5_path: Path) -> 
             group.create_dataset(column, data=dataset_values)
 
 
+def _write_fuel2tech_outputs_h5(h5_path: Path) -> None:
+    """Create a ReEDS-style fuel2tech group without generic table metadata."""
+    with h5py.File(h5_path, "w") as h5_file:
+        group = h5_file.create_group("fuel2tech")
+        group.create_dataset("f", data=np.array(["ngas", "coal"], dtype="S"))
+        group.create_dataset("i", data=np.array(["gas-cc", "coal"], dtype="S"))
+        group.create_dataset("value", data=np.array([1, 1]))
+
+
 def test_read_data_file_falls_back_to_legacy_outputs_csv(reeds_run_path: Path) -> None:
     """When outputs.h5 is absent, parser should still read legacy outputs CSV files."""
     parser = _build_parser(reeds_run_path)
@@ -90,6 +99,24 @@ def test_read_data_file_uses_outputs_h5_and_not_csv(tmp_path: Path, reeds_run_pa
     df = result.collect()
     assert not df.is_empty()
     assert {"technology", "region", "year", "fuel_price"}.issubset(set(df.columns))
+
+
+def test_read_fuel_tech_map_uses_reeds_mapping_nodes(tmp_path: Path, reeds_run_path: Path) -> None:
+    """The ReEDS fuel2tech group uses f/i/value nodes, not columns/Value."""
+    run_path = tmp_path / "test_Pacific"
+    shutil.copytree(reeds_run_path, run_path)
+
+    outputs_h5 = run_path / "outputs" / "outputs.h5"
+    _write_fuel2tech_outputs_h5(outputs_h5)
+
+    parser = _build_parser(run_path)
+    result = parser.read_data_file("fuel_tech_map")
+
+    assert result is not None
+    assert result.collect().to_dict(as_series=False) == {
+        "fuel_type": ["ngas", "coal"],
+        "technology": ["gas-cc", "coal"],
+    }
 
 
 def test_read_data_file_uses_store_for_non_outputs_dataset(reeds_run_path: Path) -> None:

@@ -481,6 +481,13 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         columns_node = group.get("columns")
         values_node = group.get("Value") or group.get("value")
         if columns_node is None or values_node is None:
+            if dataset_key == "fuel2tech":
+                mapping_columns = [column for column in ("f", "i", "value") if group.get(column) is not None]
+                if {"f", "i"}.issubset(mapping_columns):
+                    data = {column: self._decode_h5_values(group[column][()]) for column in mapping_columns}
+                    frame = pl.DataFrame(data, strict=False).lazy()
+                    self._outputs_h5_cache[dataset_key] = frame
+                    return frame
             logger.warning(
                 "Dataset '{}' is missing required 'columns' or 'Value' nodes in {}",
                 dataset_key,
@@ -559,6 +566,13 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if isinstance(value, np.bytes_):
             return value.tobytes().decode("utf-8")
         return value
+
+    def _decode_h5_values(self, values: Any) -> list[Any]:
+        """Decode a one-dimensional HDF5 value array into Python values."""
+        array = np.asarray(values)
+        if array.ndim == 0:
+            array = array.reshape(1)
+        return [self._decode_h5_scalar(value) for value in array.tolist()]
 
     def _close_outputs_h5(self) -> None:
         """Close active outputs.h5 handle and clear in-memory dataset cache."""
