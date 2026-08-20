@@ -115,6 +115,17 @@ def _normalize_hour_map_myr(frame: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def _rename_existing_columns(frame: pl.DataFrame, rename_map: dict[str, str]) -> pl.DataFrame:
+    """Rename raw ReEDS columns without repeating DataStore mappings."""
+    return frame.rename(
+        {
+            source: target
+            for source, target in rename_map.items()
+            if source in frame.columns and target not in frame.columns
+        }
+    )
+
+
 def _normalize_loadsite(frame: pl.DataFrame, solve_year: int | None) -> pl.DataFrame:
     """Normalize loadsite-like tables to region/hour/value format.
 
@@ -195,13 +206,9 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
             "consume_characteristics",
         )
         if hydrogen_production_capacity_raw is not None and not hydrogen_production_capacity_raw.is_empty():
-            cap_df = hydrogen_production_capacity_raw.rename(
-                {
-                    "i": "technology",
-                    "r": "region",
-                    "Value": "capacity",
-                    "t": "year",
-                }
+            cap_df = _rename_existing_columns(
+                hydrogen_production_capacity_raw,
+                {"i": "technology", "r": "region", "Value": "capacity", "t": "year"},
             )
             if config.solve_year is not None and "year" in cap_df.columns:
                 cap_df = cap_df.filter(pl.col("year").cast(pl.Int64, strict=False) == config.solve_year)
@@ -212,11 +219,9 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
 
             efficiencies: dict[str, float] = {}
             if consume_char_raw is not None and not consume_char_raw.is_empty():
-                consume_df = consume_char_raw.rename(
-                    {
-                        "*i": "technology",
-                        "t": "year",
-                    }
+                consume_df = _rename_existing_columns(
+                    consume_char_raw,
+                    {"*i": "technology", "t": "year"},
                 )
                 if config.solve_year is not None and "year" in consume_df.columns:
                     consume_df = consume_df.filter(
@@ -317,14 +322,15 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
             "hydrogen_production_annual_load",
         )
         if hydrogen_production_profile_raw is not None and not hydrogen_production_profile_raw.is_empty():
-            profile = hydrogen_production_profile_raw.rename(
+            profile = _rename_existing_columns(
+                hydrogen_production_profile_raw,
                 {
                     "i": "technology",
                     "r": "region",
                     "allh": "hour_period",
                     "Value": "value",
                     "t": "year",
-                }
+                },
             )
             if config.solve_year is not None and "year" in profile.columns:
                 profile = profile.filter(pl.col("year").cast(pl.Int64, strict=False) == config.solve_year)
@@ -336,13 +342,14 @@ def add_purchaser_load(system: System, config: PurchaserLoadConfig) -> Result[Sy
 
             annual_targets: dict[tuple[str, str], float] = {}
             if hydrogen_production_annual_raw is not None and not hydrogen_production_annual_raw.is_empty():
-                annual = hydrogen_production_annual_raw.rename(
+                annual = _rename_existing_columns(
+                    hydrogen_production_annual_raw,
                     {
                         "i": "technology",
                         "r": "region",
                         "Value": "value",
                         "t": "year",
-                    }
+                    },
                 )
                 if config.solve_year is not None and "year" in annual.columns:
                     annual = annual.filter(pl.col("year").cast(pl.Int64, strict=False) == config.solve_year)

@@ -38,6 +38,43 @@ def _run_modifier(system: System, **kwargs) -> System:
     return result.unwrap()
 
 
+def test_datastore_mapped_purchaser_columns_are_supported() -> None:
+    capacity = pl.DataFrame(
+        {"technology": ["electrolyzer"], "region": ["p4"], "year": [2032], "capacity": [1.0]}
+    )
+    consume_char = pl.DataFrame(
+        {
+            "technology": ["electrolyzer"],
+            "year": [2032],
+            "parameter": ["electricity_efficiency"],
+            "value": [1.0],
+        }
+    )
+    profile = pl.DataFrame(
+        {
+            "technology": ["electrolyzer"],
+            "region": ["p4"],
+            "hour_period": ["h1"],
+            "year": [2032],
+            "value": [1.0],
+        }
+    )
+    annual = pl.DataFrame({"technology": ["electrolyzer"], "region": ["p4"], "year": [2032], "value": [1.0]})
+
+    assert purchaser_load._rename_existing_columns(capacity, {"i": "technology", "r": "region"}).equals(
+        capacity
+    )
+    assert purchaser_load._rename_existing_columns(consume_char, {"*i": "technology", "t": "year"}).equals(
+        consume_char
+    )
+    assert purchaser_load._rename_existing_columns(
+        profile, {"i": "technology", "r": "region", "allh": "hour_period", "Value": "value", "t": "year"}
+    ).equals(profile)
+    assert purchaser_load._rename_existing_columns(
+        annual, {"i": "technology", "r": "region", "Value": "value", "t": "year"}
+    ).equals(annual)
+
+
 def test_purchaser_load_scope_full_flow(tmp_path: Path) -> None:
     system, _, _ = _build_system()
 
