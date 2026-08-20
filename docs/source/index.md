@@ -47,51 +47,41 @@ This ensures consistent annual resolution for hydro generation, renewable dispat
 
 ## Quick Start
 
-```python
-from pathlib import Path
-from r2x_reeds import ReEDSParser, ReEDSConfig, ReEDSRegion
-from r2x_core.store import DataStore
+The recommended end-to-end workflow uses the `r2x` CLI. See [ReEDS to X with the
+CLI](how-tos/reeds-to-x-cli.md) for installation, a complete pipeline
+file, parser capabilities, all ReEDS system modifiers, and validation commands.
 
-# Configure
-config = ReEDSConfig(
-    solve_years=2030,
-    weather_years=2012,
-    case_name="High_Renewable"
-)
+For a minimal parser-only pipeline:
 
-# Load data using the default file mapping
-file_mapping = ReEDSConfig.get_file_mapping_path()
-data_store = DataStore.from_json(
-    file_mapping,
-    path=Path("path/to/reeds/outputs")
-)
+```yaml
+variables:
+    reeds_run: <reeds_run_path>
+    solve_year: 2050
+    weather_year: 2012
 
-# Parse
-parser = ReEDSParser(config, store=data_store, name="ReEDS_System")
-system = parser.build_system()
+pipelines:
+    parse:
+        - r2x-reeds.reeds-parser
 
-# Access components
-regions = list(system.get_components(ReEDSRegion))
-print(f"Built system with {len(regions)} regions")
+config:
+    r2x-reeds.reeds-parser:
+        path: ${reeds_run}
+        solve_year: ${solve_year}
+        weather_year: ${weather_year}
 ```
 
-Apply optional transforms after parsing:
+Run it with:
 
-```python
-from r2x_reeds.sysmod.purchaser_load import PurchaserLoadConfig, add_purchaser_load
+```bash
+r2x run reeds-parser-pipeline.yaml parse
+```
 
-result = add_purchaser_load(
-    system,
-    PurchaserLoadConfig(
-        solve_year=2032,
-        weather_year=2012,
-        hour_map_myr_fpath="/path/to/inputs_case/rep/hmap_myr.csv",
-        loadsite_op_fpath="/path/to/outputs/loadsite_op.csv",
-    ),
-)
-if result.is_err():
-    raise RuntimeError(result.unwrap_err())
-system = result.unwrap()
+Apply optional transforms after parsing by adding them to the pipeline and
+giving each step a matching `config` block:
+
+```yaml
+- r2x-reeds.add-purchaser-load
+- r2x-reeds.add-optimal-siting
 ```
 
 ## Documentation Sections
