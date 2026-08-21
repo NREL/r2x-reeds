@@ -130,6 +130,20 @@ Optional fields:
 
 - `case_name`: case label stored in the system description.
 - `scenario`: scenario label; defaults to `base`.
+- `enable_can_imports`: set to `true` to include `can-imports` generators. Defaults to `false`.
+
+The package defaults still contain `can-imports` in `excluded_techs`; this parser flag removes only
+that technology from the effective exclusion list for the current run. Apply `r2x-reeds.add-imports`
+after the parser to attach the Canadian import time series.
+
+```yaml
+config:
+  r2x-reeds.reeds-parser:
+    path: /path/to/reeds/run
+    solve_year: 2030
+    weather_year: 2012
+    enable_can_imports: true
+```
 
 The parser supports CSV inputs and `outputs/outputs.h5`, with fallback to legacy output CSV files. It can build:
 
