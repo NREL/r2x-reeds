@@ -76,6 +76,50 @@ def test_imports_scope_full_flow(tmp_path: Path) -> None:
     assert all(val > 0 for val in ts_values)
 
 
+def test_imports_scope_reeds_input_shapes(tmp_path: Path) -> None:
+    """Canadian imports plugin accepts the native ReEDS input shapes."""
+    system, generator = _build_generator()
+
+    hour_map_path = _write_csv(
+        tmp_path / "hmap_allyrs.csv",
+        {
+            "*timestamp": [
+                "2024-01-01 00:00:00-06:00",
+                "2024-01-02 00:00:00-06:00",
+                "2024-01-03 00:00:00-06:00",
+            ],
+            "year": [2024, 2024, 2024],
+            "actual_period": ["y2024d001", "y2024d002", "y2024d003"],
+            "season": ["y2024d001", "y2024d002", "y2024d003"],
+        },
+    )
+    szn_frac_path = _write_csv(
+        tmp_path / "can_imports_szn_frac.csv",
+        {
+            "*szn": ["y2024d001", "y2024d002", "y2024d003"],
+            "frac_weighted": [0.2, 0.3, 0.5],
+        },
+    )
+    imports_path = _write_csv(
+        tmp_path / "can_imports.csv",
+        {"r": ["west"], "2035": [2000.0]},
+    )
+
+    _run_imports(
+        system,
+        solve_year=2035,
+        weather_year=2024,
+        canada_imports_fpath=imports_path,
+        canada_szn_frac_fpath=szn_frac_path,
+        hour_map_fpath=hour_map_path,
+    )
+
+    assert system.has_time_series(generator)
+    values = system.get_time_series(generator).data
+    assert len(values) == 2
+    assert all(value == value for value in values)
+
+
 def test_imports_scope_missing_weather_year(caplog) -> None:
     """Weather year is required to build imports time series."""
     system, _ = _build_generator()

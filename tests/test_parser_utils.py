@@ -90,7 +90,7 @@ def test_merge_lazy_frames_success() -> None:
 
     left = pl.DataFrame({"key": [1, 2], "value": ["a", "b"]}).lazy()
     right = pl.DataFrame({"key": [1], "other": ["x"]}).lazy()
-    merged_df = cast(pl.DataFrame, parser_utils.merge_lazy_frames(left, right, on=["key"]).unwrap().collect())
+    merged_df = parser_utils.merge_lazy_frames(left, right, on=["key"]).unwrap().collect()
     assert merged_df.shape[0] == 2
     assert merged_df.filter(pl.col("other").is_not_null()).shape[0] == 1
     assert merged_df["other"][0] == "x"
@@ -777,7 +777,7 @@ def test_merge_lazy_frames_with_no_matches() -> None:
     left = pl.DataFrame({"key": [1, 2], "value": ["a", "b"]}).lazy()
     right = pl.DataFrame({"key": [3, 4], "other": ["x", "y"]}).lazy()
 
-    merged = cast(pl.DataFrame, parser_utils.merge_lazy_frames(left, right, on=["key"]).unwrap().collect())
+    merged = parser_utils.merge_lazy_frames(left, right, on=["key"]).unwrap().collect()
     # No matches, so right values should be null
     assert merged.filter(pl.col("other").is_not_null()).shape[0] == 0
 
@@ -877,7 +877,7 @@ def test_merge_lazy_frames_empty_left() -> None:
     left = pl.DataFrame({"key": [], "value": []}).cast({"key": pl.Int64, "value": pl.Utf8}).lazy()
     right = pl.DataFrame({"key": [1, 2], "other": ["x", "y"]}).lazy()
 
-    merged = cast(pl.DataFrame, parser_utils.merge_lazy_frames(left, right, on=["key"]).unwrap().collect())
+    merged = parser_utils.merge_lazy_frames(left, right, on=["key"]).unwrap().collect()
     assert merged.shape[0] == 0
 
 
@@ -890,10 +890,7 @@ def test_merge_lazy_frames_inner_join() -> None:
     left = pl.DataFrame({"key": [1, 2, 3], "value": ["a", "b", "c"]}).lazy()
     right = pl.DataFrame({"key": [2, 3, 4], "other": ["x", "y", "z"]}).lazy()
 
-    merged = cast(
-        pl.DataFrame,
-        parser_utils.merge_lazy_frames(left, right, on=["key"], how="inner").unwrap().collect(),
-    )
+    merged = parser_utils.merge_lazy_frames(left, right, on=["key"], how="inner").unwrap().collect()
     # Only keys 2 and 3 are in both
     assert merged.shape[0] == 2
     assert set(merged["key"].to_list()) == {2, 3}
@@ -908,10 +905,7 @@ def test_merge_lazy_frames_custom_suffix() -> None:
     left = pl.DataFrame({"key": [1], "value": ["a"]}).lazy()
     right = pl.DataFrame({"key": [1], "value": ["x"]}).lazy()
 
-    merged = cast(
-        pl.DataFrame,
-        parser_utils.merge_lazy_frames(left, right, on=["key"], suffix="_other").unwrap().collect(),
-    )
+    merged = parser_utils.merge_lazy_frames(left, right, on=["key"], suffix="_other").unwrap().collect()
     assert "value" in merged.columns
     assert "value_other" in merged.columns
 
@@ -1476,7 +1470,6 @@ def test_prepare_generator_inputs_propagates_dataset_error(monkeypatch: pytest.M
 
 def test_get_rule_for_target_named_miss_returns_first() -> None:
     """When name doesn't match any rule, falls through and returns the first candidate."""
-    from typing import cast
 
     from r2x_core import Rule
     from r2x_reeds.parser_utils import get_rule_for_target

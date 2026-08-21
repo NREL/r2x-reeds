@@ -5,6 +5,13 @@ import pytest
 pytestmark = [pytest.mark.integration]
 
 
+def test_enable_can_imports_is_opt_in():
+    from r2x_reeds import ReEDSConfig
+
+    assert ReEDSConfig(solve_year=2030, weather_year=2012).enable_can_imports is False
+    assert ReEDSConfig(solve_year=2030, weather_year=2012, enable_can_imports=True).enable_can_imports is True
+
+
 def test_excluded_techs_empty_list_default(reeds_config, reeds_run_path):
     from typing import cast
 
