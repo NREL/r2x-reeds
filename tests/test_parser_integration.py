@@ -106,6 +106,19 @@ def test_load_time_series_values(
     )
 
 
+def test_load_profiles_exposes_one_solve_year_column(example_data_store, example_reeds_config) -> None:
+    """Load profiles should expose the solve year without duplicate columns."""
+    load_profiles = example_data_store.read_data(
+        "load_profiles",
+        placeholders={
+            "solve_year": example_reeds_config.primary_solve_year,
+            "weather_year": example_reeds_config.primary_weather_year,
+        },
+    ).collect()
+
+    assert load_profiles.columns.count("solve_year") == 1
+
+
 @pytest.fixture(scope="session")
 def loadsite_run_path(tmp_path_factory, reeds_run_path):
     """Copy test_Pacific run and inject hmap_myr.csv + loadsite_op.csv."""
