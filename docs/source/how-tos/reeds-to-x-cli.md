@@ -132,8 +132,8 @@ Optional fields:
 - `scenario`: scenario label; defaults to `base`.
 - `excluded_techs`: optional list of technologies to exclude. When omitted, the list from `defaults.json` is used.
 
-The package defaults still contain `can-imports` in `excluded_techs`; this parser flag removes only
-that technology from the effective exclusion list for the current run. Apply `r2x-reeds.add-imports`
+The package defaults still contain `can-imports` in `excluded_techs`. To include it while keeping the other default exclusions,
+set `excluded_techs` explicitly (for example, to the default list with `can-imports` removed), then apply `r2x-reeds.add-imports`
 after the parser to attach the Canadian import time series.
 
 ```yaml

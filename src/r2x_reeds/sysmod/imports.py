@@ -86,6 +86,10 @@ def add_imports(system: System, config: ImportsConfig) -> Result[System, str]:
         szn_frac = DataStore.load_file(config.canada_szn_frac_fpath, name="canada_szn_frac")
         total_imports = DataStore.load_file(config.canada_imports_fpath, name="canada_imports")
 
+        if hour_map is None or szn_frac is None or total_imports is None:
+            logger.warning("Imports input data could not be loaded. Skipping imports plugin.")
+            return Ok(system)
+
         if hour_map is not None:
             hour_map = hour_map.collect()
         if szn_frac is not None:
@@ -108,7 +112,7 @@ def add_imports(system: System, config: ImportsConfig) -> Result[System, str]:
         if "value" not in total_imports.columns:
             import_year = config.solve_year or config.weather_year
             if import_year is None or str(import_year) not in total_imports.columns:
-                raise ValueError(f"Import data does not contain solve year {import_year}")
+                raise ValueError(f"Import data does not contain a column for year {import_year}")
             total_imports = total_imports.select(
                 "r",
                 pl.col(str(import_year)).alias("value"),
