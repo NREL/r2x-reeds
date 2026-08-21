@@ -27,6 +27,10 @@ class ImportsConfig(PluginConfig):
         default=None,
         description="Weather year for time series alignment.",
     )
+    solve_year: int | None = Field(
+        default=None,
+        description="ReEDS solve year used to select wide import values.",
+    )
     canada_imports_fpath: Path | str | None = Field(
         default=None,
         description="Path to CSV file containing total Canadian import values.",
@@ -89,6 +93,29 @@ def add_imports(system: System, config: ImportsConfig) -> Result[System, str]:
         if total_imports is not None:
             total_imports = total_imports.collect()
 
+        if "*szn" in szn_frac.columns:
+            szn_frac = szn_frac.rename({"*szn": "season"})
+        if "frac_weighted" in szn_frac.columns:
+            szn_frac = szn_frac.rename({"frac_weighted": "value"})
+
+        if "*timestamp" in hour_map.columns:
+            hour_map = hour_map.rename({"*timestamp": "time_index"})
+        if "actual_period" in hour_map.columns:
+            if "season" in hour_map.columns:
+                hour_map = hour_map.drop("season")
+            hour_map = hour_map.rename({"actual_period": "season"})
+        if "year" in hour_map.columns:
+            hour_map = hour_map.filter(pl.col("year") == config.weather_year)
+
+        if "value" not in total_imports.columns:
+            import_year = config.solve_year or config.weather_year
+            if import_year is None or str(import_year) not in total_imports.columns:
+                raise ValueError(f"Import data does not contain solve year {import_year}")
+            total_imports = total_imports.select(
+                "r",
+                pl.col(str(import_year)).alias("value"),
+            )
+
         # Create hourly time series by joining hour map with seasonal fractions
         hourly_time_series = hour_map.join(szn_frac, on="season", how="left")
 
@@ -98,7 +125,10 @@ def add_imports(system: System, config: ImportsConfig) -> Result[System, str]:
 
         # Convert time_index to datetime
         hourly_time_series = hourly_time_series.with_columns(
-            pl.col("time_index").str.to_datetime(),
+            pl.col("time_index")
+            .str.replace("T", " ")
+            .str.replace(r"[+-]\d{2}:\d{2}$", "")
+            .str.to_datetime(format="%Y-%m-%d %H:%M:%S"),
         )
 
         # Group by date to get daily values

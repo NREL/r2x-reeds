@@ -1588,7 +1588,9 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         load_profiles = self.read_data_file("load_profiles").collect()
         logger.trace("Load profile columns: {}", load_profiles.columns)
 
-        region_columns = [col for col in load_profiles.columns if col not in {"datetime", "solve_year"}]
+        region_columns = [
+            col for col in load_profiles.columns if col not in {"datetime", "solve_year", "year"}
+        ]
         if not region_columns:
             msg = "Load data has no region columns"
             logger.warning(msg)
@@ -2286,7 +2288,9 @@ class ReEDSParser(Plugin[ReEDSConfig]):
     def _prepare_default_metadata(self) -> Result[None, str]:
         """Initialize important configuration from the parser."""
         self._tech_categories = self._defaults.get("tech_categories", {})
-        self._excluded_techs = self._defaults.get("excluded_techs", [])
+        self._excluded_techs = list(self._defaults.get("excluded_techs", []))
+        if self.config.enable_can_imports:
+            self._excluded_techs = [tech for tech in self._excluded_techs if tech != "can-imports"]
         self._category_to_class_map = self._defaults.get("category_class_mapping", {})
         self._resource_supply_curve_datasets = tuple(self._defaults.get("resource_supply_curve_datasets", []))
         return Ok(None)
@@ -2306,7 +2310,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         biofuel_merged = merge_result.ok()
         if biofuel_merged is not None:
             biofuel_mapped = biofuel_merged.select(pl.exclude("fuel_type"))
-            biofuel_mapped_df = cast(pl.DataFrame, biofuel_mapped.collect())
+            biofuel_mapped_df = biofuel_mapped.collect()
             if not biofuel_mapped_df.is_empty():
                 fuel_price = pl.concat([fuel_price, biofuel_mapped], how="diagonal")
 

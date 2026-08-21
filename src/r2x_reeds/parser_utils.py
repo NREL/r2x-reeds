@@ -333,7 +333,7 @@ def _prepare_generator_dataset(
         except Exception as e:
             return Err(ValidationError(f"Failed to join {name} data: {e}"))
 
-    collected = cast(pl.DataFrame, df.collect())
+    collected = df.collect()
     df_out = collected.with_columns(pl.col("technology").str.split("_").list.get(0).alias("technology_base"))
 
     if "fuel_type" not in df_out.columns:

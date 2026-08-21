@@ -287,9 +287,6 @@
       "function": null
     },
     "proc_spec": {
-      "column_mapping": {
-        "year": "solve_year"
-      },
       "filter_by": {
         "solve_year": "{solve_year}",
         "datetime": "{weather_year}"

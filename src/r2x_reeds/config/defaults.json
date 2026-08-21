@@ -125,6 +125,12 @@
         "electrolyzer"
       ]
     },
+    "imports": {
+      "prefixes": [],
+      "exact": [
+        "can-imports"
+      ]
+    },
     "geothermal": {
       "prefixes": [
         "geothermal",
@@ -171,7 +177,8 @@
     "geothermal": "ReEDSVariableGenerator",
     "renewable": "ReEDSVariableGenerator",
     "variable_renewable": "ReEDSVariableGenerator",
-    "hydrogen": "ReEDSConsumingTechnology"
+    "hydrogen": "ReEDSConsumingTechnology",
+    "imports": "ReEDSGenerator"
   },
   "default_values": {
     "base_year": 2020,

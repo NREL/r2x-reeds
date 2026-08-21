@@ -74,6 +74,13 @@ class ReEDSConfig(PluginConfig):
     ]
     case_name: Annotated[str | None, Field(default=None, description="Case name")] = None
     scenario: Annotated[str, Field(default="base", description="Scenario identifier")] = "base"
+    enable_can_imports: Annotated[
+        bool,
+        Field(
+            default=False,
+            description="Include can-imports generators in the parsed system.",
+        ),
+    ] = False
 
     @property
     def primary_solve_year(self) -> int:
