@@ -37,6 +37,5 @@ def create_parser_context(
         config=config,
         metadata={
             "tech_categories": defaults.get("tech_categories", {}),
-            "category_class_mapping": defaults.get("category_class_mapping", {}),
         },
     )

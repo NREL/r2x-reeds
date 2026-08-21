@@ -8,11 +8,10 @@ using the new Plugin[ReEDSConfig] pattern with lifecycle hooks.
 from __future__ import annotations
 
 import calendar
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta
-from functools import partial
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 import polars as pl
@@ -20,13 +19,7 @@ from infrasys import Component, SingleTimeSeries, SupplementalAttribute
 from loguru import logger
 from rust_ok import Err, Ok, Result
 
-from r2x_core import (
-    ComponentCreationError,
-    Plugin,
-    Rule,
-    System,
-    create_component,
-)
+from r2x_core import Plugin, Rule, System
 
 from .enum_mappings import RESERVE_TYPE_MAP
 from .getters import (
@@ -50,47 +43,36 @@ from .models import (
 )
 from .models.components import (
     ReEDSConsumingTechnology,
-    ReEDSConsumingTechnologyEconomics,
-    ReEDSConsumingTechnologyPerformance,
     ReEDSDemand,
     ReEDSEmission,
     ReEDSGenerator,
-    ReEDSGeneratorEconomics,
-    ReEDSGeneratorIdentity,
-    ReEDSGeneratorOperatingConstraints,
-    ReEDSGeneratorPerformance,
-    ReEDSGeneratorSupplyCurve,
     ReEDSInterface,
     ReEDSRegion,
     ReEDSReserve,
     ReEDSReservePercentages,
     ReEDSReserveRegion,
-    ReEDSStorage,
-    ReEDSThermalGenerator,
     ReEDSTransmissionLine,
-    ReEDSVariableGenerator,
 )
 from .models.enums import ReserveType
 from .parser_checks import check_dataset_non_empty, check_required_values_in_column
 from .parser_utils import (
-    _collect_component_kwargs_from_rule,
-    _resolve_generator_rule_from_row,
     build_capacity_expansion_initial_capacity_frame,
     build_capacity_expansion_periods_frame,
     build_capacity_expansion_plant_characteristics_frame,
     build_capacity_expansion_representative_timepoints_frame,
+    build_reserve_rows,
     build_synthetic_hour_map,
     calculate_reserve_requirement,
-    get_generator_class,
     get_rule_for_target,
     get_rules_by_target,
-    merge_lazy_frames,
     monthly_to_hourly_polars,
-    prepare_generator_inputs,
+    prepare_generator_datasets,
+    select_generator_rule,
     tech_matches_category,
     truncate_and_cast_time_series,
 )
 from .plugin_config import ReEDSConfig
+from .rule_construction import create_and_attach_from_rule
 from .rules_helper import create_parser_context
 from .upgrader.data_upgrader import run_reeds_upgrades
 
@@ -199,12 +181,12 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         self._variable_generator_df: pl.DataFrame | None = None
         self._non_variable_generator_df: pl.DataFrame | None = None
         self._region_cache: dict[str, ReEDSRegion] = {}
-        self._generator_cache: dict[str, ReEDSGenerator] = {}
+        self._generator_cache: dict[str, ReEDSGenerator | ReEDSConsumingTechnology] = {}
         self._interface_cache: dict[str, ReEDSInterface] = {}
         self._reserve_region_cache: dict[str, ReEDSReserveRegion] = {}
         self._hydro_cf_prepared: pl.DataFrame | None = None
         self._reserve_percentages: dict[ReserveType, ReEDSReservePercentages] = {}
-        self._reserve_costs: dict[str, dict[str, float]] = {}
+        self._generator_dataset_names: dict[str, str] = {}
 
         # Parser context and time indices
         self._ctx: Any = None
@@ -219,7 +201,6 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         # Technology categorization
         self._tech_categories: dict[str, list[str]] = {}
         self._excluded_techs: list[str] = []
-        self._category_to_class_map: dict[str, str | type[ReEDSGenerator]] = {}
 
     def on_validate_config(self) -> Result[None, str]:
         """Validate configuration assets before upgrades or data I/O."""
@@ -347,25 +328,22 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             switch_values[name] = row["value"]
         planning_switches = ReEDSPlanningSwitches.model_validate(switch_values)
         logger.debug(
-            "Capacity-expansion switches: annual_cap={}, storage_enabled={}, "
-            "duration_overrides_enabled={}",
+            "Capacity-expansion switches: annual_cap={}, storage_enabled={}, duration_overrides_enabled={}",
             planning_switches.annual_cap.name,
             planning_switches.storage_enabled,
             planning_switches.hydro_psh_duration_data_enabled,
         )
 
-        co2_cap_data = (
-            self.read_data_file("co2_cap")
-            if planning_switches.emission_type is not None
-            else None
-        )
+        co2_cap_data = self.read_data_file("co2_cap") if planning_switches.emission_type is not None else None
         co2_cap = co2_cap_data.collect() if co2_cap_data is not None else None
         periods_frame = build_capacity_expansion_periods_frame(
             modeled_years,
             present_value_factors,
             co2_cap,
         )
-        missing_factor_years = periods_frame.filter(pl.col("present_value_factor").is_null())["year"].to_list()
+        missing_factor_years = periods_frame.filter(pl.col("present_value_factor").is_null())[
+            "year"
+        ].to_list()
         if missing_factor_years:
             raise ValueError(
                 f"planning_present_value_factors is missing modeled years {missing_factor_years}"
@@ -376,8 +354,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                 raise ValueError(f"co2_cap is missing modeled years {missing_cap_years}")
 
         planning_periods = tuple(
-            ReEDSPlanningPeriod.model_validate(row)
-            for row in periods_frame.iter_rows(named=True)
+            ReEDSPlanningPeriod.model_validate(row) for row in periods_frame.iter_rows(named=True)
         )
 
         representative_frame = build_capacity_expansion_representative_timepoints_frame(
@@ -398,10 +375,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             for field_name, field in ReEDSPlantCharacteristics.model_fields.items()
             if field_name not in {"technology", "year"}
             and isinstance(field.validation_alias, str)
-            and (
-                field.is_required()
-                or bool((field.json_schema_extra or {}).get("source_required"))
-            )
+            and (field.is_required() or bool((field.json_schema_extra or {}).get("source_required")))
         }
         unsupported_variables = set(plant_characteristics["variable"].unique()) - source_variables
         if unsupported_variables:
@@ -434,15 +408,16 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             energy_capacity,
         )
         initial_capacity_models = tuple(
-            ReEDSInitialCapacity.model_validate(row)
-            for row in initial_capacity_frame.iter_rows(named=True)
+            ReEDSInitialCapacity.model_validate(row) for row in initial_capacity_frame.iter_rows(named=True)
         )
 
         storage_enabled = planning_switches.storage_enabled
         duration_overrides_enabled = planning_switches.hydro_psh_duration_data_enabled
 
         storage_duration_data = self.read_data_file("planning_storage_durations")
-        storage_duration_frame = storage_duration_data.collect() if storage_duration_data is not None else None
+        storage_duration_frame = (
+            storage_duration_data.collect() if storage_duration_data is not None else None
+        )
         storage_duration_models: tuple[ReEDSStorageDuration, ...] = ()
         if storage_duration_frame is not None and not storage_duration_frame.is_empty():
             if "technology" not in storage_duration_frame.columns:
@@ -520,19 +495,27 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         )
         return Ok(None)
 
-    def create_component(self, component_class: type[Component], **kwargs: Any) -> Component:
-        """Create a component instance with consistent validation handling."""
-        result = create_component(
-            component_class,
-            skip_validation=self._ctx.skip_validation,
-            **kwargs,
+    def _create_from_rule(
+        self,
+        row: Mapping[str, Any],
+        rule: Rule,
+        system: System,
+        *,
+        attachment_source: Component | None = None,
+    ) -> Result[Component | SupplementalAttribute, str]:
+        """Create and attach the outputs declared by one parser rule."""
+        if self._ctx is None:
+            return Err("Parser context is missing")
+        self._ctx.system = system
+        self._ctx.target_system = system
+
+        return create_and_attach_from_rule(
+            row,
+            rule,
+            system=system,
+            context=self._ctx,
+            attachment_source=attachment_source,
         )
-        if result.is_err():
-            raise ComponentCreationError(str(result.err()))
-        component = result.ok()
-        if component is None:
-            raise ComponentCreationError("Component creation returned None")
-        return component
 
     def on_validate(self) -> Result[None, str]:
         """Validate input data after upgrades, before building the system.
@@ -583,15 +566,11 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         else:
             if hour_map_data is None:
                 hour_map_df = build_synthetic_hour_map(weather_years)
-                logger.warning(
-                    "hour_map is not mapped. Using a synthetic in-memory hour_map for validation."
-                )
+                logger.warning("hour_map is not mapped. Using a synthetic in-memory hour_map for validation.")
             else:
                 try:
                     hour_map_df = (
-                        hour_map_data.collect()
-                        if isinstance(hour_map_data, pl.LazyFrame)
-                        else hour_map_data
+                        hour_map_data.collect() if isinstance(hour_map_data, pl.LazyFrame) else hour_map_data
                     )
                 except Exception as exc:
                     return Err(f"Weather year(s): hour_map could not be collected: {exc}")
@@ -708,6 +687,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if self._ctx is None:
             return Err("Parser context is missing")
         self._ctx.system = system
+        self._ctx.target_system = system
 
         capacity_expansion_result = self._build_capacity_expansion(system)
         if capacity_expansion_result.is_err():
@@ -781,27 +761,28 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if region_rules is None:
             return Err("Region rules missing")
 
-        region_kwargs_result = _collect_component_kwargs_from_rule(
-            data=hierarchy_data,
-            rule_provider=region_rules,
-            parser_context=self._ctx,
-            row_identifier_getter=partial(build_region_name, context=self._ctx),
-        )
-        if region_kwargs_result.is_err():
-            return Err(str(region_kwargs_result.err()))
+        if self._ctx is None:
+            return Err("Parser context is missing")
 
         creation_errors: list[str] = []
         created = 0
-        for identifier, kwargs in region_kwargs_result.ok() or []:
-            try:
-                region = self.create_component(ReEDSRegion, **kwargs)
-            except ComponentCreationError as exc:
-                creation_errors.append(f"{identifier}: {exc}")
-                logger.error("Failed to create region {}: {}", identifier, exc)
+        for row in hierarchy_data.iter_rows(named=True):
+            identifier_result = build_region_name(row, context=self._ctx)
+            if identifier_result.is_err():
+                creation_errors.append(str(identifier_result.err()))
                 continue
-
-            system.add_component(region)
-            region = cast(ReEDSRegion, region)
+            identifier = identifier_result.ok()
+            if not identifier:
+                creation_errors.append("Region row has no identifier")
+                continue
+            creation_result = self._create_from_rule(row, region_rules, system)
+            if creation_result.is_err():
+                creation_errors.append(f"{identifier}: {creation_result.err()}")
+                continue
+            region = creation_result.ok()
+            if not isinstance(region, ReEDSRegion):
+                creation_errors.append(f"{identifier}: rule did not create ReEDSRegion")
+                continue
             self._region_cache[region.name] = region
             created += 1
 
@@ -864,41 +845,47 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             logger.info("No {} generator data found; attached 0 generators", label)
             return Ok(0)
 
-        kwargs_result = _collect_component_kwargs_from_rule(
-            data=df,
-            rule_provider=lambda row: _resolve_generator_rule_from_row(
-                row,
-                self._tech_categories or {},
-                self._category_to_class_map,
-                self._rules_by_target,
-            ),
-            parser_context=self._ctx,
-            row_identifier_getter=partial(build_generator_name, context=self._ctx),
-        )
-        if kwargs_result.is_err():
-            return Err(str(kwargs_result.err()))
+        if self._ctx is None:
+            return Err("Parser context is missing")
+        self._ctx.system = system
+        self._ctx.target_system = system
 
         creation_errors: list[str] = []
         built = 0
-        for identifier, component_kwargs in kwargs_result.ok() or []:
-            # Check for duplicate generator by name
+        for row in df.iter_rows(named=True):
+            identifier_result = build_generator_name(row, context=self._ctx)
+            if identifier_result.is_err():
+                creation_errors.append(str(identifier_result.err()))
+                continue
+            identifier = identifier_result.ok()
+            if not identifier:
+                creation_errors.append("Generator row has no identifier")
+                continue
             if identifier in self._generator_cache:
                 logger.debug("Duplicate generator '{}' detected, skipping.", identifier)
                 continue
 
-            creation_result = self._instantiate_generator(identifier, component_kwargs)
+            rule_result = select_generator_rule(
+                self._parser_rules or [],
+                row,
+                context=self._ctx,
+            )
+            if rule_result.is_err():
+                creation_errors.append(f"{identifier}: {rule_result.err()}")
+                continue
+            rule = rule_result.ok()
+            if rule is None:
+                creation_errors.append(f"{identifier}: generator rule resolution returned None")
+                continue
+            creation_result = self._create_from_rule(row, rule, system)
             if creation_result.is_err():
                 creation_errors.append(f"{identifier}: {creation_result.err()}")
                 continue
 
-            creation = creation_result.ok()
-            if creation is None:
-                creation_errors.append(f"{identifier}: generator creation returned None")
+            generator = creation_result.ok()
+            if not isinstance(generator, (ReEDSGenerator, ReEDSConsumingTechnology)):
+                creation_errors.append(f"{identifier}: rule did not create a generator technology")
                 continue
-            generator, attributes = creation
-            system.add_component(generator)
-            for attribute in attributes:
-                system.add_supplemental_attribute(generator, attribute)
             self._generator_cache[generator.name] = generator
             built += 1
 
@@ -908,77 +895,6 @@ class ReEDSParser(Plugin[ReEDSConfig]):
 
         logger.info("Attached {} {} generators", built, label)
         return Ok(built)
-
-    def _instantiate_generator(
-        self,
-        identifier: str,
-        kwargs: dict[str, Any],
-    ) -> Result[tuple[ReEDSGenerator, list[SupplementalAttribute]], str]:
-        """Instantiate a generator component with technology-specific class resolution."""
-        technology = kwargs.get("technology")
-        if technology is None:
-            return Err(f"Generator {identifier} missing technology")
-
-        class_result = get_generator_class(
-            str(technology),
-            self._tech_categories or {},
-            self._category_to_class_map,
-        )
-        if class_result.is_err():
-            return Err(f"Generator {identifier} class lookup failed: {class_result.err()}")
-
-        generator_class = class_result.ok()
-        if generator_class is None:
-            return Err(f"Generator {identifier} class lookup returned None")
-
-        component_kwargs = dict(kwargs)
-
-        def take(model: type[Any], *, exclude: set[str] | None = None) -> dict[str, Any]:
-            """Move source fields into one concept-specific enrichment model."""
-            fields = set(model.model_fields) - (exclude or set())
-            return {field: component_kwargs.pop(field) for field in fields if field in component_kwargs}
-
-        component_kwargs["identity"] = ReEDSGeneratorIdentity(**take(ReEDSGeneratorIdentity))
-        attributes: list[SupplementalAttribute] = []
-
-        def add_attribute(attribute: SupplementalAttribute) -> None:
-            """Keep only source records that contain at least one fact."""
-            values = attribute.model_dump(exclude_none=True)
-            values.pop("uuid", None)
-            if values:
-                attributes.append(attribute)
-
-        if issubclass(generator_class, ReEDSConsumingTechnology):
-            economics = ReEDSConsumingTechnologyEconomics(**take(ReEDSConsumingTechnologyEconomics))
-            performance = ReEDSConsumingTechnologyPerformance(**take(ReEDSConsumingTechnologyPerformance))
-            add_attribute(economics)
-            add_attribute(performance)
-        else:
-            economics = ReEDSGeneratorEconomics(**take(ReEDSGeneratorEconomics))
-            add_attribute(economics)
-            performance_exclude = (
-                {"heat_rate"} if issubclass(generator_class, ReEDSThermalGenerator) else set()
-            )
-            performance = ReEDSGeneratorPerformance(
-                **take(ReEDSGeneratorPerformance, exclude=performance_exclude)
-            )
-            operating_constraints = ReEDSGeneratorOperatingConstraints(
-                **take(ReEDSGeneratorOperatingConstraints)
-            )
-            add_attribute(performance)
-            add_attribute(operating_constraints)
-            if issubclass(generator_class, ReEDSVariableGenerator):
-                add_attribute(ReEDSGeneratorSupplyCurve(**take(ReEDSGeneratorSupplyCurve)))
-            if issubclass(generator_class, ReEDSStorage):
-                # Storage energy capacity is derived from power capacity and duration.
-                component_kwargs.pop("energy_capacity", None)
-                component_kwargs.pop("capital_cost_energy", None)
-
-        try:
-            generator = self.create_component(generator_class, **component_kwargs)
-        except ComponentCreationError as exc:
-            return Err(f"Generator {identifier} creation failed: {exc}")
-        return Ok((cast(ReEDSGenerator, generator), attributes))
 
     def _build_transmission(self, system: System) -> Result[None, str]:
         """Build transmission interface and line components with bi-directional ratings."""
@@ -1116,27 +1032,26 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         )
         logger.trace("Derived {} unique transmission interface rows", interface_rows.height)
 
-        interface_kwargs_result = _collect_component_kwargs_from_rule(
-            data=interface_rows,
-            rule_provider=interface_rule,
-            parser_context=self._ctx,
-            row_identifier_getter=partial(build_transmission_interface_name, context=self._ctx),
-        )
-        if interface_kwargs_result.is_err():
-            return Err(str(interface_kwargs_result.err()))
-
         creation_errors: list[str] = []
         interface_count = 0
-        for identifier, kwargs in interface_kwargs_result.ok() or []:
-            try:
-                interface = self.create_component(ReEDSInterface, **kwargs)
-            except ComponentCreationError as exc:
-                creation_errors.append(f"{identifier}: {exc}")
-                logger.error("Failed to create transmission interface {}: {}", identifier, exc)
+        for row in interface_rows.iter_rows(named=True):
+            identifier_result = build_transmission_interface_name(row, context=self._ctx)
+            if identifier_result.is_err():
+                creation_errors.append(str(identifier_result.err()))
                 continue
-
-            system.add_component(interface)
-            self._interface_cache[identifier] = cast(ReEDSInterface, interface)
+            identifier = identifier_result.ok()
+            if not identifier:
+                creation_errors.append("Transmission interface row has no identifier")
+                continue
+            result = self._create_from_rule(row, interface_rule, system)
+            if result.is_err():
+                creation_errors.append(f"{identifier}: {result.err()}")
+                continue
+            interface = result.ok()
+            if not isinstance(interface, ReEDSInterface):
+                creation_errors.append(f"{identifier}: rule did not create ReEDSInterface")
+                continue
+            self._interface_cache[identifier] = interface
             interface_count += 1
 
         return Ok((interface_count, creation_errors))
@@ -1157,37 +1072,33 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if line_rule is None:
             return Err("Transmission line rule is missing")
 
-        line_kwargs_result = _collect_component_kwargs_from_rule(
-            data=trancap,
-            rule_provider=line_rule,
-            parser_context=self._ctx,
-            row_identifier_getter=partial(build_transmission_line_name, context=self._ctx),
-        )
-        if line_kwargs_result.is_err():
-            return Err(str(line_kwargs_result.err()))
-
-        unique_lines = {}
-        for identifier, kwargs in line_kwargs_result.ok() or []:
-            if identifier not in unique_lines:
-                unique_lines[identifier] = kwargs
-            else:
+        unique_rows: dict[str, Mapping[str, Any]] = {}
+        for row in trancap.iter_rows(named=True):
+            identifier_result = build_transmission_line_name(row, context=self._ctx)
+            if identifier_result.is_err():
+                return Err(str(identifier_result.err()))
+            identifier = identifier_result.ok()
+            if not identifier:
+                return Err("Transmission line row has no identifier")
+            if identifier in unique_rows:
                 logger.warning(
-                    "Duplicate transmission line identifier '{}' detected; "
-                    "keeping the first occurrence and discarding subsequent entries.",
+                    "Duplicate transmission line identifier '{}' detected; keeping the first occurrence and discarding subsequent entries.",
                     identifier,
                 )
+                continue
+            unique_rows[identifier] = row
 
         creation_errors: list[str] = []
         line_count = 0
-        for identifier, kwargs in unique_lines.items():
-            try:
-                line = self.create_component(ReEDSTransmissionLine, **kwargs)
-            except ComponentCreationError as exc:
-                creation_errors.append(f"{identifier}: {exc}")
-                logger.error("Failed to create transmission line {}: {}", identifier, exc)
+        for identifier, row in unique_rows.items():
+            result = self._create_from_rule(row, line_rule, system)
+            if result.is_err():
+                creation_errors.append(f"{identifier}: {result.err()}")
                 continue
-
-            system.add_component(line)
+            line = result.ok()
+            if not isinstance(line, ReEDSTransmissionLine):
+                creation_errors.append(f"{identifier}: rule did not create ReEDSTransmissionLine")
+                continue
             line_count += 1
 
         return Ok((line_count, creation_errors))
@@ -1224,31 +1135,26 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if load_rule is None:
             return Err("Load rule is missing")
 
-        load_kwargs_result = _collect_component_kwargs_from_rule(
-            data=loads_df,
-            rule_provider=load_rule,
-            parser_context=self._ctx,
-            row_identifier_getter=partial(build_load_name, context=self._ctx),
-        )
-        if load_kwargs_result.is_err():
-            return Err(str(load_kwargs_result.err()))
-
         creation_errors: list[str] = []
         load_count = 0
-        for identifier, kwargs in load_kwargs_result.ok() or []:
-            try:
-                demand = self.create_component(ReEDSDemand, **kwargs)
-            except ComponentCreationError as exc:
-                creation_errors.append(f"{identifier}: {exc}")
-                logger.error("Failed to create load {}: {}", identifier, exc)
+        for row in loads_df.iter_rows(named=True):
+            identifier_result = build_load_name(row, context=self._ctx)
+            if identifier_result.is_err():
+                creation_errors.append(str(identifier_result.err()))
                 continue
-
-            system.add_component(demand)
+            identifier = identifier_result.ok()
+            if not identifier:
+                creation_errors.append("Load row has no identifier")
+                continue
+            result = self._create_from_rule(row, load_rule, system)
+            if result.is_err():
+                creation_errors.append(f"{identifier}: {result.err()}")
+                continue
+            demand = result.ok()
+            if not isinstance(demand, ReEDSDemand):
+                creation_errors.append(f"{identifier}: rule did not create ReEDSDemand")
+                continue
             load_count += 1
-
-        if creation_errors:
-            failure_list = "; ".join(creation_errors)
-            return Err(f"Failed to build the following loads: {failure_list}")
 
         if creation_errors:
             failure_list = "; ".join(creation_errors)
@@ -1295,53 +1201,43 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             len(reserve_types),
         )
 
+        reserve_region_rule_result = get_rule_for_target(
+            self._rules_by_target, name="reserve_region", target_type=ReEDSReserveRegion.__name__
+        )
+        if reserve_region_rule_result.is_err():
+            return Err(str(reserve_region_rule_result.err()))
+        reserve_region_rule = reserve_region_rule_result.ok()
+        if reserve_region_rule is None:
+            return Err("Reserve-region rule is missing")
+
         reserve_region_errors: list[str] = []
         for region_name in transmission_regions:
             if region_name in self._reserve_region_cache:
                 continue
-            try:
-                reserve_region = self.create_component(ReEDSReserveRegion, name=region_name)
-            except ComponentCreationError as exc:
-                reserve_region_errors.append(f"{region_name}: {exc}")
-                logger.error("Failed to create reserve region {}: {}", region_name, exc)
+            result = self._create_from_rule({"name": region_name}, reserve_region_rule, system)
+            if result.is_err():
+                reserve_region_errors.append(f"{region_name}: {result.err()}")
                 continue
-
-            system.add_component(reserve_region)
-            self._reserve_region_cache[region_name] = cast(ReEDSReserveRegion, reserve_region)
+            reserve_region = result.ok()
+            if not isinstance(reserve_region, ReEDSReserveRegion):
+                reserve_region_errors.append(f"{region_name}: rule did not create ReEDSReserveRegion")
+                continue
+            self._reserve_region_cache[region_name] = reserve_region
             reserve_region_count += 1
 
         if reserve_region_errors:
             failure_list = "; ".join(reserve_region_errors)
             return Err(f"Failed to create reserve regions: {failure_list}")
 
-        rows: list[dict[str, Any]] = []
-        for region_name in transmission_regions:
-            for reserve_type_name in reserve_types:
-                reserve_type = RESERVE_TYPE_MAP.get(str(reserve_type_name).upper())
-                if reserve_type is None:
-                    logger.warning("Unknown reserve type: {}", reserve_type_name)
-                    continue
-                pct_cfg = self._reserve_percentages.get(
-                    reserve_type,
-                    ReEDSReservePercentages(reserve_type=reserve_type),
-                )
-                cost_cfg = self._reserve_costs.get(reserve_type.value, {})
-                rows.append(
-                    {
-                        "region": region_name,
-                        "reserve_type": reserve_type.value,
-                        "duration": reserve_duration.get(reserve_type_name),
-                        "time_frame": reserve_time_frame.get(reserve_type_name),
-                        "vors": reserve_vors.get(reserve_type_name),
-                        "direction": reserve_direction.get(reserve_type_name, "Up"),
-                        "or_load_percentage": pct_cfg.or_load_percentage,
-                        "or_wind_percentage": pct_cfg.or_wind_percentage,
-                        "or_pv_percentage": pct_cfg.or_pv_percentage,
-                        "spin_cost": cost_cfg.get("spin_cost"),
-                        "reg_cost": cost_cfg.get("reg_cost"),
-                        "flex_cost": cost_cfg.get("flex_cost"),
-                    }
-                )
+        rows = build_reserve_rows(
+            transmission_regions,
+            reserve_types,
+            reserve_duration=reserve_duration,
+            reserve_time_frame=reserve_time_frame,
+            reserve_vors=reserve_vors,
+            reserve_direction=reserve_direction,
+            reserve_percentages=self._reserve_percentages,
+        )
 
         if not rows:
             logger.debug("No reserve rows generated, skipping reserves")
@@ -1361,25 +1257,24 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         if reserve_rule is None:
             return Err("Reserve rule is missing")
 
-        reserve_kwargs_result = _collect_component_kwargs_from_rule(
-            data=rows_df,
-            rule_provider=reserve_rule,
-            parser_context=self._ctx,
-            row_identifier_getter=partial(build_reserve_name, context=self._ctx),
-        )
-        if reserve_kwargs_result.is_err():
-            return Err(str(reserve_kwargs_result.err()))
-
         creation_errors: list[str] = []
-        for identifier, kwargs in reserve_kwargs_result.ok() or []:
-            try:
-                reserve = self.create_component(ReEDSReserve, **kwargs)
-            except ComponentCreationError as exc:
-                creation_errors.append(f"{identifier}: {exc}")
-                logger.error("Failed to create reserve {}: {}", identifier, exc)
+        for row in rows_df.iter_rows(named=True):
+            identifier_result = build_reserve_name(row, context=self._ctx)
+            if identifier_result.is_err():
+                creation_errors.append(str(identifier_result.err()))
                 continue
-
-            system.add_component(reserve)
+            identifier = identifier_result.ok()
+            if not identifier:
+                creation_errors.append("Reserve row has no identifier")
+                continue
+            result = self._create_from_rule(row, reserve_rule, system)
+            if result.is_err():
+                creation_errors.append(f"{identifier}: {result.err()}")
+                continue
+            reserve = result.ok()
+            if not isinstance(reserve, ReEDSReserve):
+                creation_errors.append(f"{identifier}: rule did not create ReEDSReserve")
+                continue
             reserve_count += 1
 
         if creation_errors:
@@ -1460,31 +1355,27 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             logger.warning("No emission rows matched existing generators, skipping emissions")
             return Ok(None)
 
-        emission_kwargs_result = _collect_component_kwargs_from_rule(
-            data=emission_matches,
-            rule_provider=emission_rule,
-            parser_context=self._ctx,
-            row_identifier_getter=lambda row: resolve_emission_generator_identifier(row, context=self._ctx),
-        )
-        if emission_kwargs_result.is_err():
-            return Err(str(emission_kwargs_result.err()))
-
         creation_errors: list[str] = []
         attached = 0
-        for identifier, kwargs in emission_kwargs_result.ok() or []:
+        for row in emission_matches.iter_rows(named=True):
+            identifier_result = resolve_emission_generator_identifier(row, context=self._ctx)
+            if identifier_result.is_err():
+                creation_errors.append(str(identifier_result.err()))
+                continue
+            identifier = identifier_result.ok()
             generator = self._generator_cache.get(identifier)
             if generator is None:
                 logger.trace("Generator {} not found for emission, skipping", identifier)
                 continue
 
-            try:
-                emission = ReEDSEmission(**kwargs)
-            except Exception as exc:
-                creation_errors.append(f"{identifier}: {exc}")
-                logger.error("Failed to create emission {}: {}", identifier, exc)
+            result = self._create_from_rule(row, emission_rule, system, attachment_source=generator)
+            if result.is_err():
+                creation_errors.append(f"{identifier}: {result.err()}")
                 continue
-
-            system.add_supplemental_attribute(generator, emission)
+            emission = result.ok()
+            if not isinstance(emission, SupplementalAttribute):
+                creation_errors.append(f"{identifier}: rule did not create ReEDSEmission")
+                continue
             attached += 1
 
         if creation_errors:
@@ -1620,9 +1511,9 @@ class ReEDSParser(Plugin[ReEDSConfig]):
 
             region_name = reserve.name.rsplit("_", 1)[0]
 
-            wind_pct = percentages.or_wind_percentage
-            solar_pct = percentages.or_pv_percentage
-            load_pct = percentages.or_load_percentage
+            wind_pct = float(percentages.or_wind_percentage)
+            solar_pct = float(percentages.or_pv_percentage)
+            load_pct = float(percentages.or_load_percentage)
 
             wind_generators = [
                 {
@@ -1751,8 +1642,9 @@ class ReEDSParser(Plugin[ReEDSConfig]):
 
         hydro_generators = [
             gen
-            for gen_name, gen in self._generator_cache.items()
-            if tech_matches_category(gen.technology, "hydro", self._tech_categories)
+            for gen in self._generator_cache.values()
+            if isinstance(gen, ReEDSGenerator)
+            and tech_matches_category(gen.technology, "hydro", self._tech_categories)
         ]
         logger.trace("Hydro generators detected: {}", len(hydro_generators))
 
@@ -1913,7 +1805,6 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         self._reserve_region_cache = {}
         self._hydro_cf_prepared = None
         self._reserve_percentages = {}
-        self._reserve_costs = {}
 
     def _capacity_expansion_is_available(self) -> bool:
         """Return whether all canonical capacity-expansion files exist."""
@@ -1970,95 +1861,45 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         """Initialize important configuration from the parser."""
         self._tech_categories = self._defaults.get("tech_categories", {})
         self._excluded_techs = self._defaults.get("excluded_techs", [])
-        self._category_to_class_map = self._defaults.get("category_class_mapping", {})
+        configured_names = self._defaults.get("generator_datasets", {})
+        required_names = {
+            "capacity",
+            "fuel_price",
+            "biofuel_price",
+            "fuel_tech_map",
+            "heat_rate",
+            "cost_vom",
+            "forced_outages",
+            "planned_outages",
+            "maxage",
+            "storage_duration",
+            "storage_efficiency",
+            "storage_duration_out",
+            "consume_characteristics",
+            "ramp_rate",
+        }
+        if not isinstance(configured_names, dict) or not required_names <= configured_names.keys():
+            return Err("generator_datasets must configure every generator input dataset")
+        self._generator_dataset_names = {name: str(configured_names[name]) for name in required_names}
         return Ok(None)
 
     def _prepare_generator_datasets(self) -> Result[None, str]:
         """Load and preprocess generator-related datasets."""
         logger.trace("Preparing generator datasets with excluded techs: {}", self._excluded_techs)
-        capacity_data = self.read_data_file("online_capacity")
-        fuel_price = self.read_data_file("fuel_price")
-        biofuel = self.read_data_file("biofuel_price")
-        fuel_map = self.read_data_file("fuel_tech_map")
-
-        biofuel_prepped = biofuel.with_columns(pl.lit("biomass").alias("fuel_type"))
-        merge_result = merge_lazy_frames(biofuel_prepped, fuel_map, on=["fuel_type"], how="inner")
-        if merge_result.is_err():
-            return Err(str(merge_result.err()))
-        biofuel_merged = merge_result.ok()
-        if biofuel_merged is not None:
-            biofuel_mapped = biofuel_merged.select(pl.exclude("fuel_type"))
-            biofuel_mapped_df = cast(pl.DataFrame, biofuel_mapped.collect())
-            if not biofuel_mapped_df.is_empty():
-                fuel_price = pl.concat([fuel_price, biofuel_mapped], how="diagonal")
-
-        generator_data_result = prepare_generator_inputs(
-            capacity_data=capacity_data,
-            optional_data={
-                "fuel_price": fuel_price,
-                "fuel_tech_map": fuel_map,
-                "heat_rate": self.read_data_file("heat_rate"),
-                "cost_vom": self.read_data_file("cost_vom"),
-                "forced_outages": self.read_data_file("forced_outages"),
-                "planned_outages": self.read_data_file("planned_outages"),
-                "maxage": self.read_data_file("maxage"),
-                "storage_duration": self.read_data_file("storage_duration"),
-                "storage_efficiency": self.read_data_file("storage_efficiency"),
-                "storage_duration_out": self.read_data_file("storage_duration_out"),
-                "consume_characteristics": self.read_data_file("consume_characteristics"),
-            },
+        dataset_names = self._generator_dataset_names
+        datasets = {role: self.read_data_file(dataset_name) for role, dataset_name in dataset_names.items()}
+        generator_data_result = prepare_generator_datasets(
+            datasets,
             excluded_technologies=self._excluded_techs,
             technology_categories=self._tech_categories,
+            default_values=self._defaults.get("default_values", {}),
         )
         if generator_data_result.is_err():
             return Err(str(generator_data_result.err()))
         generator_data = generator_data_result.ok()
         if generator_data is None:
             return Err("Generator data result was unexpectedly None")
-
         variable_df, non_variable_df = generator_data
-        ramprate_data = self.read_data_file("ramprate")
-        if ramprate_data is not None:
-            ramprate_df = ramprate_data.collect()
-            if not ramprate_df.is_empty():
-                ramprate_df = ramprate_df.filter(pl.col("ramp_rate").is_not_null())
-                logger.trace(
-                    "Joining ramp rate data ({} techs) into generator datasets",
-                    ramprate_df.height,
-                )
-                variable_df = variable_df.join(ramprate_df, on="technology", how="left")
-                non_variable_df = non_variable_df.join(ramprate_df, on="technology", how="left")
-            else:
-                logger.debug("Ramp rate data is empty, skipping join")
-        else:
-            logger.debug("No ramp rate data found, skipping join")
-
-        # Fill null heat_rate values using the mean of the same technology + vintage group.
-        # Only use the global default_heat_rate for groups where every row is null.
-        default_heat_rate = self._defaults.get("default_values", {}).get("default_heat_rate")
-        if default_heat_rate is not None:
-            if "heat_rate" not in non_variable_df.columns:
-                non_variable_df = non_variable_df.with_columns(
-                    pl.lit(None, dtype=pl.Float64).alias("heat_rate")
-                )
-
-            null_count = non_variable_df["heat_rate"].null_count()
-            if null_count > 0:
-                group_cols = [c for c in ("technology", "vintage") if c in non_variable_df.columns]
-                group_fill = (
-                    pl.col("heat_rate").mean().over(group_cols)
-                    if group_cols
-                    else pl.lit(default_heat_rate, dtype=pl.Float64)
-                )
-                non_variable_df = non_variable_df.with_columns(
-                    pl.col("heat_rate").fill_null(group_fill).fill_null(default_heat_rate)
-                )
-                logger.debug(
-                    "Filled {} null heat_rate(s): group mean over [{}], default={}",
-                    null_count,
-                    ", ".join(group_cols),
-                    default_heat_rate,
-                )
 
         self._variable_generator_df = variable_df
         self._non_variable_generator_df = non_variable_df
@@ -2123,23 +1964,6 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         self._reserve_percentages = reserve_percentages
         logger.trace("Prepared reserve percentage models: {}", len(self._reserve_percentages))
 
-        cost_map: dict[str, dict[str, float]] = {}
-        cost_df = self.read_data_file("reserve_costs_default")
-        if cost_df is None:
-            cost_df = self.read_data_file("reserve_costs_market")
-        if cost_df is not None:
-            df = cost_df.collect()
-            for col, rtype in (
-                ("spin_cost", ReserveType.SPINNING.value),
-                ("reg_cost", ReserveType.REGULATION.value),
-                ("flex_cost", ReserveType.FLEXIBILITY.value),
-            ):
-                if col in df.columns:
-                    val = df[col].mean()
-                    if val is not None:
-                        cost_map[rtype] = {col: float(val)}
-        self._reserve_costs = cost_map
-        logger.trace("Prepared reserve cost map entries: {}", len(self._reserve_costs))
         return Ok(None)
 
     def _prepare_rules_by_target(self) -> Result[None, str]:

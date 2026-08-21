@@ -137,7 +137,7 @@ def test_file_mapping_and_parser_rules_match_canonical_contracts() -> None:
     assert "units" not in datasets["renewable_supply_curves"]["info"]
 
     resource_rule = rules["ReEDSVariableGenerator"]
-    assert resource_rule["field_map"]["resource_class"] == "resource_class"
+    assert resource_rule["supplemental_attributes"][-1]["field_map"]["resource_class"] == "resource_class"
     load_rule = rules["ReEDSDemand"]
     assert "max_active_power" not in load_rule.get("defaults", {})
 
@@ -158,16 +158,22 @@ def test_generator_parser_rules_use_normalized_optional_columns() -> None:
         "ReEDSElectrolyzerDemand",
     )
     for target_type in generator_targets:
-        assert rules[target_type]["field_map"]["max_age"] == "maxage_years"
+        if target_type in {"ReEDSGenerator", "ReEDSConsumingTechnology", "ReEDSElectrolyzerDemand"}:
+            continue
+        assert (
+            rules[target_type].get("field_map", {}).get("max_age") == "maxage_years"
+            or any(
+                output.get("field_map", {}).get("max_age") == "maxage_years"
+                for output in rules[target_type].get("supplemental_attributes", [])
+            )
+        )
 
-    assert rules["ReEDSGenerator"]["field_map"]["vom_cost"] == "vom_cost"
+    assert rules["ReEDSThermalGenerator"]["supplemental_attributes"][0]["field_map"]["vom_cost"] == "vom_cost"
     assert rules["ReEDSThermalGenerator"]["field_map"]["category"] == "category"
     assert "heat_rate" not in rules["ReEDSThermalGenerator"].get("defaults", {})
     assert "max_active_power" not in rules["ReEDSElectrolyzerDemand"].get("defaults", {})
 
     storage_rule = rules["ReEDSStorage"]
-    assert "storage_duration" not in storage_rule["field_map"]
-    assert "round_trip_efficiency" not in storage_rule["field_map"]
     assert storage_rule["getters"]["storage_duration"] == "get_storage_duration"
     assert storage_rule["getters"]["round_trip_efficiency"] == "get_round_trip_efficiency"
 
@@ -196,6 +202,9 @@ def test_storage_parser_rule_defaults_optional_duration_facts() -> None:
             "capacity": 10.0,
             "category": "storage",
             "region": "p1",
+            "storage_duration": None,
+            "round_trip_efficiency": None,
+            "maxage_years": None,
         },
         rule=storage_rule,
         context=context,

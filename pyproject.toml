@@ -16,14 +16,13 @@ maintainers = [
 ]
 requires-python = ">=3.11,<3.14"
 dependencies = [
-    "r2x-core>=0.7.0,<1.0.0",
+    "r2x-core>=0.8.0,<1.0.0",
 ]
 keywords=["ReEDS"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: BSD License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
@@ -76,7 +75,7 @@ docs = [
 ]
 
 [build-system]
-requires = ["uv_build>=0.8.22,<0.10.0"]
+requires = ["uv_build>=0.8.22,<1.0.0"]
 build-backend = "uv_build"
 
 [tool.pytest.ini_options]
@@ -162,6 +161,3 @@ fail_under = 90
 
 [tool.coverage.html]
 directory = "htmlcov"
-
-[tool.uv.sources]
-r2x-core = { git = "https://github.com/NatLabRockies/r2x-core", branch = "feat/hdf5-columnar-reader" }

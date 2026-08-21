@@ -26,7 +26,8 @@ Defines package-level parser defaults including:
 
 - `excluded_techs`
 - `tech_categories`
-- `category_class_mapping`
+- `category_class_mapping` (legacy utility compatibility mapping)
+- `generator_datasets`, which names the datasets used to prepare generator rows
 - reserve defaults (`default_reserve_types`, `reserve_duration`, `reserve_time_frame`, etc.)
 - unit conversion constants
 
@@ -76,6 +77,7 @@ Rule fields include:
 - `field_map`
 - `getters`
 - `defaults`
+- `supplemental_attributes`
 
 ## Runtime Placeholder Substitution
 

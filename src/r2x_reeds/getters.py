@@ -12,9 +12,17 @@ from r2x_reeds.enum_mappings import (
     map_reserve_direction,
     map_reserve_type,
 )
-from r2x_reeds.models.base import FromTo_ToFrom
-from r2x_reeds.models.components import ReEDSInterface, ReEDSRegion, ReEDSReserveRegion
-from r2x_reeds.models.enums import EmissionSource, EmissionType, ReserveDirection, ReserveType
+from r2x_reeds.models import (
+    EmissionSource,
+    EmissionType,
+    FromTo_ToFrom,
+    ReEDSGeneratorIdentity,
+    ReEDSInterface,
+    ReEDSRegion,
+    ReEDSReserveRegion,
+    ReserveDirection,
+    ReserveType,
+)
 from r2x_reeds.parser_utils import tech_matches_category
 from r2x_reeds.row_utils import get_row_field
 
@@ -84,6 +92,19 @@ def build_region_name(row: Any, *, context: PluginContext) -> Result[str, Except
         return Ok(str(region_id))
     except Exception as e:
         return Err(e)
+
+
+@_reeds_getter
+def build_generator_identity(
+    row: Any, *, context: PluginContext
+) -> Result[ReEDSGeneratorIdentity, Exception]:
+    """Build generator identity metadata from a parser row."""
+    _ = context
+    try:
+        vintage = get_row_field(row, "vintage")
+        return Ok(ReEDSGeneratorIdentity(vintage=str(vintage) if vintage is not None else None))
+    except Exception as exc:
+        return Err(exc)
 
 
 @_reeds_getter

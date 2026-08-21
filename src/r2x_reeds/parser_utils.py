@@ -5,6 +5,7 @@ from __future__ import annotations
 import calendar
 import importlib
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
@@ -15,11 +16,30 @@ from rust_ok import Err, Ok, Result
 from r2x_core import PluginContext, System
 from r2x_core.exceptions import ValidationError
 from r2x_core.utils import build_component_kwargs
-from r2x_reeds.models.components import ReEDSDemand, ReEDSRegion
+from r2x_reeds.enum_mappings import RESERVE_TYPE_MAP
+from r2x_reeds.models import ReEDSDemand, ReEDSRegion, ReEDSReservePercentages, ReserveType
 
 if TYPE_CHECKING:
     from r2x_core.rules import Rule
     from r2x_reeds.models import ReEDSGenerator
+
+# Columns that can be aggregated from the model.
+AGG_COLUMNS = [
+    "heat_rate",
+    "forced_outage_rate",
+    "planned_outage_rate",
+    "maxage_years",
+    "fuel_type",
+    "fuel_price",
+    "vom_cost",
+    "resource_class",
+    "inverter_loading_ratio",
+    "capacity_factor_adjustment",
+    "max_capacity_factor",
+    "supply_curve_cost",
+    "transmission_adder",
+]
+
 
 def build_synthetic_hour_map(weather_years: Iterable[int]) -> pl.DataFrame:
     """Build a minimal in-memory hour map for runs without a source file."""
@@ -121,7 +141,9 @@ def build_capacity_expansion_initial_capacity_frame(
         pl.col("region").cast(pl.String).str.strip_chars().alias("region"),
         pl.col("energy_capacity").alias("initial_energy_capacity"),
     )
-    orphaned = energy.join(power.select("technology", "region").unique(), on=["technology", "region"], how="anti")
+    orphaned = energy.join(
+        power.select("technology", "region").unique(), on=["technology", "region"], how="anti"
+    )
     if not orphaned.is_empty():
         key = orphaned.select("technology", "region").row(0)
         raise ValueError(f"existing_energy_capacity has no matching power capacity for {key}")
@@ -129,24 +151,6 @@ def build_capacity_expansion_initial_capacity_frame(
     if result.is_empty():
         raise ValueError("existing_capacity contains no rows")
     return result
-
-
-# Columns that can be aggregated from the model.
-AGG_COLUMNS = [
-    "heat_rate",
-    "forced_outage_rate",
-    "planned_outage_rate",
-    "maxage_years",
-    "fuel_type",
-    "fuel_price",
-    "vom_price",
-    "resource_class",
-    "inverter_loading_ratio",
-    "capacity_factor_adjustment",
-    "max_capacity_factor",
-    "supply_curve_cost",
-    "transmission_adder",
-]
 
 
 def _build_generator_field_map(row: Mapping[str, Any], system: System) -> dict[str, Any]:
@@ -322,6 +326,28 @@ def get_generator_class(
 
     logger.error("Technology model not found for {} on {} (categories: {})", tech, models_path, categories)
     return Err(TypeError(f"Technology model {tech} not found on {models_path} for categories {categories}"))
+
+
+def select_generator_rule(
+    rules: Sequence[Rule],
+    row: Mapping[str, Any],
+    *,
+    context: PluginContext,
+) -> Result[Rule, ValidationError]:
+    """Select the filtered parser rule that matches a prepared generator row."""
+    source = SimpleNamespace(**dict(row))
+    for rule in rules:
+        if rule.source_type != "data_row" or rule.filter is None:
+            continue
+        if rule.filter.matches(source, context=context):
+            return Ok(rule)
+
+    return Err(
+        ValidationError(
+            f"No generator parser rule matched technology={row.get('technology')!r}, "
+            f"category={row.get('category')!r}"
+        )
+    )
 
 
 def _prepare_generator_dataset(
@@ -723,6 +749,136 @@ def _resolve_generator_rule_from_row(
         return Err(ValidationError(f"No parser rule found for {generator_class.__name__}"))
 
     return Ok(rules[0])
+
+
+def build_reserve_rows(
+    transmission_regions: Iterable[str],
+    reserve_types: Iterable[Any],
+    *,
+    reserve_duration: Mapping[str, Any],
+    reserve_time_frame: Mapping[str, Any],
+    reserve_vors: Mapping[str, Any],
+    reserve_direction: Mapping[str, Any],
+    reserve_percentages: Mapping[ReserveType, ReEDSReservePercentages],
+) -> list[dict[str, Any]]:
+    """Prepare reserve component rows from configured reserve inputs."""
+    rows: list[dict[str, Any]] = []
+    for region_name in transmission_regions:
+        for reserve_type_name in reserve_types:
+            reserve_type = RESERVE_TYPE_MAP.get(str(reserve_type_name).upper())
+            if reserve_type is None:
+                logger.warning("Unknown reserve type: {}", reserve_type_name)
+                continue
+            pct_cfg = reserve_percentages.get(
+                reserve_type,
+                ReEDSReservePercentages(reserve_type=reserve_type),
+            )
+            key = str(reserve_type_name)
+            rows.append(
+                {
+                    "region": region_name,
+                    "reserve_type": reserve_type.value,
+                    "duration": reserve_duration.get(key),
+                    "time_frame": reserve_time_frame.get(key),
+                    "vors": reserve_vors.get(key),
+                    "direction": reserve_direction.get(key, "Up"),
+                    "or_load_percentage": pct_cfg.or_load_percentage,
+                    "or_wind_percentage": pct_cfg.or_wind_percentage,
+                    "or_pv_percentage": pct_cfg.or_pv_percentage,
+                }
+            )
+    return rows
+
+
+def prepare_generator_datasets(
+    datasets: Mapping[str, pl.LazyFrame | None],
+    *,
+    excluded_technologies: list[str],
+    technology_categories: dict[str, Any],
+    default_values: Mapping[str, Any],
+) -> Result[tuple[pl.DataFrame, pl.DataFrame], ValidationError]:
+    """Read prepared generator inputs into variable and non-variable rows.
+
+    ``datasets`` is keyed by the canonical roles in ``defaults.json``. The parser
+    resolves those roles to logical DataStore names before calling this function,
+    so file names remain configurable without moving data preparation into the
+    parser lifecycle class.
+    """
+    fuel_price = datasets.get("fuel_price")
+    biofuel = datasets.get("biofuel_price")
+    fuel_map = datasets.get("fuel_tech_map")
+
+    if biofuel is not None and fuel_map is not None:
+        biofuel_prepped = biofuel.with_columns(pl.lit("biomass").alias("fuel_type"))
+        merge_result = merge_lazy_frames(biofuel_prepped, fuel_map, on=["fuel_type"], how="inner")
+        if merge_result.is_err():
+            return Err(merge_result.err())
+        biofuel_merged = merge_result.ok()
+        if biofuel_merged is not None:
+            biofuel_mapped = biofuel_merged.select(pl.exclude("fuel_type"))
+            biofuel_mapped_df = cast(pl.DataFrame, biofuel_mapped.collect())
+            if not biofuel_mapped_df.is_empty():
+                fuel_price = (
+                    pl.concat([fuel_price, biofuel_mapped], how="diagonal")
+                    if fuel_price is not None
+                    else biofuel_mapped
+                )
+
+    optional_data = {
+        name: datasets.get(name)
+        for name in (
+            "fuel_price",
+            "fuel_tech_map",
+            "heat_rate",
+            "cost_vom",
+            "forced_outages",
+            "planned_outages",
+            "maxage",
+            "storage_duration",
+            "storage_efficiency",
+            "storage_duration_out",
+            "consume_characteristics",
+        )
+    }
+    optional_data["fuel_price"] = fuel_price
+
+    generator_data_result = prepare_generator_inputs(
+        capacity_data=datasets.get("capacity"),
+        optional_data=optional_data,
+        excluded_technologies=excluded_technologies,
+        technology_categories=technology_categories,
+    )
+    if generator_data_result.is_err():
+        return Err(generator_data_result.err() or ValidationError("Failed to prepare generator data"))
+    generator_data = generator_data_result.ok()
+    if generator_data is None:
+        return Err(ValidationError("Generator data result was unexpectedly None"))
+
+    variable_df, non_variable_df = generator_data
+    ramprate_data = datasets.get("ramp_rate")
+    if ramprate_data is not None:
+        ramprate_df = cast(pl.DataFrame, ramprate_data.collect())
+        if not ramprate_df.is_empty():
+            ramprate_df = ramprate_df.filter(pl.col("ramp_rate").is_not_null())
+            variable_df = variable_df.join(ramprate_df, on="technology", how="left")
+            non_variable_df = non_variable_df.join(ramprate_df, on="technology", how="left")
+
+    default_heat_rate = default_values.get("default_heat_rate")
+    if default_heat_rate is not None:
+        if "heat_rate" not in non_variable_df.columns:
+            non_variable_df = non_variable_df.with_columns(pl.lit(None, dtype=pl.Float64).alias("heat_rate"))
+        if non_variable_df["heat_rate"].null_count() > 0:
+            group_cols = [column for column in ("technology", "vintage") if column in non_variable_df.columns]
+            group_fill = (
+                pl.col("heat_rate").mean().over(group_cols)
+                if group_cols
+                else pl.lit(default_heat_rate, dtype=pl.Float64)
+            )
+            non_variable_df = non_variable_df.with_columns(
+                pl.col("heat_rate").fill_null(group_fill).fill_null(default_heat_rate)
+            )
+
+    return Ok((variable_df, non_variable_df))
 
 
 def prepare_generator_inputs(

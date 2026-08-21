@@ -161,6 +161,22 @@
     "variable_renewable": "ReEDSVariableGenerator",
     "hydrogen": "ReEDSConsumingTechnology"
   },
+  "generator_datasets": {
+    "capacity": "online_capacity",
+    "fuel_price": "fuel_price",
+    "biofuel_price": "biofuel_price",
+    "fuel_tech_map": "fuel_tech_map",
+    "heat_rate": "heat_rate",
+    "cost_vom": "cost_vom",
+    "forced_outages": "forced_outages",
+    "planned_outages": "planned_outages",
+    "maxage": "maxage",
+    "storage_duration": "storage_duration",
+    "storage_efficiency": "storage_efficiency",
+    "storage_duration_out": "storage_duration_out",
+    "consume_characteristics": "consume_characteristics",
+    "ramp_rate": "ramprate"
+  },
   "default_values": {
     "base_year": 2020,
     "default_heat_rate": 10.0,

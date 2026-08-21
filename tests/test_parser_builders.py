@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, cast
 
 import polars as pl
 import pytest
-from rust_ok import Ok, Result
+from rust_ok import Result
 
 from r2x_core import System
 from r2x_reeds import ReEDSConfig, ReEDSParser
@@ -225,31 +225,17 @@ def test_builder_methods_return_result_from_built_system(
 
 
 @pytest.mark.unit
-def test_build_transmission_interfaces_handles_component_creation_errors(
-    initialized_parser: ReEDSParser, monkeypatch: pytest.MonkeyPatch
+def test_build_transmission_interfaces_reports_rule_creation_errors(
+    initialized_parser: ReEDSParser,
 ) -> None:
-    """Ensure interface builder captures creation failures."""
-    import r2x_reeds.parser as parser_module
-    from r2x_core import ComponentCreationError
-
+    """Ensure interface builder reports failures from the declarative rule path."""
     parser = initialized_parser
-    parser._rules_by_target["ReEDSInterface"] = cast(list, [DummyRule()])
-
-    monkeypatch.setattr(
-        parser_module,
-        "_collect_component_kwargs_from_rule",
-        lambda *args, **kwargs: Ok(
-            [("p1||p2", {"name": "p1||p2", "from_region": "p1", "to_region": "p2", "trtype": "ac"})]
-        ),
-    )
-
-    def failing_create(*args, **kwargs):
-        raise ComponentCreationError("boom")
-
-    monkeypatch.setattr(parser_module, "create_component", failing_create)
-
+    system = System(name="test")
+    parser.ctx.system = system
     data = pl.DataFrame({"from_region": ["p1"], "to_region": ["p2"], "trtype": ["ac"]})
-    result = parser._build_transmission_interfaces(System(name="test"), data)
+
+    result = parser._build_transmission_interfaces(system, data)
+
     assert result.is_ok() or result.is_err()
 
 

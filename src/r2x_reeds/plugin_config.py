@@ -64,6 +64,8 @@ class ReEDSConfig(PluginConfig):
     r2x_reeds.parser.ReEDSParser : Parser that uses this configuration
     """
 
+    models: tuple[str, ...] = ("r2x_reeds.models",)
+
     solve_year: Annotated[
         int | list[int],
         Field(description="Model solve year(s) - automatically converted to list"),
