@@ -2288,9 +2288,12 @@ class ReEDSParser(Plugin[ReEDSConfig]):
     def _prepare_default_metadata(self) -> Result[None, str]:
         """Initialize important configuration from the parser."""
         self._tech_categories = self._defaults.get("tech_categories", {})
-        self._excluded_techs = list(self._defaults.get("excluded_techs", []))
-        if self.config.enable_can_imports:
-            self._excluded_techs = [tech for tech in self._excluded_techs if tech != "can-imports"]
+        configured_excluded_techs = self.config.excluded_techs
+        self._excluded_techs = list(
+            configured_excluded_techs
+            if configured_excluded_techs is not None
+            else self._defaults.get("excluded_techs", [])
+        )
         self._category_to_class_map = self._defaults.get("category_class_mapping", {})
         self._resource_supply_curve_datasets = tuple(self._defaults.get("resource_supply_curve_datasets", []))
         return Ok(None)

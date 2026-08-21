@@ -130,7 +130,7 @@ Optional fields:
 
 - `case_name`: case label stored in the system description.
 - `scenario`: scenario label; defaults to `base`.
-- `enable_can_imports`: set to `true` to include `can-imports` generators. Defaults to `false`.
+- `excluded_techs`: optional list of technologies to exclude. When omitted, the list from `defaults.json` is used.
 
 The package defaults still contain `can-imports` in `excluded_techs`; this parser flag removes only
 that technology from the effective exclusion list for the current run. Apply `r2x-reeds.add-imports`
@@ -142,7 +142,10 @@ config:
     path: /path/to/reeds/run
     solve_year: 2030
     weather_year: 2012
-    enable_can_imports: true
+    excluded_techs:
+      - electrolyzer
+      - smr
+      - smr_ccs
 ```
 
 The parser supports CSV inputs and `outputs/outputs.h5`, with fallback to legacy output CSV files. It can build:

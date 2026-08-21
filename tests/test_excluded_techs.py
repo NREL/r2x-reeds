@@ -5,11 +5,16 @@ import pytest
 pytestmark = [pytest.mark.integration]
 
 
-def test_enable_can_imports_is_opt_in():
+def test_excluded_techs_can_be_overridden():
     from r2x_reeds import ReEDSConfig
 
-    assert ReEDSConfig(solve_year=2030, weather_year=2012).enable_can_imports is False
-    assert ReEDSConfig(solve_year=2030, weather_year=2012, enable_can_imports=True).enable_can_imports is True
+    config = ReEDSConfig(
+        solve_year=2030,
+        weather_year=2012,
+        excluded_techs=["electrolyzer", "smr", "smr_ccs"],
+    )
+
+    assert config.excluded_techs == ["electrolyzer", "smr", "smr_ccs"]
 
 
 def test_excluded_techs_empty_list_default(reeds_config, reeds_run_path):

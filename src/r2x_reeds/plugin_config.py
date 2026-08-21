@@ -27,6 +27,9 @@ class ReEDSConfig(PluginConfig):
         Name of the ReEDS case
     scenario : str, optional
         Scenario identifier
+    excluded_techs : list[str], optional
+        Technologies to exclude from the parsed system. When omitted, the list
+        from ``defaults.json`` is used.
 
     Examples
     --------
@@ -74,13 +77,16 @@ class ReEDSConfig(PluginConfig):
     ]
     case_name: Annotated[str | None, Field(default=None, description="Case name")] = None
     scenario: Annotated[str, Field(default="base", description="Scenario identifier")] = "base"
-    enable_can_imports: Annotated[
-        bool,
+    excluded_techs: Annotated[
+        list[str] | None,
         Field(
-            default=False,
-            description="Include can-imports generators in the parsed system.",
+            default=None,
+            description=(
+                "Technologies to exclude from the parsed system. "
+                "When omitted, the defaults.json list is used."
+            ),
         ),
-    ] = False
+    ] = None
 
     @property
     def primary_solve_year(self) -> int:

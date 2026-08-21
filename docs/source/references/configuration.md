@@ -10,7 +10,7 @@ Key fields:
 - `weather_year`: int or list of int
 - `case_name`: optional string
 - `scenario`: optional string, default `base`
-- `enable_can_imports`: optional boolean, default `false`
+- `excluded_techs`: optional list of technologies to exclude. When omitted, the list from `defaults.json` is used.
 
 Convenience properties:
 
@@ -34,7 +34,7 @@ Defines package-level parser defaults including:
 Notable default behavior:
 
 - `electrolyzer` is excluded from general generator parsing (`excluded_techs`) to keep purchaser-load modeling explicit.
-- `can-imports` is excluded by default but can be included for a run with `enable_can_imports: true`.
+- `can-imports` is excluded by default. To include it for a run, provide an `excluded_techs` list that omits `can-imports`.
 
 ## file_mapping.json
 
