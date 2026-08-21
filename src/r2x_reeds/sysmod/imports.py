@@ -100,9 +100,7 @@ def add_imports(system: System, config: ImportsConfig) -> Result[System, str]:
 
         if "*timestamp" in hour_map.columns:
             hour_map = hour_map.rename({"*timestamp": "time_index"})
-        if "actual_period" in hour_map.columns:
-            if "season" in hour_map.columns:
-                hour_map = hour_map.drop("season")
+        if "actual_period" in hour_map.columns and "season" not in hour_map.columns:
             hour_map = hour_map.rename({"actual_period": "season"})
         if "year" in hour_map.columns:
             hour_map = hour_map.filter(pl.col("year") == config.weather_year)
