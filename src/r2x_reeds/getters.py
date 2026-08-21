@@ -138,6 +138,60 @@ def compute_is_dispatchable(row: Any, *, context: PluginContext) -> Result[bool,
 
 
 @_reeds_getter
+def get_technology_name(row: Any, *, context: PluginContext) -> Result[str, Exception]:
+    """Return the technology field as the component name."""
+    _ = context
+    value = get_row_field(row, "technology")
+    if value is None or not str(value):
+        return Err(ValueError("Row missing technology name"))
+    return Ok(str(value))
+
+
+@_reeds_getter
+def build_representative_timepoint_name(row: Any, *, context: PluginContext) -> Result[str, Exception]:
+    """Build the global representative-timepoint name from the mapped label."""
+    _ = context
+    label = get_row_field(row, "label")
+    if label is None or not str(label):
+        return Err(ValueError("Representative timepoint row missing 'label'"))
+    return Ok(str(label))
+
+
+@_reeds_getter
+def build_plant_characteristics_name(row: Any, *, context: PluginContext) -> Result[str, Exception]:
+    """Build a stable technology-year plant-characteristics name."""
+    _ = context
+    technology = get_row_field(row, "technology")
+    year = get_row_field(row, "year")
+    if technology is None or year is None:
+        return Err(ValueError("Plant-characteristics row missing technology or year"))
+    return Ok(f"{technology}_{year}")
+
+
+@_reeds_getter
+def build_initial_capacity_name(row: Any, *, context: PluginContext) -> Result[str, Exception]:
+    """Build a stable technology-region initial-capacity name."""
+    _ = context
+    technology = get_row_field(row, "technology")
+    region = get_row_field(row, "region")
+    if technology is None or region is None:
+        return Err(ValueError("Initial-capacity row missing technology or region"))
+    return Ok(f"{technology}_{region}")
+
+
+@_reeds_getter
+def build_storage_duration_override_name(row: Any, *, context: PluginContext) -> Result[str, Exception]:
+    """Build a stable technology-vintage-region duration-override name."""
+    _ = context
+    technology = get_row_field(row, "technology")
+    vintage = get_row_field(row, "vintage")
+    region = get_row_field(row, "region")
+    if technology is None or vintage is None or region is None:
+        return Err(ValueError("Storage-duration override row is missing an identity field"))
+    return Ok(f"{technology}_{vintage}_{region}")
+
+
+@_reeds_getter
 def build_generator_name(row: Any, *, context: PluginContext) -> Result[str, Exception]:
     """Build generator name from technology, vintage, and region.
 

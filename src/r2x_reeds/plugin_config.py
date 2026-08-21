@@ -76,6 +76,14 @@ class ReEDSConfig(PluginConfig):
     ]
     case_name: Annotated[str | None, Field(default=None, description="Case name")] = None
     scenario: Annotated[str, Field(default="base", description="Scenario identifier")] = "base"
+    time_periods_per_year: Annotated[
+        int | None,
+        Field(
+            default=None,
+            gt=0,
+            description="Number of hourly values retained for each model year",
+        ),
+    ] = None
 
     @property
     def primary_solve_year(self) -> int:

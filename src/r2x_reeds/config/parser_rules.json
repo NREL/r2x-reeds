@@ -51,7 +51,10 @@
       "values": [
         "thermal"
       ]
-    }
+    },
+    "depends_on": [
+      "region"
+    ]
   },
   {
     "source_type": "data_row",
@@ -121,7 +124,10 @@
         "renewable",
         "variable_renewable"
       ]
-    }
+    },
+    "depends_on": [
+      "region"
+    ]
   },
   {
     "source_type": "data_row",
@@ -178,7 +184,10 @@
         "storage",
         "pumped_storage"
       ]
-    }
+    },
+    "depends_on": [
+      "region"
+    ]
   },
   {
     "source_type": "data_row",
@@ -236,7 +245,10 @@
         "hydro_dispatchable",
         "hydro_nondispatchable"
       ]
-    }
+    },
+    "depends_on": [
+      "region"
+    ]
   },
   {
     "source_type": "data_row",
@@ -284,7 +296,10 @@
       "values": [
         "hydrogen"
       ]
-    }
+    },
+    "depends_on": [
+      "region"
+    ]
   },
   {
     "source_type": "data_row",
@@ -333,7 +348,10 @@
       "values": [
         "electrolyzer"
       ]
-    }
+    },
+    "depends_on": [
+      "region"
+    ]
   },
   {
     "source_type": "data_row",
@@ -342,7 +360,10 @@
     "name": "reserve_region",
     "field_map": {
       "name": "name"
-    }
+    },
+    "depends_on": [
+      "region"
+    ]
   },
   {
     "source_type": "data_row",
@@ -381,7 +402,10 @@
     "getters": {
       "name": "build_load_name",
       "region": "lookup_region"
-    }
+    },
+    "depends_on": [
+      "region"
+    ]
   },
   {
     "source_type": "data_row",
@@ -401,7 +425,11 @@
       "reserve_type": "resolve_reserve_type",
       "direction": "resolve_reserve_direction",
       "region": "lookup_reserve_region"
-    }
+    },
+    "depends_on": [
+      "region",
+      "reserve_region"
+    ]
   },
   {
     "source_type": "data_row",
@@ -434,7 +462,10 @@
     },
     "defaults": {
       "category": null
-    }
+    },
+    "depends_on": [
+      "region"
+    ]
   },
   {
     "source_type": "data_row",
@@ -452,6 +483,145 @@
     },
     "defaults": {
       "losses": 0.0
+    },
+    "depends_on": [
+      "region",
+      "transmission_interface"
+    ]
+  },
+  {
+    "source_type": "data_row",
+    "target_type": "ReEDSPlanningSwitches",
+    "version": 1,
+    "name": "planning_switches",
+    "field_map": {
+      "name": "name",
+      "annual_cap": "annual_cap",
+      "storage": "storage",
+      "hydro_psh_duration_data": "hydro_psh_duration_data"
+    }
+  },
+  {
+    "source_type": "data_row",
+    "target_type": "ReEDSPlanningPeriod",
+    "version": 1,
+    "name": "planning_period",
+    "field_map": {
+      "year": "year",
+      "present_value_factor": "present_value_factor",
+      "emission_cap": "emission_cap"
+    },
+    "depends_on": [
+      "planning_switches"
+    ],
+    "defaults": {
+      "emission_cap": null
+    }
+  },
+  {
+    "source_type": "data_row",
+    "target_type": "ReEDSRepresentativeTimepoint",
+    "version": 1,
+    "name": "representative_timepoint",
+    "field_map": {
+      "position": "position",
+      "weight": "weight"
+    },
+    "getters": {
+      "name": "build_representative_timepoint_name"
+    }
+  },
+  {
+    "source_type": "data_row",
+    "target_type": "ReEDSPlantCharacteristics",
+    "version": 1,
+    "name": "plant_characteristics",
+    "field_map": {
+      "technology": "technology",
+      "year": "year",
+      "capital_cost": "capcost",
+      "capital_cost_energy": "capcost_energy",
+      "fom_cost": "fom",
+      "fom_cost_energy": "fom_energy",
+      "vom_cost": "vom",
+      "heat_rate": "heatrate",
+      "round_trip_efficiency": "rte",
+      "upgrade_cost": "upgradecost"
+    },
+    "depends_on": [
+      "planning_period"
+    ],
+    "getters": {
+      "name": "build_plant_characteristics_name"
+    },
+    "defaults": {
+      "heat_rate": null,
+      "round_trip_efficiency": null,
+      "upgrade_cost": null
+    }
+  },
+  {
+    "source_type": "data_row",
+    "target_type": "ReEDSInitialCapacity",
+    "version": 1,
+    "name": "initial_capacity",
+    "field_map": {
+      "technology": "technology",
+      "initial_power_capacity": "initial_power_capacity",
+      "initial_energy_capacity": "initial_energy_capacity"
+    },
+    "getters": {
+      "name": "build_initial_capacity_name",
+      "region": "lookup_region"
+    },
+    "defaults": {
+      "initial_energy_capacity": null
+    },
+    "depends_on": [
+      "region"
+    ]
+  },
+  {
+    "source_type": "data_row",
+    "target_type": "ReEDSStorageDuration",
+    "version": 1,
+    "name": "storage_duration",
+    "field_map": {
+      "technology": "technology",
+      "duration": "duration"
+    },
+    "getters": {
+      "name": "get_technology_name"
+    }
+  },
+  {
+    "source_type": "data_row",
+    "target_type": "ReEDSStorageDurationOverride",
+    "version": 1,
+    "name": "storage_duration_override",
+    "field_map": {
+      "technology": "technology",
+      "vintage": "vintage",
+      "duration": "duration"
+    },
+    "getters": {
+      "name": "build_storage_duration_override_name",
+      "region": "lookup_region"
+    },
+    "depends_on": [
+      "region"
+    ]
+  },
+  {
+    "source_type": "data_row",
+    "target_type": "ReEDSPumpedStorageSupplyCurveDuration",
+    "version": 1,
+    "name": "pumped_storage_supply_curve_duration",
+    "field_map": {
+      "duration": "duration"
+    },
+    "defaults": {
+      "name": "pumped_storage_supply_curve_duration"
     }
   }
 ]

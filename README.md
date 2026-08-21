@@ -115,6 +115,26 @@ uv sync --all-groups
 - Configure parsing through `ReEDSConfig`.
 - Apply optional `r2x.transforms` after parsing for scenario/system modifiers.
 
+## Planning data model
+
+Planning inputs are represented as first-class `infrasys` objects rather than as
+an aggregate parser state container:
+
+- `ReEDSPlanningSwitches` stores run-level interpretation switches.
+- `ReEDSPlanningPeriod` is a reusable supplemental attribute for planning-year
+  metadata such as present-value factors and emissions caps.
+- `ReEDSRepresentativeTimepoint` represents the global representative
+  chronology.
+- `ReEDSPlantCharacteristics` stores technology-year cost and performance data.
+- `ReEDSInitialCapacity` links initial capacity to a `ReEDSRegion`.
+- Storage-duration defaults, pumped-storage supply-curve duration, and
+  regional/vintage overrides remain separate components.
+
+Parser rules in `src/r2x_reeds/config/parser_rules.json` declare target models,
+field mappings, getters, defaults, and dependency ordering. File mappings in
+`src/r2x_reeds/config/file_mapping.json` own source column normalization and
+the transformations supported by the current `r2x-core` release.
+
 ## Development
 
 Install dev dependencies:

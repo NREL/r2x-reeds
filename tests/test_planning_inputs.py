@@ -1,4 +1,4 @@
-"""Tests for reading canonical ReEDS capacity-expansion inputs."""
+"""Tests for canonical ReEDS planning inputs."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from typing import cast
 
 import pytest
 
-from r2x_core import DataStore, PluginContext
-from r2x_reeds import EmissionType, ReEDSConfig, ReEDSParser
+from r2x_core import DataStore, PluginContext, System
+from r2x_reeds import ReEDSConfig, ReEDSParser
 
 pytestmark = [pytest.mark.integration]
 
@@ -55,7 +55,7 @@ _PLANT_CHARACTERISTICS = {
 }
 
 
-def _write_capacity_expansion_case(case_path: Path) -> None:
+def _write_planning_inputs(case_path: Path) -> None:
     """Write the minimal canonical ReEDS inputs needed for planning data."""
     inputs_path = case_path / "inputs_case"
     representative_path = inputs_path / "rep"
@@ -68,9 +68,11 @@ def _write_capacity_expansion_case(case_path: Path) -> None:
     (representative_path / "numhours.csv").write_text("*h,numhours\nh1,4380\nh2,4380\n")
     (inputs_path / "storage_duration.csv").write_text("caes,12\n")
     (inputs_path / "psh_sc_duration.csv").write_text("8\n")
-    (inputs_path / "storage_duration_pshdata.csv").write_text("*i,v,r,hours\npumped-hydro,init-1,r1,10\n")
-    (inputs_path / "capnonrsc.csv").write_text("i,r,value\nbattery_li,r1,2\nGas-CC,r1,100\n")
-    (inputs_path / "capnonrsc_energy.csv").write_text("i,r,value\nbattery_li,r1,4\n")
+    (inputs_path / "storage_duration_pshdata.csv").write_text(
+        "*i,v,r,hours\npumped-hydro,init-1,p1,10\n"
+    )
+    (inputs_path / "capnonrsc.csv").write_text("i,r,value\nbattery_li,p1,2\nGas-CC,p1,100\n")
+    (inputs_path / "capnonrsc_energy.csv").write_text("i,r,value\nbattery_li,p1,4\n")
 
     plant_rows = ["*i,t,variable,value"]
     for (technology, year), values in _PLANT_CHARACTERISTICS.items():
@@ -78,42 +80,69 @@ def _write_capacity_expansion_case(case_path: Path) -> None:
     (inputs_path / "plantcharout.csv").write_text("\n".join(plant_rows) + "\n")
 
 
-def _prepare_capacity_expansion_case(tmp_path: Path, reeds_run_path: Path) -> Path:
-    """Copy a complete fixture case and replace its planning inputs."""
+def _prepare_parser(tmp_path: Path, reeds_run_path: Path) -> tuple[ReEDSParser, System]:
+    """Create a parser with loaded rules, regions, and a target system."""
     case_path = tmp_path / "case"
     shutil.copytree(reeds_run_path, case_path)
-    _write_capacity_expansion_case(case_path)
-    return case_path
+    _write_planning_inputs(case_path)
 
-
-def _build_parser(case_path: Path) -> ReEDSParser:
-    """Build a parser backed by one small ReEDS input case."""
     config = ReEDSConfig(solve_year=2030, weather_year=2012, case_name="planning-inputs")
     store = DataStore.from_plugin_config(config, path=case_path)
     context = PluginContext(config=config, store=store)
-    return cast(ReEDSParser, ReEDSParser.from_context(context))
+    parser = cast(ReEDSParser, ReEDSParser.from_context(context))
+    assert parser.on_validate_config().is_ok()
+
+    system = System(name="planning-inputs")
+    parser.ctx.system = system
+    parser.ctx.target_system = system
+
+    from r2x_reeds.parser_builders import build_regions
+
+    regions_result = build_regions(parser.ctx)
+    assert regions_result.is_ok(), regions_result.err()
+    return parser, system
 
 
-def test_build_capacity_expansion_reads_canonical_reeds_tables(
-    tmp_path: Path, reeds_run_path: Path
+def test_parser_materializes_canonical_planning_components(
+    tmp_path: Path,
+    reeds_run_path: Path,
 ) -> None:
-    """The parser reads technology-year, chronology, and initial-capacity inputs."""
-    case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
+    """Canonical planning tables become components and reusable period attributes."""
+    from r2x_reeds import (
+        ReEDSInitialCapacity,
+        ReEDSPlanningPeriod,
+        ReEDSPlanningSwitches,
+        ReEDSPlantCharacteristics,
+        ReEDSPumpedStorageSupplyCurveDuration,
+        ReEDSRepresentativeTimepoint,
+        ReEDSStorageDuration,
+        ReEDSStorageDurationOverride,
+    )
+    from r2x_reeds.parser_planning_inputs import attach_planning_inputs
 
-    inputs = _build_parser(case_path).build_capacity_expansion()
+    parser, system = _prepare_parser(tmp_path, reeds_run_path)
+    result = attach_planning_inputs(parser.ctx)
+    assert result.is_ok(), result.err()
 
-    assert [period.year for period in inputs.planning_periods] == [2030, 2035]
-    assert [period.present_value_factor for period in inputs.planning_periods] == [1.0, 0.7]
-    assert [period.emission_cap for period in inputs.planning_periods] == [1_000_000.0, 900_000.0]
-    assert inputs.emission_type is EmissionType.CO2
-    assert [(point.label, point.position, point.weight) for point in inputs.representative_timepoints] == [
+    switches = system.get_component(ReEDSPlanningSwitches, "planning_switches")
+    periods = sorted(
+        system.get_supplemental_attributes_with_component(switches, ReEDSPlanningPeriod),
+        key=lambda period: period.year,
+    )
+    assert [(period.year, period.present_value_factor, period.emission_cap) for period in periods] == [
+        (2030, 1.0, 1_000_000.0),
+        (2035, 0.7, 900_000.0),
+    ]
+
+    timepoints = list(system.get_components(ReEDSRepresentativeTimepoint))
+    assert [(point.name, point.position, point.weight) for point in timepoints] == [
         ("h1", 0, 4_380.0),
         ("h2", 1, 4_380.0),
     ]
 
-    characteristics = {(item.technology, item.year): item for item in inputs.plant_characteristics}
-    battery = characteristics[("battery_li", 2030)]
-    gas = characteristics[("gas-cc", 2030)]
+    characteristics = list(system.get_components(ReEDSPlantCharacteristics))
+    battery = system.get_component(ReEDSPlantCharacteristics, "battery_li_2030")
+    gas = system.get_component(ReEDSPlantCharacteristics, "gas-cc_2030")
     assert battery.capital_cost == 202_141.0
     assert battery.capital_cost_energy == 152_868.0
     assert battery.fom_cost_energy == 3_823.0
@@ -121,227 +150,42 @@ def test_build_capacity_expansion_reads_canonical_reeds_tables(
     assert battery.heat_rate is None
     assert gas.heat_rate == 6.206
     assert gas.round_trip_efficiency is None
-    assert characteristics[("gas-cc", 2035)].upgrade_cost == 50_000.0
+    assert system.get_component(ReEDSPlantCharacteristics, "gas-cc_2035").upgrade_cost == 50_000.0
+    assert all(system.get_supplemental_attributes_with_component(item, ReEDSPlanningPeriod) for item in characteristics)
 
-    initial_capacity = {(item.technology, item.region): item for item in inputs.initial_capacities}
-    assert initial_capacity[("battery_li", "r1")].initial_power_capacity == 2.0
-    assert initial_capacity[("battery_li", "r1")].initial_energy_capacity == 4.0
-    assert initial_capacity[("gas-cc", "r1")].initial_energy_capacity is None
-    assert [(item.technology, item.duration) for item in inputs.storage_durations] == [("caes", 12.0)]
-    assert inputs.pumped_storage_supply_curve_duration == 8.0
-    assert [
-        (item.technology, item.vintage, item.region, item.duration)
-        for item in inputs.storage_duration_overrides
-    ] == [("pumped-hydro", "init-1", "r1", 10.0)]
+    initial_capacity = system.get_component(ReEDSInitialCapacity, "battery_li_p1")
+    assert initial_capacity.initial_power_capacity == 2.0
+    assert initial_capacity.initial_energy_capacity == 4.0
+    assert system.get_component(ReEDSInitialCapacity, "gas-cc_p1").initial_energy_capacity is None
+    assert system.get_component(ReEDSStorageDuration, "caes").duration == 12.0
+    assert (
+        system.get_component(
+            ReEDSPumpedStorageSupplyCurveDuration,
+            "pumped_storage_supply_curve_duration",
+        ).duration
+        == 8.0
+    )
+    assert system.get_component(ReEDSStorageDurationOverride, "pumped-hydro_init-1_p1").duration == 10.0
 
 
-def test_parser_attaches_capacity_expansion_to_system(
-    tmp_path: Path, reeds_run_path: Path
+def test_inactive_annual_cap_leaves_period_emission_caps_unset(
+    tmp_path: Path,
+    reeds_run_path: Path,
 ) -> None:
-    """The parser attaches capacity-expansion data as a system component."""
-    from r2x_core import System
-    from r2x_reeds import ReEDSCapacityExpansion
+    """An inactive annual-cap switch produces uncapped planning periods."""
+    from r2x_reeds import ReEDSPlanningPeriod, ReEDSPlanningSwitches
+    from r2x_reeds.parser_planning_inputs import attach_planning_inputs
 
-    case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
-    parser = _build_parser(case_path)
-    system = System(name="planning-inputs")
-
-    result = parser._build_capacity_expansion(system)
-
-    assert result.is_ok()
-    expansion = system.get_component(ReEDSCapacityExpansion, "capacity_expansion")
-    assert [period.year for period in expansion.planning_periods] == [2030, 2035]
-
-
-def test_build_capacity_expansion_ignores_inactive_co2_cap(
-    tmp_path: Path, reeds_run_path: Path
-) -> None:
-    """GSw_AnnualCap=0 makes cap data irrelevant to planning inputs."""
-    case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
-    (case_path / "inputs_case" / "switches.csv").write_text(
+    parser, system = _prepare_parser(tmp_path, reeds_run_path)
+    (tmp_path / "case" / "inputs_case" / "switches.csv").write_text(
         "GSw_AnnualCap,0\nGSw_Storage,1\nGSw_HydroPSHDurData,1\n"
     )
-    (case_path / "inputs_case" / "co2_cap.csv").write_text("*t,tonne_per_year\n2030,not-a-number\n")
+    result = attach_planning_inputs(parser.ctx)
+    assert result.is_ok(), result.err()
 
-    inputs = _build_parser(case_path).build_capacity_expansion()
-
-    assert inputs.emission_type is None
-    assert [period.emission_cap for period in inputs.planning_periods] == [None, None]
-
-
-def test_build_capacity_expansion_ignores_disabled_storage_duration_overrides(
-    tmp_path: Path, reeds_run_path: Path
-) -> None:
-    """GSw_HydroPSHDurData controls whether PSH duration input rows are applied."""
-    case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
-    (case_path / "inputs_case" / "switches.csv").write_text(
-        "GSw_AnnualCap,1\nGSw_Storage,1\nGSw_HydroPSHDurData,0\n"
+    switches = system.get_component(ReEDSPlanningSwitches, "planning_switches")
+    periods = sorted(
+        system.get_supplemental_attributes_with_component(switches, ReEDSPlanningPeriod),
+        key=lambda period: period.year,
     )
-    (case_path / "inputs_case" / "storage_duration_pshdata.csv").write_text("not-a-duration\n")
-
-    inputs = _build_parser(case_path).build_capacity_expansion()
-
-    assert inputs.storage_duration_overrides == ()
-
-
-def test_build_capacity_expansion_ignores_psh_duration_data_when_storage_is_disabled(
-    tmp_path: Path, reeds_run_path: Path
-) -> None:
-    """GSw_Storage disables both selected and regional PSH duration data."""
-    case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
-    (case_path / "inputs_case" / "switches.csv").write_text(
-        "GSw_AnnualCap,1\nGSw_Storage,0\nGSw_HydroPSHDurData,1\n"
-    )
-    (case_path / "inputs_case" / "psh_sc_duration.csv").write_text("not-a-duration\n")
-    (case_path / "inputs_case" / "storage_duration_pshdata.csv").write_text("not-a-duration\n")
-
-    inputs = _build_parser(case_path).build_capacity_expansion()
-
-    assert inputs.pumped_storage_supply_curve_duration is None
-    assert inputs.storage_duration_overrides == ()
-
-
-def test_build_capacity_expansion_rejects_invalid_storage_switch(
-    tmp_path: Path, reeds_run_path: Path
-) -> None:
-    """GSw_Storage accepts only the source model's enabled/disabled values."""
-    case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
-    (case_path / "inputs_case" / "switches.csv").write_text(
-        "GSw_AnnualCap,1\nGSw_Storage,2\nGSw_HydroPSHDurData,1\n"
-    )
-
-    with pytest.raises(ValueError, match="Input should be 0 or 1"):
-        _build_parser(case_path).build_capacity_expansion()
-
-
-def test_build_capacity_expansion_rejects_invalid_psh_duration_switch(
-    tmp_path: Path, reeds_run_path: Path
-) -> None:
-    """GSw_HydroPSHDurData accepts only the source model's enabled/disabled values."""
-    case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
-    (case_path / "inputs_case" / "switches.csv").write_text(
-        "GSw_AnnualCap,1\nGSw_Storage,1\nGSw_HydroPSHDurData,2\n"
-    )
-
-    with pytest.raises(ValueError, match="Input should be 0 or 1"):
-        _build_parser(case_path).build_capacity_expansion()
-
-
-def test_build_capacity_expansion_rejects_invalid_psh_duration_switch_when_storage_is_disabled(
-    tmp_path: Path, reeds_run_path: Path
-) -> None:
-    """GSw_HydroPSHDurData remains a binary source switch when storage is disabled."""
-    case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
-    (case_path / "inputs_case" / "switches.csv").write_text(
-        "GSw_AnnualCap,1\nGSw_Storage,0\nGSw_HydroPSHDurData,2\n"
-    )
-
-    with pytest.raises(ValueError, match="Input should be 0 or 1"):
-        _build_parser(case_path).build_capacity_expansion()
-
-
-def test_build_capacity_expansion_rejects_multiple_psh_supply_curve_durations(
-    tmp_path: Path, reeds_run_path: Path
-) -> None:
-    """The selected PSH supply curve contributes one scalar duration."""
-    case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
-    (case_path / "inputs_case" / "psh_sc_duration.csv").write_text("8\n10\n")
-
-    with pytest.raises(ValueError, match="must contain exactly one duration"):
-        _build_parser(case_path).build_capacity_expansion()
-
-
-@pytest.mark.parametrize("annual_cap_mode", [2, 3])
-def test_build_capacity_expansion_maps_co2e_annual_caps(
-    tmp_path: Path, reeds_run_path: Path, annual_cap_mode: int
-) -> None:
-    """CO2e annual-cap modes, including hydrogen leakage, use the CO2e cap data."""
-    case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
-    (case_path / "inputs_case" / "switches.csv").write_text(
-        f"GSw_AnnualCap,{annual_cap_mode}\nGSw_Storage,1\nGSw_HydroPSHDurData,1\n"
-    )
-
-    inputs = _build_parser(case_path).build_capacity_expansion()
-
-    assert inputs.emission_type is EmissionType.CO2E
-    assert [period.emission_cap for period in inputs.planning_periods] == [1_000_000.0, 900_000.0]
-
-
-def test_build_capacity_expansion_rejects_an_active_cap_missing_a_modeled_year(
-    tmp_path: Path, reeds_run_path: Path
-) -> None:
-    """An active annual constraint needs a cap for every modeled year."""
-    case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
-    (case_path / "inputs_case" / "co2_cap.csv").write_text("*t,tonne_per_year\n2030,1000000\n")
-
-    with pytest.raises(ValueError, match="co2_cap is missing modeled years"):
-        _build_parser(case_path).build_capacity_expansion()
-
-
-def test_build_capacity_expansion_rejects_an_unknown_plant_characteristic(
-    tmp_path: Path, reeds_run_path: Path
-) -> None:
-    """A source-schema change cannot silently drop a plant characteristic."""
-    case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
-    plant_characteristics_path = case_path / "inputs_case" / "plantcharout.csv"
-    plant_characteristics_path.write_text(
-        plant_characteristics_path.read_text().replace(
-            "battery_li,2035,rte,0.85",
-            "battery_li,2035,unknown,0.85",
-        )
-    )
-
-    with pytest.raises(ValueError, match="unsupported variable 'unknown'"):
-        _build_parser(case_path).build_capacity_expansion()
-
-
-def test_build_capacity_expansion_rejects_orphan_energy_capacity(
-    tmp_path: Path, reeds_run_path: Path
-) -> None:
-    """Storage energy capacity must have a matching regional power capacity."""
-    case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
-    (case_path / "inputs_case" / "capnonrsc_energy.csv").write_text("i,r,value\nbattery_li,r2,4\n")
-
-    with pytest.raises(ValueError, match="no matching power capacity"):
-        _build_parser(case_path).build_capacity_expansion()
-
-
-def test_build_capacity_expansion_requires_present_value_factors(
-    tmp_path: Path, reeds_run_path: Path
-) -> None:
-    """Capital-cost present values are required for every planning input case."""
-    case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
-    (case_path / "inputs_case" / "pvf_cap.csv").unlink()
-
-    with pytest.raises(ValueError, match=r"planning_present_value_factors.*missing"):
-        _build_parser(case_path).build_capacity_expansion()
-
-
-def test_build_capacity_expansion_rejects_duplicate_storage_durations(
-    tmp_path: Path, reeds_run_path: Path
-) -> None:
-    """A fixed-duration technology can have only one source duration."""
-    case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
-    (case_path / "inputs_case" / "storage_duration.csv").write_text("caes,12\ncaes,24\n")
-
-    with pytest.raises(ValueError, match="duplicate duration"):
-        _build_parser(case_path).build_capacity_expansion()
-
-
-def test_build_capacity_expansion_rejects_incomplete_plant_characteristics(
-    tmp_path: Path, reeds_run_path: Path
-) -> None:
-    """Every technology-year record must retain all required plant characteristics."""
-    case_path = _prepare_capacity_expansion_case(tmp_path, reeds_run_path)
-    plant_characteristics_path = case_path / "inputs_case" / "plantcharout.csv"
-    plant_characteristics_path.write_text(
-        "\n".join(
-            line
-            for line in plant_characteristics_path.read_text().splitlines()
-            if line != "battery_li,2035,rte,0.85"
-        )
-        + "\n"
-    )
-
-    with pytest.raises(ValueError, match=r"missing variables .*rte"):
-        _build_parser(case_path).build_capacity_expansion()
+    assert [period.emission_cap for period in periods] == [None, None]

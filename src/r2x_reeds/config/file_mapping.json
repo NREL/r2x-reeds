@@ -31,6 +31,16 @@
         "i": "technology",
         "r": "region",
         "value": "capacity"
+      },
+      "select_columns": [
+        "technology",
+        "region",
+        "capacity"
+      ],
+      "column_schema": {
+        "technology": "string",
+        "region": "string",
+        "capacity": "float"
       }
     }
   },
@@ -48,6 +58,16 @@
         "i": "technology",
         "r": "region",
         "value": "energy_capacity"
+      },
+      "select_columns": [
+        "technology",
+        "region",
+        "energy_capacity"
+      ],
+      "column_schema": {
+        "technology": "string",
+        "region": "string",
+        "energy_capacity": "float"
       }
     }
   },
@@ -665,9 +685,12 @@
     },
     "proc_spec": {
       "column_schema": {
-        "modeledyears": "i16"
+        "modeled_years": "int32"
       },
-      "pivot_on": "modeled_years"
+      "pivot_on": "modeled_years",
+      "select_columns": [
+        "modeled_years"
+      ]
     }
   },
   {
@@ -683,7 +706,15 @@
       "column_mapping": {
         "*t": "year",
         "pvf_capital": "present_value_factor"
-      }
+      },
+      "column_schema": {
+        "year": "int32",
+        "present_value_factor": "float"
+      },
+      "select_columns": [
+        "year",
+        "present_value_factor"
+      ]
     }
   },
   {
@@ -700,6 +731,12 @@
         "new_columns": ["switch", "value"]
       },
       "function": null
+    },
+    "proc_spec": {
+      "select_columns": [
+        "switch",
+        "value"
+      ]
     }
   },
   {
@@ -731,7 +768,15 @@
       "column_mapping": {
         "*h": "label",
         "numhours": "weight"
-      }
+      },
+      "column_schema": {
+        "label": "string",
+        "weight": "float"
+      },
+      "select_columns": [
+        "label",
+        "weight"
+      ]
     }
   },
   {
@@ -762,7 +807,15 @@
       "column_mapping": {
         "*t": "year",
         "tonne_per_year": "value"
-      }
+      },
+      "column_schema": {
+        "year": "int32",
+        "value": "float"
+      },
+      "select_columns": [
+        "year",
+        "value"
+      ]
     }
   },
   {
@@ -779,7 +832,19 @@
         "t": "year",
         "variable": "variable",
         "value": "value"
-      }
+      },
+      "column_schema": {
+        "technology": "string",
+        "year": "int32",
+        "variable": "string",
+        "value": "float"
+      },
+      "select_columns": [
+        "technology",
+        "year",
+        "variable",
+        "value"
+      ]
     }
   },
   {
@@ -802,7 +867,11 @@
       "column_schema": {
         "technology": "string",
         "duration": "float"
-      }
+      },
+      "select_columns": [
+        "technology",
+        "duration"
+      ]
     }
   },
   {
@@ -824,7 +893,10 @@
     "proc_spec": {
       "column_schema": {
         "duration": "float"
-      }
+      },
+      "select_columns": [
+        "duration"
+      ]
     }
   },
   {
@@ -842,7 +914,19 @@
         "v": "vintage",
         "r": "region",
         "hours": "duration"
-      }
+      },
+      "column_schema": {
+        "technology": "string",
+        "vintage": "string",
+        "region": "string",
+        "duration": "float"
+      },
+      "select_columns": [
+        "technology",
+        "vintage",
+        "region",
+        "duration"
+      ]
     }
   },
   {
@@ -887,10 +971,7 @@
     "reader": {
       "kwargs": {
         "has_header": false,
-        "new_columns": [
-          "technology",
-          "maxage_years"
-        ]
+        "new_columns": ["technology", "maxage_years"]
       },
       "function": null
     },

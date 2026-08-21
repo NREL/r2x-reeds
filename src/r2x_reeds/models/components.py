@@ -9,13 +9,13 @@ from infrasys.models import InfraSysBaseModel
 from pydantic import AfterValidator, Field, model_validator
 
 from r2x_core.units import HasUnits, Unit
-
-from .base import FractionRange, FromTo_ToFrom, ReEDSComponent
-from .checks import (
+from r2x_reeds.checks import (
     validate_optional_fraction,
     validate_optional_nonnegative,
     validate_optional_positive,
 )
+
+from .base import FractionRange, FromTo_ToFrom, ReEDSComponent
 from .enums import EmissionSource, EmissionType, ReserveDirection, ReserveType, TransmissionLineType
 from .types import (
     EmissionRate,
