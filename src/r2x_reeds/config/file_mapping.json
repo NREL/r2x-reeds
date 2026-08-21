@@ -281,7 +281,6 @@
         "columns_key": "columns",
         "datetime_key": "index_datetime",
         "additional_keys": [
-          "index_year",
           "index_0"
         ]
       },
