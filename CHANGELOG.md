@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.0](https://github.com/NatLabRockies/r2x-reeds/compare/v0.7.0...v0.8.0) (2026-08-21)
+
+
+### 🚀 Features
+
+* get startcost correctly from original reeds run ([#97](https://github.com/NatLabRockies/r2x-reeds/issues/97)) ([a24fe29](https://github.com/NatLabRockies/r2x-reeds/commit/a24fe2960de1d0caeae354488bcf8b2fc38b525a))
+* represent reV supply-curve sites as ReEDS components ([#82](https://github.com/NatLabRockies/r2x-reeds/issues/82)) ([f032456](https://github.com/NatLabRockies/r2x-reeds/commit/f032456ed0b2047b958caf25d1eb40c11b806853))
+
+
+### 🐛 Bug Fixes
+
+* avoid duplicate solve year in load profiles ([#99](https://github.com/NatLabRockies/r2x-reeds/issues/99)) ([826a1ec](https://github.com/NatLabRockies/r2x-reeds/commit/826a1ec519b85c04572dbf2ec33705fcea1812fd))
+
 ## [0.7.0](https://github.com/NatLabRockies/r2x-reeds/compare/v0.6.0...v0.7.0) (2026-08-13)
 
 
