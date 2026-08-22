@@ -253,10 +253,11 @@ Adds Canadian import time series.
 
 ```yaml
 r2x-reeds.add-imports:
+  solve_year: ${solve_year}
   weather_year: ${weather_year}
   canada_imports_fpath: ${reeds_run}/inputs_case/can_imports.csv # specific path (for fast lookup)
   canada_szn_frac_fpath: ${reeds_run}/inputs_case/rep/can_imports_szn_frac.csv # specific path (for fast lookup)
-  hour_map_fpath: ${reeds_run}/inputs_case/rep/hmap_allyrs.csv # specific path (for fast lookup)
+  hour_map_fpath: ${reeds_run}/inputs_case/rep/hmap_myr.csv # specific path (for fast lookup)
 ```
 
 ### `r2x-reeds.add-optimal-siting`

@@ -72,8 +72,7 @@ def test_imports_scope_full_flow(tmp_path: Path) -> None:
 
     assert system.has_time_series(generator)
     ts_values = system.get_time_series(generator).data.tolist()
-    assert len(ts_values) == 2
-    assert all(val > 0 for val in ts_values)
+    assert ts_values == pytest.approx([0.6, 0.6, 0.8])
 
 
 def test_imports_scope_reeds_input_shapes(tmp_path: Path) -> None:
@@ -81,23 +80,27 @@ def test_imports_scope_reeds_input_shapes(tmp_path: Path) -> None:
     system, generator = _build_generator()
 
     hour_map_path = _write_csv(
-        tmp_path / "hmap_allyrs.csv",
+        tmp_path / "hmap_myr.csv",
         {
             "*timestamp": [
-                "2024-01-01 00:00:00-06:00",
-                "2024-01-02 00:00:00-06:00",
-                "2024-01-03 00:00:00-06:00",
+                "2012-01-01 00:00:00-06:00",
+                "2012-01-02 00:00:00-06:00",
+                "2012-01-03 00:00:00-06:00",
             ],
-            "year": [2024, 2024, 2024],
-            "actual_period": ["y2024d001", "y2024d002", "y2024d003"],
-            "season": ["y2024d001", "y2024d002", "y2024d003"],
+            "year": [2012, 2012, 2012],
+            "actual_period": [
+                "y2012d001",
+                "y2012d002",
+                "y2012d003",
+            ],
+            "season": ["y2012d292", "y2012d292", "y2012d097"],
         },
     )
     szn_frac_path = _write_csv(
         tmp_path / "can_imports_szn_frac.csv",
         {
-            "*szn": ["y2024d001", "y2024d002", "y2024d003"],
-            "frac_weighted": [0.2, 0.3, 0.5],
+            "*szn": ["y2012d292", "y2012d097"],
+            "frac_weighted": [0.6, 0.4],
         },
     )
     imports_path = _write_csv(
@@ -115,9 +118,41 @@ def test_imports_scope_reeds_input_shapes(tmp_path: Path) -> None:
     )
 
     assert system.has_time_series(generator)
-    values = system.get_time_series(generator).data
-    assert len(values) == 2
-    assert all(value == value for value in values)
+    time_series_key = system.list_time_series_keys(generator)[0]
+    assert time_series_key.features == {"solve_year": 2035}
+    time_series = system.get_time_series(generator, name="hydro_budget")
+    assert time_series.initial_timestamp.year == 2024
+    assert time_series.data.tolist() == pytest.approx([0.6, 0.6, 0.8])
+
+
+def test_imports_scope_wide_data_requires_solve_year(tmp_path: Path) -> None:
+    """Wide Canadian import data requires an explicit solve year."""
+    system, _ = _build_generator()
+    hour_map_path = _write_csv(
+        tmp_path / "hour_map.csv",
+        {"time_index": ["2024-01-01T00:00:00"], "season": ["winter"]},
+    )
+    szn_frac_path = _write_csv(
+        tmp_path / "szn_frac.csv",
+        {"season": ["winter"], "value": [1.0]},
+    )
+    imports_path = _write_csv(
+        tmp_path / "imports.csv",
+        {"r": ["west"], "2035": [2000.0]},
+    )
+
+    result = imports.add_imports(
+        system,
+        imports.ImportsConfig(
+            weather_year=2024,
+            canada_imports_fpath=imports_path,
+            canada_szn_frac_fpath=szn_frac_path,
+            hour_map_fpath=hour_map_path,
+        ),
+    )
+
+    assert result.is_err()
+    assert "Solve year is required" in result.unwrap_err()
 
 
 def test_imports_scope_missing_weather_year(caplog) -> None:
@@ -161,8 +196,8 @@ def test_imports_scope_missing_region(tmp_path: Path, caplog) -> None:
     assert system.has_time_series(generator) is False
 
 
-def test_imports_scope_empty_join(tmp_path: Path, caplog) -> None:
-    """Empty hourly join logs a warning and skips adding time series."""
+def test_imports_scope_empty_join(tmp_path: Path) -> None:
+    """Empty hourly join returns an error without adding time series."""
     system, generator = _build_generator()
 
     hour_map_path = _write_csv(tmp_path / "hour_map_empty.csv", {"hour": [], "time_index": [], "season": []})
@@ -172,16 +207,18 @@ def test_imports_scope_empty_join(tmp_path: Path, caplog) -> None:
     )
     imports_path = _write_csv(tmp_path / "imports.csv", {"r": ["west"], "value": [1000.0]})
 
-    caplog.set_level("WARNING", logger="r2x_reeds.sysmod.imports")
-    _run_imports(
+    result = imports.add_imports(
         system,
-        weather_year=2024,
-        canada_imports_fpath=imports_path,
-        canada_szn_frac_fpath=szn_frac_path,
-        hour_map_fpath=hour_map_path,
+        imports.ImportsConfig(
+            weather_year=2024,
+            canada_imports_fpath=imports_path,
+            canada_szn_frac_fpath=szn_frac_path,
+            hour_map_fpath=hour_map_path,
+        ),
     )
 
-    assert "empty time series" in caplog.text.lower()
+    assert result.is_err()
+    assert "hour map does not contain seasons" in result.unwrap_err().lower()
     assert system.has_time_series(generator) is False
 
 

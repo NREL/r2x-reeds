@@ -34,7 +34,11 @@ def test_excluded_techs_can_be_overridden(reeds_run_path):
     override_generators = parse_generators(override_config)
 
     assert not any(generator.technology == "can-imports" for generator in default_generators)
-    assert any(generator.technology == "can-imports" for generator in override_generators)
+    import_generators = [
+        generator for generator in override_generators if generator.technology == "can-imports"
+    ]
+    assert import_generators
+    assert all(generator.heat_rate is None for generator in import_generators)
 
 
 def test_excluded_techs_empty_list_default(reeds_config, reeds_run_path):

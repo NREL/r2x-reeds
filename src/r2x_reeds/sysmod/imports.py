@@ -45,6 +45,81 @@ class ImportsConfig(PluginConfig):
     )
 
 
+def _prepare_daily_import_fractions(
+    hour_map: pl.DataFrame,
+    szn_frac: pl.DataFrame,
+    weather_year: int,
+) -> pl.Series:
+    """Expand ReEDS representative-season fractions to chronological daily fractions."""
+    required_hour_map_columns = {"time_index", "season"}
+    missing_hour_map_columns = required_hour_map_columns - set(hour_map.columns)
+    if missing_hour_map_columns:
+        raise ValueError(f"Hour map is missing required columns: {sorted(missing_hour_map_columns)}")
+
+    required_fraction_columns = {"season", "value"}
+    missing_fraction_columns = required_fraction_columns - set(szn_frac.columns)
+    if missing_fraction_columns:
+        raise ValueError(
+            f"Seasonal fractions are missing required columns: {sorted(missing_fraction_columns)}"
+        )
+
+    if hour_map.schema["time_index"] == pl.String:
+        hour_map = hour_map.with_columns(
+            pl.col("time_index")
+            .str.replace("T", " ")
+            .str.replace(r"[+-]\d{2}:\d{2}$", "")
+            .str.to_datetime(format="%Y-%m-%d %H:%M:%S"),
+        )
+
+    szn_frac = szn_frac.group_by("season").agg(pl.col("value").sum())
+    mapped_hours = hour_map.join(szn_frac, on="season", how="inner")
+    if mapped_hours.is_empty():
+        raise ValueError("Hour map does not contain seasons from the seasonal fractions")
+
+    if "year" in mapped_hours.columns:
+        mapped_years = mapped_hours["year"].drop_nulls().unique().sort().to_list()
+        if weather_year in mapped_years:
+            mapped_hours = mapped_hours.filter(pl.col("year") == weather_year)
+        elif len(mapped_years) == 1:
+            mapped_hours = mapped_hours.filter(pl.col("year") == mapped_years[0])
+        else:
+            raise ValueError(f"Could not identify a unique representative weather year: {mapped_years}")
+
+    mapped_days = mapped_hours.select(
+        pl.col("time_index").dt.date().alias("date"),
+        "season",
+        "value",
+    ).unique()
+    conflicting_days = mapped_days.group_by("date").agg(pl.col("season").n_unique().alias("count"))
+    if conflicting_days.filter(pl.col("count") != 1).height:
+        raise ValueError("Hour map assigns more than one representative season to a day")
+
+    mapped_seasons = set(mapped_days["season"].to_list())
+    missing_seasons = set(szn_frac["season"].to_list()) - mapped_seasons
+    if missing_seasons:
+        raise ValueError(f"Hour map does not include seasonal fractions for: {sorted(missing_seasons)}")
+
+    daily_fractions = (
+        mapped_days.with_columns(pl.len().over("season").alias("days_in_season"))
+        .with_columns((pl.col("value") / pl.col("days_in_season")).alias("daily_fraction"))
+        .sort("date")
+    )
+    total_fraction = daily_fractions["daily_fraction"].sum()
+    if total_fraction is None or not total_fraction > 0:
+        raise ValueError("Seasonal import fractions must have a positive sum")
+
+    daily_fractions = daily_fractions.with_columns(
+        (pl.col("daily_fraction") / total_fraction).alias("daily_fraction")
+    )
+    invalid_fractions = daily_fractions.filter(
+        pl.col("daily_fraction").is_null() | ~pl.col("daily_fraction").is_finite()
+    )
+    if invalid_fractions.height:
+        raise ValueError("Daily import fractions contain null or non-finite values")
+
+    return daily_fractions["daily_fraction"]
+
+
 @expose_plugin
 def add_imports(system: System, config: ImportsConfig) -> Result[System, str]:
     """Add Canadian imports time series to the system.
@@ -106,40 +181,18 @@ def add_imports(system: System, config: ImportsConfig) -> Result[System, str]:
             hour_map = hour_map.rename({"*timestamp": "time_index"})
         if "actual_period" in hour_map.columns and "season" not in hour_map.columns:
             hour_map = hour_map.rename({"actual_period": "season"})
-        if "year" in hour_map.columns:
-            hour_map = hour_map.filter(pl.col("year") == config.weather_year)
 
         if "value" not in total_imports.columns:
-            import_year = config.solve_year or config.weather_year
-            if import_year is None or str(import_year) not in total_imports.columns:
-                raise ValueError(f"Import data does not contain a column for year {import_year}")
+            if config.solve_year is None:
+                raise ValueError("Solve year is required for wide Canadian import data")
+            if str(config.solve_year) not in total_imports.columns:
+                raise ValueError(f"Import data does not contain a column for year {config.solve_year}")
             total_imports = total_imports.select(
                 "r",
-                pl.col(str(import_year)).alias("value"),
+                pl.col(str(config.solve_year)).alias("value"),
             )
 
-        # Create hourly time series by joining hour map with seasonal fractions
-        hourly_time_series = hour_map.join(szn_frac, on="season", how="left")
-
-        if hourly_time_series.is_empty():
-            logger.warning("Empty time series after joining hour_map and seasonal fractions")
-            return Ok(system)
-
-        # Convert time_index to datetime
-        hourly_time_series = hourly_time_series.with_columns(
-            pl.col("time_index")
-            .str.replace("T", " ")
-            .str.replace(r"[+-]\d{2}:\d{2}$", "")
-            .str.to_datetime(format="%Y-%m-%d %H:%M:%S"),
-        )
-
-        # Group by date to get daily values
-        daily_time_series = hourly_time_series.group_by(pl.col("time_index").dt.date()).median()
-
-        # NOTE: Since the seasons can be repeated, the szn frac can be greater than one. To avoid this, we
-        # normalize it again to redistribute the fraction throughout the 365 or 366 days.
-        if "value" in daily_time_series.columns:
-            daily_time_series = daily_time_series.with_columns(pl.col("value") / pl.col("value").sum())
+        daily_fractions = _prepare_daily_import_fractions(hour_map, szn_frac, config.weather_year)
 
         initial_time = datetime(year=config.weather_year, month=1, day=1)
 
@@ -159,8 +212,7 @@ def add_imports(system: System, config: ImportsConfig) -> Result[System, str]:
                 continue
 
             total_import_value = region_imports["value"].item()
-            daily_budget = total_import_value * daily_time_series["value"].to_numpy()
-            daily_budget_gwh = daily_budget[:-1] / 1e3  # Convert MWh to GWh
+            daily_budget_gwh = total_import_value * daily_fractions.to_numpy() / 1e3
 
             ts = SingleTimeSeries.from_array(
                 data=daily_budget_gwh,  # Data in GWh
@@ -169,7 +221,8 @@ def add_imports(system: System, config: ImportsConfig) -> Result[System, str]:
                 resolution=timedelta(days=1),
             )
 
-            system.add_time_series(ts, generator)
+            features = {"solve_year": config.solve_year} if config.solve_year is not None else {}
+            system.add_time_series(ts, generator, **features)
             logger.debug("Added imports time series to generator: {}", generator.name)
 
         logger.info("Finished adding imports time series")
