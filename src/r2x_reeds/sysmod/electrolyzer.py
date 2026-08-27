@@ -6,7 +6,6 @@ each of the ReEDS regions.
 
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import cast
 
 import numpy as np
 import polars as pl
@@ -210,7 +209,7 @@ def _add_hydrogen_fuel_price(
         The modified system.
     """
     if isinstance(h2_prices, pl.LazyFrame):
-        h2_prices = cast(pl.DataFrame, h2_prices.collect())
+        h2_prices = h2_prices.collect()
 
     if h2_prices is None or h2_prices.is_empty():
         logger.warning("Hydrogen fuel price data is empty. Skipping hydrogen fuel price.")

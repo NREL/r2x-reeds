@@ -130,6 +130,23 @@ Optional fields:
 
 - `case_name`: case label stored in the system description.
 - `scenario`: scenario label; defaults to `base`.
+- `excluded_techs`: optional list of technologies to exclude. When omitted, the list from `defaults.json` is used.
+
+The package defaults still contain `can-imports` in `excluded_techs`. To include it while keeping the other default exclusions,
+set `excluded_techs` explicitly (for example, to the default list with `can-imports` removed), then apply `r2x-reeds.add-imports`
+after the parser to attach the Canadian import time series.
+
+```yaml
+config:
+  r2x-reeds.reeds-parser:
+    path: /path/to/reeds/run
+    solve_year: 2030
+    weather_year: 2012
+    excluded_techs:
+      - electrolyzer
+      - smr
+      - smr_ccs
+```
 
 The parser supports CSV inputs and `outputs/outputs.h5`, with fallback to legacy output CSV files. It can build:
 
@@ -236,10 +253,11 @@ Adds Canadian import time series.
 
 ```yaml
 r2x-reeds.add-imports:
+  solve_year: ${solve_year}
   weather_year: ${weather_year}
-  canada_imports_fpath: <path_to_canada_imports.csv>
-  canada_szn_frac_fpath: <path_to_seasonal_fractions.csv>
-  hour_map_fpath: <path_to_hour_map.csv>
+  canada_imports_fpath: ${reeds_run}/inputs_case/can_imports.csv # specific path (for fast lookup)
+  canada_szn_frac_fpath: ${reeds_run}/inputs_case/rep/can_imports_szn_frac.csv # specific path (for fast lookup)
+  hour_map_fpath: ${reeds_run}/inputs_case/rep/hmap_myr.csv # specific path (for fast lookup)
 ```
 
 ### `r2x-reeds.add-optimal-siting`

@@ -1588,7 +1588,9 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         load_profiles = self.read_data_file("load_profiles").collect()
         logger.trace("Load profile columns: {}", load_profiles.columns)
 
-        region_columns = [col for col in load_profiles.columns if col not in {"datetime", "solve_year"}]
+        region_columns = [
+            col for col in load_profiles.columns if col not in {"datetime", "solve_year", "year"}
+        ]
         if not region_columns:
             msg = "Load data has no region columns"
             logger.warning(msg)
@@ -2286,7 +2288,12 @@ class ReEDSParser(Plugin[ReEDSConfig]):
     def _prepare_default_metadata(self) -> Result[None, str]:
         """Initialize important configuration from the parser."""
         self._tech_categories = self._defaults.get("tech_categories", {})
-        self._excluded_techs = self._defaults.get("excluded_techs", [])
+        configured_excluded_techs = self.config.excluded_techs
+        self._excluded_techs = list(
+            configured_excluded_techs
+            if configured_excluded_techs is not None
+            else self._defaults.get("excluded_techs", [])
+        )
         self._category_to_class_map = self._defaults.get("category_class_mapping", {})
         self._resource_supply_curve_datasets = tuple(self._defaults.get("resource_supply_curve_datasets", []))
         return Ok(None)
@@ -2306,7 +2313,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         biofuel_merged = merge_result.ok()
         if biofuel_merged is not None:
             biofuel_mapped = biofuel_merged.select(pl.exclude("fuel_type"))
-            biofuel_mapped_df = cast(pl.DataFrame, biofuel_mapped.collect())
+            biofuel_mapped_df = biofuel_mapped.collect()
             if not biofuel_mapped_df.is_empty():
                 fuel_price = pl.concat([fuel_price, biofuel_mapped], how="diagonal")
 
@@ -2352,8 +2359,7 @@ class ReEDSParser(Plugin[ReEDSConfig]):
         else:
             logger.debug("No ramp rate data found, skipping join")
 
-        # Fill null heat_rate values using the mean of the same technology + vintage group.
-        # Only use the global default_heat_rate for groups where every row is null.
+        # Fill missing thermal heat rates with the technology-vintage mean or global default.
         default_heat_rate = self._defaults.get("default_values", {}).get("default_heat_rate")
         if default_heat_rate is not None:
             if "heat_rate" not in non_variable_df.columns:
@@ -2361,7 +2367,8 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                     pl.lit(None, dtype=pl.Float64).alias("heat_rate")
                 )
 
-            null_count = non_variable_df["heat_rate"].null_count()
+            thermal_mask = pl.col("categories").list.contains("thermal")
+            null_count = non_variable_df.filter(thermal_mask & pl.col("heat_rate").is_null()).height
             if null_count > 0:
                 group_cols = [c for c in ("technology", "vintage") if c in non_variable_df.columns]
                 group_fill = (
@@ -2370,10 +2377,13 @@ class ReEDSParser(Plugin[ReEDSConfig]):
                     else pl.lit(default_heat_rate, dtype=pl.Float64)
                 )
                 non_variable_df = non_variable_df.with_columns(
-                    pl.col("heat_rate").fill_null(group_fill).fill_null(default_heat_rate)
+                    pl.when(thermal_mask)
+                    .then(pl.col("heat_rate").fill_null(group_fill).fill_null(default_heat_rate))
+                    .otherwise(pl.col("heat_rate"))
+                    .alias("heat_rate")
                 )
                 logger.debug(
-                    "Filled {} null heat_rate(s): group mean over [{}], default={}",
+                    "Filled {} null thermal heat_rate(s): group mean over [{}], default={}",
                     null_count,
                     ", ".join(group_cols),
                     default_heat_rate,

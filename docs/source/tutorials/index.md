@@ -141,10 +141,11 @@ from r2x_reeds.sysmod.imports import ImportsConfig, add_imports
 res = add_imports(
 	system,
 	ImportsConfig(
+		solve_year=2035,
 		weather_year=2012,
-		canada_imports_fpath=run_path / "outputs/canada_imports.csv",
-		canada_szn_frac_fpath=run_path / "inputs_case/canada_szn_frac.csv",
-		hour_map_fpath=run_path / "inputs_case/rep/hmap_allyrs.csv",
+		canada_imports_fpath=run_path / "inputs_case/can_imports.csv",
+		canada_szn_frac_fpath=run_path / "inputs_case/rep/can_imports_szn_frac.csv",
+		hour_map_fpath=run_path / "inputs_case/rep/hmap_myr.csv",
 	),
 )
 system = res.unwrap() if res.is_ok() else system

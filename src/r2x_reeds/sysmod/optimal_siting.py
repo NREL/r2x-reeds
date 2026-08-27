@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
 
 import numpy as np
 import polars as pl
@@ -83,7 +82,7 @@ def _collect_frame(data: pl.DataFrame | pl.LazyFrame | None) -> pl.DataFrame | N
     if data is None:
         return None
     if isinstance(data, pl.LazyFrame):
-        return cast(pl.DataFrame, data.collect())
+        return data.collect()
     return data
 
 
