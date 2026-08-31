@@ -431,6 +431,8 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             return self.store.read_data(name, placeholders=placeholders)
 
         dataset_key = OUTPUTS_H5_DATASET_KEYS.get(name, name)
+        if name == "online_capacity" and self.config.use_degraded_capacity:
+            dataset_key = "cap_deg_ivrt"
         outputs_h5 = data_file.fpath
 
         h5_data = self._read_outputs_h5_group(outputs_h5=outputs_h5, dataset_key=dataset_key)

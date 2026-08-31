@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     pass
 
 
-def _build_parser(run_path: Path):
+def _build_parser(run_path: Path, *, use_degraded_capacity: bool = False):
     from typing import cast
 
     from r2x_core import DataStore, PluginContext
@@ -33,6 +33,7 @@ def _build_parser(run_path: Path):
         weather_year=2012,
         case_name="test",
         scenario="base",
+        use_degraded_capacity=use_degraded_capacity,
     )
     store = DataStore.from_plugin_config(config, path=run_path)
     ctx = PluginContext(config=config, store=store)
@@ -99,6 +100,59 @@ def test_read_data_file_uses_outputs_h5_and_not_csv(tmp_path: Path, reeds_run_pa
     df = result.collect()
     assert not df.is_empty()
     assert {"technology", "region", "year", "fuel_price"}.issubset(set(df.columns))
+
+
+def test_read_data_file_uses_degraded_capacity_from_outputs_h5(tmp_path: Path, reeds_run_path: Path) -> None:
+    """The degraded-capacity flag selects cap_deg_ivrt from outputs.h5."""
+    run_path = tmp_path / "test_Pacific"
+    shutil.copytree(reeds_run_path, run_path)
+
+    outputs_h5 = run_path / "outputs" / "outputs.h5"
+    with h5py.File(outputs_h5, "w") as h5_file:
+        group = h5_file.create_group("cap_deg_ivrt")
+        group.create_dataset("columns", data=np.array([b"i", b"r", b"t", b"v", b"value"]))
+        group.create_dataset("i", data=np.array([b"wind-ons"]))
+        group.create_dataset("r", data=np.array([b"p4"]))
+        group.create_dataset("t", data=np.array([2032]))
+        group.create_dataset("v", data=np.array([2020]))
+        group.create_dataset("value", data=np.array([95.0]))
+
+    parser = _build_parser(run_path, use_degraded_capacity=True)
+    result = parser.read_data_file("online_capacity")
+
+    assert result is not None
+    assert result.collect().to_dict(as_series=False) == {
+        "technology": ["wind-ons"],
+        "region": ["p4"],
+        "year": [2032],
+        "vintage": [2020],
+        "capacity": [95.0],
+    }
+
+
+def test_read_data_file_uses_degraded_capacity_csv_fallback(tmp_path: Path, reeds_run_path: Path) -> None:
+    """The degraded-capacity flag falls back to outputs/cap_deg_ivrt.csv."""
+    run_path = tmp_path / "test_Pacific"
+    shutil.copytree(reeds_run_path, run_path)
+
+    outputs_dir = run_path / "outputs"
+    with h5py.File(outputs_dir / "outputs.h5", "w"):
+        pass
+    pl.DataFrame(
+        {
+            "i": ["wind-ons"],
+            "r": ["p4"],
+            "t": [2032],
+            "v": [2020],
+            "value": [95.0],
+        }
+    ).write_csv(outputs_dir / "cap_deg_ivrt.csv")
+
+    parser = _build_parser(run_path, use_degraded_capacity=True)
+    result = parser.read_data_file("online_capacity")
+
+    assert result is not None
+    assert result.collect().to_dict(as_series=False)["capacity"] == [95.0]
 
 
 def test_read_fuel_tech_map_uses_reeds_mapping_nodes(tmp_path: Path, reeds_run_path: Path) -> None:

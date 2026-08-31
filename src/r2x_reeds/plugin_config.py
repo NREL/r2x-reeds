@@ -87,6 +87,15 @@ class ReEDSConfig(PluginConfig):
             ),
         ),
     ] = None
+    use_degraded_capacity: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "Use degradation-adjusted generator capacity from cap_deg_ivrt instead of cap_ivrt."
+            ),
+        ),
+    ] = False
 
     @property
     def primary_solve_year(self) -> int:
