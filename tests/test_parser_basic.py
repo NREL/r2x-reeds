@@ -155,6 +155,19 @@ def test_read_data_file_uses_degraded_capacity_csv_fallback(tmp_path: Path, reed
     assert result.collect().to_dict(as_series=False)["capacity"] == [95.0]
 
 
+def test_read_data_file_reports_missing_degraded_capacity(tmp_path: Path, reeds_run_path: Path) -> None:
+    """Missing degraded capacity must identify cap_deg_ivrt instead of returning None."""
+    run_path = tmp_path / "test_Pacific"
+    shutil.copytree(reeds_run_path, run_path)
+
+    with h5py.File(run_path / "outputs" / "outputs.h5", "w"):
+        pass
+
+    parser = _build_parser(run_path, use_degraded_capacity=True)
+    with pytest.raises(FileNotFoundError, match="cap_deg_ivrt"):
+        parser.read_data_file("online_capacity")
+
+
 def test_read_fuel_tech_map_uses_reeds_mapping_nodes(tmp_path: Path, reeds_run_path: Path) -> None:
     """The ReEDS fuel2tech group uses f/i/value nodes, not columns/Value."""
     run_path = tmp_path / "test_Pacific"

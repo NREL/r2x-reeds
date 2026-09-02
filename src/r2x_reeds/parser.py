@@ -437,12 +437,18 @@ class ReEDSParser(Plugin[ReEDSConfig]):
 
         h5_data = self._read_outputs_h5_group(outputs_h5=outputs_h5, dataset_key=dataset_key)
         if h5_data is None:
-            return self._read_outputs_csv_fallback(
+            fallback = self._read_outputs_csv_fallback(
                 name=name,
                 data_file_fpath=data_file.fpath,
                 dataset_key=dataset_key,
                 placeholders=placeholders,
             )
+            if fallback is None and name == "online_capacity" and self.config.use_degraded_capacity:
+                raise FileNotFoundError(
+                    "Degraded capacity dataset 'cap_deg_ivrt' was not found in "
+                    f"{outputs_h5} or {outputs_h5.parent / 'cap_deg_ivrt.csv'}"
+                )
+            return fallback
 
         processed = apply_processing(
             h5_data,
