@@ -87,6 +87,16 @@ class ReEDSConfig(PluginConfig):
             ),
         ),
     ] = None
+    use_degraded_capacity: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "Switch the online_capacity dataset key from cap_ivrt to cap_deg_ivrt "
+                "to use degradation-adjusted generator capacity."
+            ),
+        ),
+    ] = False
 
     @property
     def primary_solve_year(self) -> int:
