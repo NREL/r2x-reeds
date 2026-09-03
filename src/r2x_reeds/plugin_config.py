@@ -92,7 +92,7 @@ class ReEDSConfig(PluginConfig):
         Field(
             default=False,
             description=(
-                "Switch the online_capacity dataset key from cap/cap_ivrt to cap_deg_ivrt "
+                "Switch the online_capacity dataset key from cap_ivrt to cap_deg_ivrt "
                 "to use degradation-adjusted generator capacity."
             ),
         ),
