@@ -144,7 +144,7 @@ def test_read_data_file_uses_degraded_capacity_csv_fallback(tmp_path: Path, reed
             "r": ["p4"],
             "t": [2032],
             "v": [2020],
-            "value": [95.0],
+            "Value": [95.0],
         }
     ).write_csv(outputs_dir / "cap_deg_ivrt.csv")
 

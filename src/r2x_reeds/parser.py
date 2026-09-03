@@ -445,8 +445,8 @@ class ReEDSParser(Plugin[ReEDSConfig]):
             )
             if fallback is None and name == "online_capacity" and self.config.use_degraded_capacity:
                 raise FileNotFoundError(
-                    "Degraded capacity dataset 'cap_deg_ivrt' was not found in "
-                    f"{outputs_h5} or {outputs_h5.parent / 'cap_deg_ivrt.csv'}"
+                    f"Degraded capacity dataset '{dataset_key}' was not found in "
+                    f"{outputs_h5} or {outputs_h5.parent / f'{dataset_key}.csv'}"
                 )
             return fallback
 
